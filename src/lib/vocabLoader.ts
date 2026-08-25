@@ -45,6 +45,115 @@ export function extractToneFromPinyin(pinyin: string): ToneNumber {
 	return 5; // Neutral
 }
 
+// Vowel characters including all tonal variants and ü
+const MANDARIN_VOWELS = new Set([
+	'a', 'o', 'e', 'i', 'u', 'ü', 'v',
+	'ā', 'á', 'ǎ', 'à',
+	'ē', 'é', 'ě', 'è',
+	'ī', 'í', 'ǐ', 'ì',
+	'ō', 'ó', 'ǒ', 'ò',
+	'ū', 'ú', 'ǔ', 'ù',
+	'ǖ', 'ǘ', 'ǚ', 'ǜ'
+]);
+
+function isMandarinVowel(c: string): boolean {
+	return MANDARIN_VOWELS.has(c.toLowerCase());
+}
+
+/**
+ * Segments a single connected pinyin token (e.g. 'báitiān', 'kèqi', 'bàngōngshì', 'chūzūchē')
+ * into individual Mandarin syllables based on vowel-nuclei boundaries and consonant phonotactics.
+ */
+export function segmentPinyinWord(word: string, targetCount?: number): string[] {
+	if (!word) return [];
+	const clean = word.trim();
+
+	// If erhua suffix (e.g. yíhuìr for 一会儿)
+	if (clean.endsWith('r') && targetCount && targetCount > 1 && clean.length > 2) {
+		const base = clean.slice(0, -1);
+		const baseSegs = segmentPinyinWord(base, targetCount - 1);
+		return [...baseSegs, 'r'];
+	}
+
+	// 1. Locate all vowel groups (nuclei)
+	const vowelSpans: { start: number; end: number }[] = [];
+	let inVowel = false;
+	let start = 0;
+
+	for (let i = 0; i < clean.length; i++) {
+		const ch = clean[i];
+		if (isMandarinVowel(ch)) {
+			if (!inVowel) {
+				inVowel = true;
+				start = i;
+			}
+		} else {
+			if (inVowel) {
+				inVowel = false;
+				vowelSpans.push({ start, end: i });
+			}
+		}
+	}
+	if (inVowel) {
+		vowelSpans.push({ start, end: clean.length });
+	}
+
+	if (vowelSpans.length <= 1) {
+		return [clean];
+	}
+
+	// 2. Between each adjacent pair of vowel spans, determine the boundary
+	const splitPoints = [0];
+
+	for (let k = 0; k < vowelSpans.length - 1; k++) {
+		const currVowelEnd = vowelSpans[k].end;
+		const nextVowelStart = vowelSpans[k + 1].start;
+		const consonantsBetween = clean.slice(currVowelEnd, nextVowelStart).toLowerCase();
+
+		let boundary = currVowelEnd;
+
+		if (consonantsBetween.length === 0) {
+			boundary = nextVowelStart;
+		} else if (consonantsBetween.length === 1) {
+			// Single consonant between vowels goes to next syllable as initial (e.g. 'kèqi' -> 'q' goes to 'qi')
+			boundary = currVowelEnd;
+		} else if (consonantsBetween.length === 2) {
+			if (consonantsBetween === 'zh' || consonantsBetween === 'ch' || consonantsBetween === 'sh') {
+				boundary = currVowelEnd;
+			} else if (consonantsBetween === 'ng') {
+				boundary = currVowelEnd + 1; // 'n' is coda of current, 'g' is initial of next
+			} else {
+				boundary = currVowelEnd + 1;
+			}
+		} else if (consonantsBetween.length === 3) {
+			if (consonantsBetween.startsWith('ng')) {
+				boundary = currVowelEnd + 2; // 'ng' coda stays, rest is initial
+			} else if (consonantsBetween.startsWith('n')) {
+				boundary = currVowelEnd + 1;
+			} else {
+				boundary = currVowelEnd + 1;
+			}
+		} else {
+			if (consonantsBetween.startsWith('ng')) {
+				boundary = currVowelEnd + 2;
+			} else {
+				boundary = currVowelEnd + 1;
+			}
+		}
+
+		splitPoints.push(boundary);
+	}
+	splitPoints.push(clean.length);
+
+	const segments: string[] = [];
+	for (let i = 0; i < splitPoints.length - 1; i++) {
+		const s = clean.slice(splitPoints[i], splitPoints[i + 1]);
+		if (s.length > 0) segments.push(s);
+	}
+
+	return segments;
+}
+
 /**
  * Splits continuous or spaced pinyin into individual syllable strings matching the hanzi length.
  */
@@ -52,31 +161,29 @@ export function splitPinyinIntoSyllableTokens(pinyin: string, expectedCount: num
 	if (!pinyin) return Array(expectedCount).fill('');
 	const clean = pinyin.trim();
 
-	// 1. If already space, hyphen, or apostrophe separated
-	const separated = clean.split(/[\s\-']+/).filter((s) => s.length > 0);
-	if (separated.length === expectedCount) {
-		return separated;
+	// 1. First split by whitespace / hyphens / apostrophes
+	const blocks = clean.split(/[\s\-']+/).filter((b) => b.length > 0);
+
+	if (blocks.length === expectedCount) {
+		return blocks;
 	}
 
-	if (expectedCount <= 1) {
-		return [clean];
+	// 2. Segment each block into valid syllables
+	const syllables: string[] = [];
+	for (const block of blocks) {
+		const segs = segmentPinyinWord(block, Math.max(1, expectedCount - syllables.length));
+		syllables.push(...segs);
 	}
 
-	// 2. Regex splitting for combined Chinese pinyin (e.g. 'báitiān' -> ['bái', 'tiān'], 'bàba' -> ['bà', 'ba'])
-	// Match standard Mandarin initials + vowels + tone diacritics
-	const pinyinRegex = /(?:[bcdfghjklmnpqrstwxyzBCDFGHJKLMNPQRSTWXYZ]{1,2}|)(?:[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüv]+(?:ng|n|r)?)/gi;
-	const matches = clean.match(pinyinRegex);
-	if (matches && matches.length === expectedCount) {
-		return matches;
+	if (syllables.length === expectedCount) {
+		return syllables;
 	}
 
-	// 3. Fallback: split by approximate string length
-	const avgLen = Math.ceil(clean.length / expectedCount);
-	const fallback: string[] = [];
-	for (let i = 0; i < expectedCount; i++) {
-		fallback.push(clean.slice(i * avgLen, (i + 1) * avgLen));
+	if (blocks.length === expectedCount) {
+		return blocks;
 	}
-	return fallback;
+
+	return syllables;
 }
 
 /**
