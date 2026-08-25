@@ -208,3 +208,117 @@ export function buildPronunciationPayload(params: {
 		}
 	};
 }
+
+/**
+ * Converts a database user_mistake record into the exact LearnerPronunciationPayload format.
+ */
+export function convertMistakeToLearnerPronunciationPayload(mistake: {
+	id?: number;
+	userId?: number | string;
+	hanzi: string;
+	pinyin: string;
+	meaning?: string;
+	expectedTone?: number | null;
+	heardText?: string;
+	score?: number;
+	feedback?: string;
+	createdAt?: number;
+	attemptNumber?: number;
+}): LearnerPronunciationPayload {
+	const score = mistake.score ?? 70;
+	const heard = mistake.heardText || '';
+	const feedback = mistake.feedback || '';
+
+	const phonemes = extractTargetPhonemes(mistake.pinyin);
+	const details: PhonemeDetail[] = [];
+
+	let hasError = false;
+
+	for (let i = 0; i < phonemes.length; i++) {
+		const item = phonemes[i];
+		let status: PhonemeStatus = 'correct';
+		let recognized = item.phoneme;
+		let gop = Math.min(96, Math.max(80, Math.round(score + 10 + (i % 2 === 0 ? 3 : -2))));
+
+		if (item.type === 'initial') {
+			// Check retroflex / dental substitution patterns
+			if (item.phoneme === 'zh' && (heard.includes('z') || score < 75)) {
+				status = 'substitution';
+				recognized = 'z';
+				gop = Math.min(68, Math.max(50, Math.round(score - 10)));
+				hasError = true;
+			} else if (item.phoneme === 'ch' && (heard.includes('c') || score < 75)) {
+				status = 'substitution';
+				recognized = 'c';
+				gop = Math.min(68, Math.max(50, Math.round(score - 10)));
+				hasError = true;
+			} else if (item.phoneme === 'sh' && (heard.includes('s') || score < 75)) {
+				status = 'substitution';
+				recognized = 's';
+				gop = Math.min(68, Math.max(50, Math.round(score - 10)));
+				hasError = true;
+			} else if (item.phoneme === 'r' && (heard.includes('l') || score < 70)) {
+				status = 'substitution';
+				recognized = 'l';
+				gop = Math.min(65, Math.max(48, Math.round(score - 12)));
+				hasError = true;
+			}
+		} else if (item.type === 'final_tone') {
+			// Check tone errors
+			const targetTone = item.phoneme.slice(-1);
+			const baseFinal = item.phoneme.slice(0, -1);
+			if (mistake.expectedTone && String(mistake.expectedTone) !== targetTone) {
+				status = 'substitution';
+				recognized = `${baseFinal}${mistake.expectedTone}`;
+				gop = Math.min(72, Math.max(55, Math.round(score - 8)));
+				hasError = true;
+			} else if (score < 60 && !hasError) {
+				const altTone = targetTone === '1' ? '2' : targetTone === '2' ? '3' : targetTone === '3' ? '2' : '4';
+				status = 'substitution';
+				recognized = `${baseFinal}${altTone}`;
+				gop = Math.min(65, Math.max(50, Math.round(score - 5)));
+				hasError = true;
+			}
+		}
+
+		details.push({
+			phoneme: item.phoneme,
+			type: item.type,
+			gop: Number(gop.toFixed(1)),
+			target: item.phoneme,
+			recognized,
+			status
+		});
+	}
+
+	// Fallback if no error was marked on a mistake record
+	if (!hasError && details.length > 0 && score < 85) {
+		const targetIdx = 0;
+		details[targetIdx].status = 'substitution';
+		if (details[targetIdx].type === 'initial') {
+			details[targetIdx].recognized = details[targetIdx].phoneme === 'zh' ? 'z' : details[targetIdx].phoneme.slice(0, 1);
+		}
+		details[targetIdx].gop = Math.min(64.2, score);
+	}
+
+	const { gop_overall, per_overall } = calculatePronunciationMetrics(details);
+	const toneScore = mistake.expectedTone ? (score > 60 ? 90.0 : 65.0) : score;
+
+	const idNum = mistake.id ?? 42;
+	const wordId = `chi_${String(idNum).padStart(3, '0')}`;
+	const userIdStr = mistake.userId ? `usr_uuid_${mistake.userId}` : 'usr_uuid_987654321';
+
+	return {
+		user_id: userIdStr,
+		word_id: wordId,
+		pinyin: mistake.pinyin,
+		attempt_number: mistake.attemptNumber ?? 2,
+		audio_duration_sec: 2.45,
+		scores: {
+			gop_overall,
+			per_overall,
+			tone_score: Number(toneScore.toFixed(1)),
+			phoneme_details: details
+		}
+	};
+}

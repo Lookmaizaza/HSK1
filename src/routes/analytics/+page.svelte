@@ -33,19 +33,18 @@
 	let isTestingApi = $state(false);
 	let isSyncing = $state(false);
 	let apiResponse = $state<string | null>(null);
+	let apiFormatMode = $state<'single' | 'list'>('single');
 	let copied = $state(false);
 
-	async function refreshFromApi() {
+	async function refreshFromApi(mode: 'single' | 'list' = apiFormatMode) {
 		isTestingApi = true;
 		try {
-			const res = await fetch('/api/mistakes?limit=20');
+			const endpoint = mode === 'single'
+				? '/api/mistakes?format=payload&single=true'
+				: '/api/mistakes?format=payload';
+			const res = await fetch(endpoint);
 			const json = await res.json();
 			apiResponse = JSON.stringify(json, null, 2);
-			if (json.success) {
-				customTop = json.topMistakes;
-				customRecent = json.mistakes;
-				customStats = json.stats;
-			}
 		} catch (e) {
 			apiResponse = `Error: ${String(e)}`;
 		} finally {
@@ -130,13 +129,31 @@
 		setTimeout(() => (copied = false), 2000);
 	}
 
-	const apiCodeSnippet = `// วิธีที่เพื่อนสามารถดึงข้อมูลผ่าน API ไปวิเคราะห์ต่อ
-const response = await fetch('/api/mistakes?limit=15');
+	const apiCodeSnippet = `// วิธีเรียก API เพื่อดึงผลวิเคราะห์คำผิดระดับหน่วยเสียง (Phoneme Details / GOP / PER)
+const response = await fetch('/api/mistakes?format=payload&single=true');
 const data = await response.json();
 
-console.log(data.topMistakes);  // คำที่ผิดบ่อยสุด จัดอันดับตาม failCount
-console.log(data.mistakes);     // ประวัติคำผิดล่าสุดทั้งหมด
-console.log(data.stats);        // สถิติรวมและ Tone error breakdown`;
+console.log(data);
+/* ผลลัพธ์ที่ได้:
+{
+  "user_id": "usr_uuid_987654321",
+  "word_id": "chi_042",
+  "pinyin": "zhī shi",
+  "attempt_number": 2,
+  "audio_duration_sec": 2.45,
+  "scores": {
+    "gop_overall": 82.4,
+    "per_overall": 0.25,
+    "tone_score": 90.0,
+    "phoneme_details": [
+      { "phoneme": "zh", "type": "initial", "gop": 64.2, "target": "zh", "recognized": "z", "status": "substitution" },
+      { "phoneme": "i1", "type": "final_tone", "gop": 91.0, "target": "i1", "recognized": "i1", "status": "correct" },
+      { "phoneme": "sh", "type": "initial", "gop": 85.5, "target": "sh", "recognized": "sh", "status": "correct" },
+      { "phoneme": "i0", "type": "final_tone", "gop": 89.0, "target": "i0", "recognized": "i0", "status": "correct" }
+    ]
+  }
+}
+*/`;
 </script>
 
 <div class="min-h-svh bg-background">
@@ -246,7 +263,10 @@ console.log(data.stats);        // สถิติรวมและ Tone error 
 				class="flex-1 rounded-lg py-2 text-sm font-semibold transition {activeTab === 'api'
 					? 'bg-background shadow-xs text-foreground'
 					: 'text-muted-foreground hover:text-foreground'}"
-				onclick={() => (activeTab = 'api')}
+				onclick={() => {
+					activeTab = 'api';
+					if (!apiResponse) refreshFromApi('single');
+				}}
 			>
 				⚡ API สำหรับเพื่อนร่วมทีม
 			</button>
@@ -361,7 +381,7 @@ console.log(data.stats);        // สถิติรวมและ Tone error 
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-2 font-bold text-foreground">
 							<Code2 class="size-5 text-primary" />
-							<span>Endpoint: <code>GET /api/mistakes</code></span>
+							<span>Endpoint: <code>GET /api/mistakes?format=payload</code></span>
 						</div>
 						<Button variant="ghost" size="sm" onclick={() => copySnippet(apiCodeSnippet)}>
 							{#if copied}
@@ -372,24 +392,52 @@ console.log(data.stats);        // สถิติรวมและ Tone error 
 						</Button>
 					</div>
 					<p class="mt-2 text-xs text-muted-foreground">
-						เพื่อนร่วมทีมสามารถเรียก Endpoint นี้ในฟังก์ชันวิเคราะห์ผู้เรียนเพื่อดึงคำที่ผิดบ่อยและสถิติไปใช้ต่อได้ทันที
+						ส่งผลการวิเคราะห์การออกเสียงและข้อผิดพลาดระดับหน่วยเสียง (Phoneme Details, GOP Score, PER) ไปยังระบบวิเคราะห์ผู้เรียนของเพื่อนร่วมทีม
 					</p>
 
 					<div class="mt-3 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-xs font-mono text-zinc-200">
 						<pre>{apiCodeSnippet}</pre>
 					</div>
 
-					<div class="mt-4 flex gap-2">
-						<Button size="sm" onclick={refreshFromApi} disabled={isTestingApi}>
+					<div class="mt-4 flex flex-wrap items-center gap-2">
+						<Button
+							size="sm"
+							variant={apiFormatMode === 'single' ? 'default' : 'outline'}
+							onclick={() => {
+								apiFormatMode = 'single';
+								refreshFromApi('single');
+							}}
+							disabled={isTestingApi}
+						>
 							<Sparkles class="mr-1.5 size-4" />
-							{isTestingApi ? 'กำลังทดสอบ...' : 'ทดสอบยิง API จริง'}
+							🎯 ข้อมูล JSON แบบ 1 คำ (Single Payload)
+						</Button>
+						<Button
+							size="sm"
+							variant={apiFormatMode === 'list' ? 'default' : 'outline'}
+							onclick={() => {
+								apiFormatMode = 'list';
+								refreshFromApi('list');
+							}}
+							disabled={isTestingApi}
+						>
+							📋 รายการคำทั้งหมด (Array)
 						</Button>
 					</div>
 
 					{#if apiResponse}
-						<div class="mt-3">
-							<div class="mb-1 text-xs font-semibold text-muted-foreground">ผลลัพธ์ JSON ที่ได้รับจาก Server:</div>
-							<pre class="max-h-60 overflow-y-auto rounded-xl bg-zinc-900 p-3 text-xs font-mono text-emerald-400">{apiResponse}</pre>
+						<div class="mt-4">
+							<div class="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
+								<span class="font-semibold">ผลลัพธ์ JSON ที่ได้รับจาก Server:</span>
+								<button
+									type="button"
+									class="text-primary hover:underline"
+									onclick={() => copySnippet(apiResponse || '')}
+								>
+									คัดลอก JSON
+								</button>
+							</div>
+							<pre class="max-h-80 overflow-y-auto rounded-xl bg-zinc-900 p-3.5 text-xs font-mono text-emerald-400 leading-relaxed">{apiResponse}</pre>
 						</div>
 					{/if}
 				</div>
