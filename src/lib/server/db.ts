@@ -7,33 +7,35 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { env } from '$env/dynamic/private';
 
-const url = env.TURSO_DATABASE_URL ?? 'file:data/hsk.db';
-const authToken = env.TURSO_AUTH_TOKEN;
-
-// Detect if we're on a serverless platform without a configured DB.
 const isServerless = !!(env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.NETLIFY);
-const hasRemoteDb = !!env.TURSO_DATABASE_URL;
 
 let db: Client | null = null;
 
-if (hasRemoteDb || !isServerless) {
-	// Only create the data/ folder when using a local file: URL.
+export function getDb(): Client | null {
+	if (db) return db;
+	const url = env.TURSO_DATABASE_URL || (isServerless ? '' : 'file:data/hsk.db');
+	const authToken = env.TURSO_AUTH_TOKEN;
+
+	if (!url) {
+		return null;
+	}
+
 	if (url.startsWith('file:')) {
 		const path = url.slice('file:'.length);
 		try {
 			mkdirSync(dirname(path), { recursive: true });
 		} catch {
-			// Fall through — createClient will surface a real error if the file can't be opened.
+			// ignore
 		}
 	}
+
 	try {
 		db = createClient({ url, authToken });
-	} catch {
-		console.warn('⚠️ [DB] Failed to create database client, running without DB');
-		db = null;
+		return db;
+	} catch (e) {
+		console.warn('⚠️ [DB] Failed to create database client:', e);
+		return null;
 	}
-} else {
-	console.warn('⚠️ [DB] No TURSO_DATABASE_URL set on serverless — running without DB');
 }
 
 export { db };
@@ -83,10 +85,12 @@ CREATE TABLE IF NOT EXISTS user_mistakes (
 
 let initPromise: Promise<void> | null = null;
 function init(): Promise<void> {
-	if (!db) return Promise.resolve();
+	const client = getDb();
+	if (!client) return Promise.resolve();
 	if (!initPromise) {
-		initPromise = db.executeMultiple(SCHEMA).catch((e) => {
+		initPromise = client.executeMultiple(SCHEMA).catch((e) => {
 			initPromise = null; // allow retry on next call
+			console.error('⚠️ [DB Init Error]:', e);
 			throw e;
 		});
 	}
@@ -114,24 +118,35 @@ export type User = { id: number; username: string };
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export async function createUser(username: string, password: string): Promise<User> {
-	if (!db) throw new Error('Database not available');
+	const client = getDb();
+	if (!client) throw new Error('Database not available (Please check TURSO_DATABASE_URL)');
 	await init();
-	const result = await db.execute({
-		sql: 'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?) RETURNING id',
-		args: [username, hashPassword(password), Date.now()]
-	});
-	const id = Number(result.rows[0]?.id);
+	let id: number | undefined;
+	try {
+		const result = await client.execute({
+			sql: 'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?) RETURNING id',
+			args: [username, hashPassword(password), Date.now()]
+		});
+		id = Number(result.rows[0]?.id ?? result.lastInsertRowid);
+	} catch {
+		const result = await client.execute({
+			sql: 'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
+			args: [username, hashPassword(password), Date.now()]
+		});
+		id = Number(result.lastInsertRowid);
+	}
 	if (!id) throw new Error('Failed to create user');
-	await db.execute({ sql: 'INSERT INTO progress (user_id) VALUES (?)', args: [id] });
+	await client.execute({ sql: 'INSERT INTO progress (user_id) VALUES (?)', args: [id] });
 	return { id, username };
 }
 
 export async function findUserByUsername(
 	username: string
 ): Promise<{ id: number; username: string; password_hash: string } | null> {
-	if (!db) return null;
+	const client = getDb();
+	if (!client) return null;
 	await init();
-	const result = await db.execute({
+	const result = await client.execute({
 		sql: 'SELECT id, username, password_hash FROM users WHERE username = ?',
 		args: [username]
 	});
@@ -145,11 +160,12 @@ export async function findUserByUsername(
 }
 
 export async function createSession(userId: number): Promise<{ token: string; expiresAt: number }> {
-	if (!db) throw new Error('Database not available');
+	const client = getDb();
+	if (!client) throw new Error('Database not available');
 	await init();
 	const token = randomBytes(32).toString('hex');
 	const expiresAt = Date.now() + SESSION_TTL_MS;
-	await db.execute({
+	await client.execute({
 		sql: 'INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
 		args: [token, userId, expiresAt]
 	});
@@ -157,9 +173,10 @@ export async function createSession(userId: number): Promise<{ token: string; ex
 }
 
 export async function findUserBySession(token: string): Promise<User | null> {
-	if (!db) return null;
+	const client = getDb();
+	if (!client) return null;
 	await init();
-	const result = await db.execute({
+	const result = await client.execute({
 		sql: `SELECT u.id, u.username
 		      FROM sessions s JOIN users u ON u.id = s.user_id
 		      WHERE s.token = ? AND s.expires_at > ?`,
@@ -171,9 +188,10 @@ export async function findUserBySession(token: string): Promise<User | null> {
 }
 
 export async function deleteSession(token: string): Promise<void> {
-	if (!db) return;
+	const client = getDb();
+	if (!client) return;
 	await init();
-	await db.execute({ sql: 'DELETE FROM sessions WHERE token = ?', args: [token] });
+	await client.execute({ sql: 'DELETE FROM sessions WHERE token = ?', args: [token] });
 }
 
 export type ProgressRow = {
@@ -185,13 +203,14 @@ export type ProgressRow = {
 };
 
 export async function getProgress(userId: number): Promise<ProgressRow> {
-	if (!db) return { xp: 0, hearts: 5, streak: 0, lastPracticed: null, completed: {} };
+	const client = getDb();
+	if (!client) return { xp: 0, hearts: 5, streak: 0, lastPracticed: null, completed: {} };
 	await init();
-	const progRes = await db.execute({
+	const progRes = await client.execute({
 		sql: 'SELECT xp, hearts, streak, last_practiced FROM progress WHERE user_id = ?',
 		args: [userId]
 	});
-	const compRes = await db.execute({
+	const compRes = await client.execute({
 		sql: 'SELECT lesson_key, stars FROM lesson_completions WHERE user_id = ?',
 		args: [userId]
 	});
@@ -216,9 +235,10 @@ function today(): string {
 }
 
 export async function addXp(userId: number, amount: number): Promise<void> {
-	if (!db) return;
+	const client = getDb();
+	if (!client) return;
 	await init();
-	const cur = await db.execute({
+	const cur = await client.execute({
 		sql: 'SELECT streak, last_practiced FROM progress WHERE user_id = ?',
 		args: [userId]
 	});
@@ -231,34 +251,37 @@ export async function addXp(userId: number, amount: number): Promise<void> {
 		const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
 		streak = lastPracticed === yesterday ? streak + 1 : 1;
 	}
-	await db.execute({
+	await client.execute({
 		sql: 'UPDATE progress SET xp = xp + ?, streak = ?, last_practiced = ? WHERE user_id = ?',
 		args: [amount, streak, t, userId]
 	});
 }
 
 export async function loseHeart(userId: number): Promise<void> {
-	if (!db) return;
+	const client = getDb();
+	if (!client) return;
 	await init();
-	await db.execute({
+	await client.execute({
 		sql: 'UPDATE progress SET hearts = MAX(0, hearts - 1) WHERE user_id = ?',
 		args: [userId]
 	});
 }
 
 export async function refillHearts(userId: number, max: number): Promise<void> {
-	if (!db) return;
+	const client = getDb();
+	if (!client) return;
 	await init();
-	await db.execute({
+	await client.execute({
 		sql: 'UPDATE progress SET hearts = ? WHERE user_id = ?',
 		args: [max, userId]
 	});
 }
 
 export async function completeLesson(userId: number, lessonKey: string, stars: number): Promise<void> {
-	if (!db) return;
+	const client = getDb();
+	if (!client) return;
 	await init();
-	await db.execute({
+	await client.execute({
 		sql: `INSERT INTO lesson_completions (user_id, lesson_key, stars) VALUES (?, ?, ?)
 		      ON CONFLICT (user_id, lesson_key) DO UPDATE SET stars = MAX(stars, excluded.stars)`,
 		args: [userId, lessonKey, stars]
@@ -278,9 +301,10 @@ export type AdminUserRow = {
 };
 
 export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
-	if (!db) return [];
+	const client = getDb();
+	if (!client) return [];
 	await init();
-	const result = await db.execute(`
+	const result = await client.execute(`
 		SELECT u.id, u.username, u.created_at,
 		       COALESCE(p.xp, 0) AS xp,
 		       COALESCE(p.hearts, 5) AS hearts,
@@ -302,9 +326,10 @@ export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
 }
 
 export async function listAllCompletions(): Promise<{ userId: number; lessonKey: string; stars: number }[]> {
-	if (!db) return [];
+	const client = getDb();
+	if (!client) return [];
 	await init();
-	const result = await db.execute('SELECT user_id, lesson_key, stars FROM lesson_completions');
+	const result = await client.execute('SELECT user_id, lesson_key, stars FROM lesson_completions');
 	return result.rows.map((r) => ({
 		userId: Number(r.user_id),
 		lessonKey: String(r.lesson_key),
@@ -354,9 +379,10 @@ export async function recordMistake(params: {
 	score?: number;
 	feedback?: string;
 }): Promise<void> {
-	if (!db) return;
+	const client = getDb();
+	if (!client) return;
 	await init();
-	await db.execute({
+	await client.execute({
 		sql: `INSERT INTO user_mistakes (user_id, hanzi, pinyin, meaning, expected_tone, heard_text, score, feedback, created_at)
 		      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		args: [
@@ -374,9 +400,10 @@ export async function recordMistake(params: {
 }
 
 export async function getUserMistakes(userId: number, limit = 100): Promise<MistakeRecord[]> {
-	if (!db) return [];
+	const client = getDb();
+	if (!client) return [];
 	await init();
-	const result = await db.execute({
+	const result = await client.execute({
 		sql: `SELECT id, user_id, hanzi, pinyin, meaning, expected_tone, heard_text, score, feedback, created_at
 		      FROM user_mistakes
 		      WHERE user_id = ?
@@ -399,9 +426,10 @@ export async function getUserMistakes(userId: number, limit = 100): Promise<Mist
 }
 
 export async function getTopMistakes(userId: number, limit = 15): Promise<TopMistake[]> {
-	if (!db) return [];
+	const client = getDb();
+	if (!client) return [];
 	await init();
-	const result = await db.execute({
+	const result = await client.execute({
 		sql: `SELECT hanzi, pinyin, meaning, expected_tone,
 		             COUNT(*) AS fail_count,
 		             ROUND(AVG(score), 1) AS avg_score,
@@ -435,15 +463,16 @@ export async function getTopMistakes(userId: number, limit = 15): Promise<TopMis
 }
 
 export async function getMistakeStats(userId: number): Promise<MistakeStats> {
-	if (!db) return { totalMistakes: 0, uniqueWords: 0, toneErrors: {} };
+	const client = getDb();
+	if (!client) return { totalMistakes: 0, uniqueWords: 0, toneErrors: {} };
 	await init();
-	const totalRes = await db.execute({
+	const totalRes = await client.execute({
 		sql: `SELECT COUNT(*) AS total_count, COUNT(DISTINCT hanzi) AS unique_count
 		      FROM user_mistakes
 		      WHERE user_id = ?`,
 		args: [userId]
 	});
-	const toneRes = await db.execute({
+	const toneRes = await client.execute({
 		sql: `SELECT expected_tone, COUNT(*) AS cnt
 		      FROM user_mistakes
 		      WHERE user_id = ? AND expected_tone IS NOT NULL
@@ -463,11 +492,13 @@ export async function getMistakeStats(userId: number): Promise<MistakeStats> {
 }
 
 export async function clearUserMistakes(userId: number): Promise<void> {
-	if (!db) return;
+	const client = getDb();
+	if (!client) return;
 	await init();
-	await db.execute({
+	await client.execute({
 		sql: 'DELETE FROM user_mistakes WHERE user_id = ?',
 		args: [userId]
 	});
 }
+
 
