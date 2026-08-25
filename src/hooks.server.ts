@@ -10,10 +10,15 @@ const ADMIN_USERNAMES = new Set(
 );
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const token = event.cookies.get('session');
-	const user = token ? await findUserBySession(token) : null;
-	event.locals.user = user
-		? { ...user, isAdmin: ADMIN_USERNAMES.has(user.username.toLowerCase()) }
-		: null;
+	try {
+		const token = event.cookies.get('session');
+		const user = token ? await findUserBySession(token) : null;
+		event.locals.user = user
+			? { ...user, isAdmin: ADMIN_USERNAMES.has(user.username.toLowerCase()) }
+			: null;
+	} catch (err) {
+		console.error('Session lookup failed:', err);
+		event.locals.user = null;
+	}
 	return resolve(event);
 };

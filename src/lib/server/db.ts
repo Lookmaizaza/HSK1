@@ -13,8 +13,9 @@ let db: Client | null = null;
 
 export function getDb(): Client | null {
 	if (db) return db;
-	const url = env.TURSO_DATABASE_URL || (isServerless ? '' : 'file:data/hsk.db');
-	const authToken = env.TURSO_AUTH_TOKEN;
+	const rawUrl = env.TURSO_DATABASE_URL?.trim();
+	const authToken = env.TURSO_AUTH_TOKEN?.trim();
+	const url = rawUrl || (isServerless ? '' : 'file:data/hsk.db');
 
 	if (!url) {
 		return null;
