@@ -1,5 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { recordMistake } from '$lib/server/db';
 import type { RequestHandler } from './$types';
 
 type Tone = 2 | 3;
@@ -131,7 +132,7 @@ async function callThaiLLM(
 	return data?.choices?.[0]?.message?.content ?? '';
 }
 
-export const POST: RequestHandler = async ({ request, fetch }) => {
+export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 	const body = (await request.json()) as EvalRequest;
 	const { target, said, tone } = body;
 
@@ -170,6 +171,23 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 			feedback: anyMatch ? 'ใกล้แล้ว! แต่ยังไม่สามารถวิเคราะห์ได้ละเอียด' : 'ลองอีกครั้งนะ',
 			corrected: anyMatch ? null : target.hanzi
 		};
+	}
+
+	if (!parsed.correct && locals.user) {
+		try {
+			await recordMistake({
+				userId: locals.user.id,
+				hanzi: target.hanzi,
+				pinyin: target.pinyin,
+				meaning: target.english || '',
+				expectedTone: tone ?? null,
+				heardText: said,
+				score: parsed.score,
+				feedback: parsed.feedback
+			});
+		} catch (err) {
+			console.error('Failed to record mistake:', err);
+		}
 	}
 
 	return json(parsed);

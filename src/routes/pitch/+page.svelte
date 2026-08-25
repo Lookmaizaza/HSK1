@@ -660,38 +660,8 @@
 		{/if}
 	</section>
 
-	<!-- 5. PITCH VISUALIZER GRAPH CANVAS -->
-	<div class="mb-6">
-		<div class="mb-2 flex items-center justify-between">
-			<div class="flex items-center gap-2">
-				<span class="font-extrabold text-sm">กราฟเปรียบเทียบระดับเสียงวรรณยุกต์</span>
-				{#if isRecording}
-					<span class="flex items-center gap-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
-						● กำลังบันทึกเสียง
-					</span>
-				{/if}
-			</div>
-			<div class="flex items-center gap-3 text-xs text-muted-foreground">
-				<span class="flex items-center gap-1">
-					<span class="inline-block size-2 rounded-full bg-emerald-400"></span> เสียงของคุณ
-				</span>
-				<span class="flex items-center gap-1">
-					<span class="inline-block size-2 rounded-full bg-sky-400"></span> ระดับเสียงเป้าหมาย (Chao)
-				</span>
-			</div>
-		</div>
-
-		<PitchVisualizer
-			points={pitchPoints}
-			targetTone={selectedPreset.tone}
-			isLive={isRecording}
-			currentHz={currentHz}
-			height={250}
-		/>
-	</div>
-
-	<!-- 6. RECORDING CONTROLS (AUTO-STOP + MANUAL STOP BUTTON) -->
-	<div class="mb-8 flex flex-col items-center justify-center gap-4">
+	<!-- 5. RECORDING CONTROLS (AUTO-STOP + MANUAL STOP BUTTON) - ย้ายมาไว้ด้านบนกราฟ -->
+	<div class="mb-6 flex flex-col items-center justify-center gap-3 rounded-3xl border bg-card p-5 shadow-sm">
 		<button
 			type="button"
 			onclick={toggleRecording}
@@ -719,6 +689,36 @@
 					: 'ระบบจะตรวจจับระดับเสียงและคำนวณคะแนนให้อัตโนมัติทันทีที่พูดจบ'}
 			</div>
 		</div>
+	</div>
+
+	<!-- 6. PITCH VISUALIZER GRAPH CANVAS -->
+	<div class="mb-6">
+		<div class="mb-2 flex items-center justify-between">
+			<div class="flex items-center gap-2">
+				<span class="font-extrabold text-sm">กราฟเปรียบเทียบระดับเสียงวรรณยุกต์</span>
+				{#if isRecording}
+					<span class="flex items-center gap-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
+						● กำลังบันทึกเสียง
+					</span>
+				{/if}
+			</div>
+			<div class="flex items-center gap-3 text-xs text-muted-foreground">
+				<span class="flex items-center gap-1">
+					<span class="inline-block size-2 rounded-full bg-emerald-400"></span> เสียงของคุณ
+				</span>
+				<span class="flex items-center gap-1">
+					<span class="inline-block size-2 rounded-full bg-sky-400"></span> ระดับเสียงเป้าหมาย (Chao)
+				</span>
+			</div>
+		</div>
+
+		<PitchVisualizer
+			points={pitchPoints}
+			targetTone={selectedPreset.tone}
+			isLive={isRecording}
+			currentHz={currentHz}
+			height={250}
+		/>
 	</div>
 
 	<!-- 7. ANALYSIS RESULTS & SCORE CARD -->
@@ -833,31 +833,5 @@
 		</div>
 	{/if}
 
-	<!-- 8. EDUCATIONAL GUIDE ON CHAO 5-LEVEL PITCH -->
-	<section class="mt-8 rounded-3xl border bg-muted/40 p-6">
-		<h3 class="flex items-center gap-2 font-extrabold text-base">
-			<HelpCircle class="size-5 text-primary" /> เข้าใจระบบ Chao 5-Level Pitch Scale ในภาษาจีน
-		</h3>
-		<p class="mt-2 text-xs leading-relaxed text-muted-foreground">
-			ระบบวรรณยุกต์ภาษาจีนมาตรฐาน (Mandarin) แบ่งระดับเสียงความถี่ตามระบบเลข 5 ระดับของ Chao Yuen Ren (五度标记法):
-		</p>
-		<div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-			<div class="rounded-2xl border bg-card p-3">
-				<div class="font-bold text-emerald-600 dark:text-emerald-400">1. วรรณยุกต์ที่ 1 (阴平 · 55)</div>
-				<p class="mt-1 text-muted-foreground">เสียงสูงราบ เริ่มที่ระดับ 5 ค้างไว้ที่ระดับ 5 ตลอดทั้งคำ</p>
-			</div>
-			<div class="rounded-2xl border bg-card p-3">
-				<div class="font-bold text-blue-600 dark:text-blue-400">2. วรรณยุกต์ที่ 2 (阳平 · 35)</div>
-				<p class="mt-1 text-muted-foreground">เสียงขึ้น เริ่มจากระดับกลาง 3 ไต่ระดับขึ้นไปสูงสุดที่ระดับ 5</p>
-			</div>
-			<div class="rounded-2xl border bg-card p-3">
-				<div class="font-bold text-fuchsia-600 dark:text-fuchsia-400">3. วรรณยุกต์ที่ 3 (上声 · 214)</div>
-				<p class="mt-1 text-muted-foreground">เสียงตก-ขึ้น เริ่มที่ 2 ทิ้งตัวลงต่ำสุดที่ 1 แล้วตวัดขึ้นที่ระดับ 4</p>
-			</div>
-			<div class="rounded-2xl border bg-card p-3">
-				<div class="font-bold text-rose-600 dark:text-rose-400">4. วรรณยุกต์ที่ 4 (去声 · 51)</div>
-				<p class="mt-1 text-muted-foreground">เสียงตกลงเร็ว เริ่มจากจุดสูงสุด 5 แล้วกดเสียงตกลงมาที่ 1 ทันที</p>
-			</div>
-		</div>
-	</section>
+
 </main>

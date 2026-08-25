@@ -116,58 +116,62 @@ def generate_tone_curve(tone: int, length: int = 50):
 class HybridToneDataset(Dataset):
     def __init__(self, num_samples: int = 80000):
         self.num_samples = num_samples
-        self.samples_per_tone = num_samples // 4
+        print(f"📦 Pre-generating {num_samples} acoustic augmented samples in memory...")
+        
+        features = np.zeros((num_samples, 2, NUM_TIME_STEPS), dtype=np.float32)
+        labels = np.zeros(num_samples, dtype=np.int64)
+        
+        for idx in range(num_samples):
+            tone = (idx % 4) + 1  # 1, 2, 3, 4
+            chao_pitch, volume = generate_tone_curve(tone, NUM_TIME_STEPS)
+            features[idx, 0, :] = chao_pitch
+            features[idx, 1, :] = volume
+            labels[idx] = tone - 1  # 0, 1, 2, 3
+            
+        self.features = torch.from_numpy(features)
+        self.labels = torch.from_numpy(labels)
+        print("✅ Pre-generation completed!")
 
     def __len__(self):
         return self.num_samples
 
     def __getitem__(self, idx):
-        tone = (idx % 4) + 1  # 1, 2, 3, 4
-        chao_pitch, volume = generate_tone_curve(tone, NUM_TIME_STEPS)
-        feat = np.stack([chao_pitch, volume], axis=0)  # (2, 50)
-        label = tone - 1  # 0, 1, 2, 3
-        return torch.from_numpy(feat), torch.tensor(label, dtype=torch.long)
+        return self.features[idx], self.labels[idx]
 
-class ToneClassifierCNN_BiLSTM(nn.Module):
+class ToneClassifierCNN(nn.Module):
     def __init__(self, in_channels: int = 2, num_classes: int = 4):
         super().__init__()
-        self.conv_block1 = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.Conv1d(in_channels, 32, kernel_size=5, padding=2),
             nn.BatchNorm1d(32),
             nn.ReLU(),
             nn.Dropout(0.08)
         )
-        self.conv_block2 = nn.Sequential(
+        self.conv2 = nn.Sequential(
             nn.Conv1d(32, 64, kernel_size=5, padding=2),
             nn.BatchNorm1d(64),
             nn.ReLU(),
-            nn.MaxPool1d(kernel_size=2)  # 50 -> 25
+            nn.Dropout(0.08)
         )
-        self.lstm = nn.LSTM(
-            input_size=64,
-            hidden_size=48,
-            num_layers=2,
-            batch_first=True,
-            bidirectional=True,
-            dropout=0.12
+        self.conv3 = nn.Sequential(
+            nn.Conv1d(64, 128, kernel_size=5, padding=2),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool1d(1)
         )
         self.fc = nn.Sequential(
-            nn.Linear(48 * 2 * 2, 64),
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Dropout(0.15),
+            nn.Dropout(0.12),
             nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
-        c1 = self.conv_block1(x)
-        c2 = self.conv_block2(c1)
-        lstm_in = c2.transpose(1, 2)
-        lstm_out, (hn, cn) = self.lstm(lstm_in)
-        mean_pool = torch.mean(lstm_out, dim=1)
-        last_hidden = torch.cat([hn[-2], hn[-1]], dim=1)
-        combined = torch.cat([mean_pool, last_hidden], dim=1)
-        logits = self.fc(combined)
-        return logits
+        h = self.conv1(x)
+        h = self.conv2(h)
+        h = self.conv3(h)
+        h = h.flatten(1)
+        return self.fc(h)
 
 def train():
     total_samples = 80000
@@ -180,14 +184,14 @@ def train():
     train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False)
 
-    model = ToneClassifierCNN_BiLSTM().to(device)
+    model = ToneClassifierCNN().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=0.003, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20)
 
     num_epochs = 20
     best_val_acc = 0.0
-    print(f"🔥 Training 1D-CNN + Bi-LSTM with 80,000 Acoustic Augmented Samples on {device}...")
+    print(f"🔥 Training 1D-CNN with 80,000 Acoustic Augmented Samples on {device}...")
 
     for epoch in range(1, num_epochs + 1):
         model.train()
@@ -209,9 +213,10 @@ def train():
             total += len(targets)
 
         scheduler.step()
-        train_acc = (correct / total) * 100
-        avg_train_loss = train_loss / total
+        train_acc = (correct / total) * 100.0
+        train_loss = train_loss / total
 
+        # Validation
         model.eval()
         val_correct = 0
         val_total = 0
@@ -223,48 +228,38 @@ def train():
                 val_correct += (preds == targets).sum().item()
                 val_total += len(targets)
 
-        val_acc = (val_correct / val_total) * 100
-        print(f"Epoch {epoch:02d}/{num_epochs:02d} | Train Loss: {avg_train_loss:.4f} | Train Acc: {train_acc:.2f}% | Val Acc: {val_acc:.2f}%")
+        val_acc = (val_correct / val_total) * 100.0
+        print(f"Epoch {epoch:02d}/{num_epochs} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | Val Acc: {val_acc:.2f}%")
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
 
     print(f"\n🏆 Training Finished! Final Validation Accuracy: {best_val_acc:.2f}%")
 
-    output_dir = os.path.join(os.path.dirname(__file__), "..", "static", "models")
-    os.makedirs(output_dir, exist_ok=True)
-    onnx_path = os.path.join(output_dir, "mandarin_tone_cnn.onnx")
-
-    data_file = onnx_path + ".data"
-    if os.path.exists(data_file):
-        os.remove(data_file)
-
+    # Export to WebAssembly-friendly ONNX (Opset 14, IR 8)
     model.eval()
     model.to('cpu')
     dummy_input = torch.randn(1, 2, NUM_TIME_STEPS, dtype=torch.float32)
+    output_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'models', 'mandarin_tone_cnn.onnx')
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     torch.onnx.export(
         model,
         dummy_input,
-        onnx_path,
-        export_params=True,
-        opset_version=14,
-        do_constant_folding=True,
+        output_path,
         input_names=['pitch_input'],
         output_names=['tone_logits'],
-        dynamic_axes={
-            'pitch_input': {0: 'batch_size'},
-            'tone_logits': {0: 'batch_size'}
-        }
+        opset_version=14,
+        dynamo=False
     )
 
-    print(f"💾 Model exported to ONNX: {onnx_path} ({os.path.getsize(onnx_path) / 1024:.1f} KB)")
+    model_size_kb = os.path.getsize(output_path) / 1024.0
+    print(f"💾 Model exported to ONNX: {output_path} ({model_size_kb:.1f} KB)")
 
     # Verify ONNX
-    ort_session = ort.InferenceSession(onnx_path)
-    ort_inputs = {ort_session.get_inputs()[0].name: dummy_input.numpy()}
-    ort_outs = ort_session.run(None, ort_inputs)
-    print("✅ ONNX verification successful! Output Shape:", ort_outs[0].shape)
+    session = ort.InferenceSession(output_path)
+    res = session.run(None, {'pitch_input': dummy_input.numpy()})
+    print(f"✅ ONNX verification successful! Output Shape: {res[0].shape}")
 
 if __name__ == "__main__":
     train()

@@ -10,18 +10,33 @@ import { env } from '$env/dynamic/private';
 const url = env.TURSO_DATABASE_URL ?? 'file:data/hsk.db';
 const authToken = env.TURSO_AUTH_TOKEN;
 
-// Only create the data/ folder when using a local file: URL.
-// On Vercel serverless the filesystem is read-only.
-if (url.startsWith('file:')) {
-	const path = url.slice('file:'.length);
-	try {
-		mkdirSync(dirname(path), { recursive: true });
-	} catch {
-		// Fall through — createClient will surface a real error if the file can't be opened.
+// Detect if we're on a serverless platform without a configured DB.
+const isServerless = !!(env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.NETLIFY);
+const hasRemoteDb = !!env.TURSO_DATABASE_URL;
+
+let db: Client | null = null;
+
+if (hasRemoteDb || !isServerless) {
+	// Only create the data/ folder when using a local file: URL.
+	if (url.startsWith('file:')) {
+		const path = url.slice('file:'.length);
+		try {
+			mkdirSync(dirname(path), { recursive: true });
+		} catch {
+			// Fall through — createClient will surface a real error if the file can't be opened.
+		}
 	}
+	try {
+		db = createClient({ url, authToken });
+	} catch {
+		console.warn('⚠️ [DB] Failed to create database client, running without DB');
+		db = null;
+	}
+} else {
+	console.warn('⚠️ [DB] No TURSO_DATABASE_URL set on serverless — running without DB');
 }
 
-export const db: Client = createClient({ url, authToken });
+export { db };
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -51,10 +66,24 @@ CREATE TABLE IF NOT EXISTS lesson_completions (
 	stars INTEGER NOT NULL,
 	PRIMARY KEY (user_id, lesson_key)
 );
+
+CREATE TABLE IF NOT EXISTS user_mistakes (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	hanzi TEXT NOT NULL,
+	pinyin TEXT NOT NULL,
+	meaning TEXT NOT NULL,
+	expected_tone INTEGER,
+	heard_text TEXT,
+	score INTEGER DEFAULT 0,
+	feedback TEXT,
+	created_at INTEGER NOT NULL
+);
 `;
 
 let initPromise: Promise<void> | null = null;
 function init(): Promise<void> {
+	if (!db) return Promise.resolve();
 	if (!initPromise) {
 		initPromise = db.executeMultiple(SCHEMA).catch((e) => {
 			initPromise = null; // allow retry on next call
@@ -85,6 +114,7 @@ export type User = { id: number; username: string };
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export async function createUser(username: string, password: string): Promise<User> {
+	if (!db) throw new Error('Database not available');
 	await init();
 	const result = await db.execute({
 		sql: 'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?) RETURNING id',
@@ -99,6 +129,7 @@ export async function createUser(username: string, password: string): Promise<Us
 export async function findUserByUsername(
 	username: string
 ): Promise<{ id: number; username: string; password_hash: string } | null> {
+	if (!db) return null;
 	await init();
 	const result = await db.execute({
 		sql: 'SELECT id, username, password_hash FROM users WHERE username = ?',
@@ -114,6 +145,7 @@ export async function findUserByUsername(
 }
 
 export async function createSession(userId: number): Promise<{ token: string; expiresAt: number }> {
+	if (!db) throw new Error('Database not available');
 	await init();
 	const token = randomBytes(32).toString('hex');
 	const expiresAt = Date.now() + SESSION_TTL_MS;
@@ -125,6 +157,7 @@ export async function createSession(userId: number): Promise<{ token: string; ex
 }
 
 export async function findUserBySession(token: string): Promise<User | null> {
+	if (!db) return null;
 	await init();
 	const result = await db.execute({
 		sql: `SELECT u.id, u.username
@@ -138,6 +171,7 @@ export async function findUserBySession(token: string): Promise<User | null> {
 }
 
 export async function deleteSession(token: string): Promise<void> {
+	if (!db) return;
 	await init();
 	await db.execute({ sql: 'DELETE FROM sessions WHERE token = ?', args: [token] });
 }
@@ -151,6 +185,7 @@ export type ProgressRow = {
 };
 
 export async function getProgress(userId: number): Promise<ProgressRow> {
+	if (!db) return { xp: 0, hearts: 5, streak: 0, lastPracticed: null, completed: {} };
 	await init();
 	const progRes = await db.execute({
 		sql: 'SELECT xp, hearts, streak, last_practiced FROM progress WHERE user_id = ?',
@@ -181,6 +216,7 @@ function today(): string {
 }
 
 export async function addXp(userId: number, amount: number): Promise<void> {
+	if (!db) return;
 	await init();
 	const cur = await db.execute({
 		sql: 'SELECT streak, last_practiced FROM progress WHERE user_id = ?',
@@ -202,6 +238,7 @@ export async function addXp(userId: number, amount: number): Promise<void> {
 }
 
 export async function loseHeart(userId: number): Promise<void> {
+	if (!db) return;
 	await init();
 	await db.execute({
 		sql: 'UPDATE progress SET hearts = MAX(0, hearts - 1) WHERE user_id = ?',
@@ -210,6 +247,7 @@ export async function loseHeart(userId: number): Promise<void> {
 }
 
 export async function refillHearts(userId: number, max: number): Promise<void> {
+	if (!db) return;
 	await init();
 	await db.execute({
 		sql: 'UPDATE progress SET hearts = ? WHERE user_id = ?',
@@ -218,6 +256,7 @@ export async function refillHearts(userId: number, max: number): Promise<void> {
 }
 
 export async function completeLesson(userId: number, lessonKey: string, stars: number): Promise<void> {
+	if (!db) return;
 	await init();
 	await db.execute({
 		sql: `INSERT INTO lesson_completions (user_id, lesson_key, stars) VALUES (?, ?, ?)
@@ -239,6 +278,7 @@ export type AdminUserRow = {
 };
 
 export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
+	if (!db) return [];
 	await init();
 	const result = await db.execute(`
 		SELECT u.id, u.username, u.created_at,
@@ -262,6 +302,7 @@ export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
 }
 
 export async function listAllCompletions(): Promise<{ userId: number; lessonKey: string; stars: number }[]> {
+	if (!db) return [];
 	await init();
 	const result = await db.execute('SELECT user_id, lesson_key, stars FROM lesson_completions');
 	return result.rows.map((r) => ({
@@ -270,3 +311,163 @@ export async function listAllCompletions(): Promise<{ userId: number; lessonKey:
 		stars: Number(r.stars)
 	}));
 }
+
+// Mistakes & Learner Analytics
+
+export type MistakeRecord = {
+	id: number;
+	userId: number;
+	hanzi: string;
+	pinyin: string;
+	meaning: string;
+	expectedTone: number | null;
+	heardText: string;
+	score: number;
+	feedback: string;
+	createdAt: number;
+};
+
+export type TopMistake = {
+	hanzi: string;
+	pinyin: string;
+	meaning: string;
+	expectedTone: number | null;
+	failCount: number;
+	avgScore: number;
+	lastFailedAt: number;
+	recentFeedbacks: string[];
+};
+
+export type MistakeStats = {
+	totalMistakes: number;
+	uniqueWords: number;
+	toneErrors: Record<number, number>;
+};
+
+export async function recordMistake(params: {
+	userId: number;
+	hanzi: string;
+	pinyin: string;
+	meaning: string;
+	expectedTone?: number | null;
+	heardText?: string;
+	score?: number;
+	feedback?: string;
+}): Promise<void> {
+	if (!db) return;
+	await init();
+	await db.execute({
+		sql: `INSERT INTO user_mistakes (user_id, hanzi, pinyin, meaning, expected_tone, heard_text, score, feedback, created_at)
+		      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		args: [
+			params.userId,
+			params.hanzi,
+			params.pinyin,
+			params.meaning,
+			params.expectedTone ?? null,
+			params.heardText ?? '',
+			params.score ?? 0,
+			params.feedback ?? '',
+			Date.now()
+		]
+	});
+}
+
+export async function getUserMistakes(userId: number, limit = 100): Promise<MistakeRecord[]> {
+	if (!db) return [];
+	await init();
+	const result = await db.execute({
+		sql: `SELECT id, user_id, hanzi, pinyin, meaning, expected_tone, heard_text, score, feedback, created_at
+		      FROM user_mistakes
+		      WHERE user_id = ?
+		      ORDER BY created_at DESC
+		      LIMIT ?`,
+		args: [userId, limit]
+	});
+	return result.rows.map((r) => ({
+		id: Number(r.id),
+		userId: Number(r.user_id),
+		hanzi: String(r.hanzi),
+		pinyin: String(r.pinyin),
+		meaning: String(r.meaning),
+		expectedTone: r.expected_tone !== null ? Number(r.expected_tone) : null,
+		heardText: String(r.heard_text ?? ''),
+		score: Number(r.score ?? 0),
+		feedback: String(r.feedback ?? ''),
+		createdAt: Number(r.created_at)
+	}));
+}
+
+export async function getTopMistakes(userId: number, limit = 15): Promise<TopMistake[]> {
+	if (!db) return [];
+	await init();
+	const result = await db.execute({
+		sql: `SELECT hanzi, pinyin, meaning, expected_tone,
+		             COUNT(*) AS fail_count,
+		             ROUND(AVG(score), 1) AS avg_score,
+		             MAX(created_at) AS last_failed_at,
+		             GROUP_CONCAT(feedback, ' || ') AS all_feedbacks
+		      FROM user_mistakes
+		      WHERE user_id = ?
+		      GROUP BY hanzi, pinyin, meaning, expected_tone
+		      ORDER BY fail_count DESC, last_failed_at DESC
+		      LIMIT ?`,
+		args: [userId, limit]
+	});
+	return result.rows.map((r) => {
+		const rawFeedback = String(r.all_feedbacks ?? '');
+		const feedbacks = rawFeedback
+			.split(' || ')
+			.map((f) => f.trim())
+			.filter(Boolean)
+			.slice(0, 3);
+		return {
+			hanzi: String(r.hanzi),
+			pinyin: String(r.pinyin),
+			meaning: String(r.meaning),
+			expectedTone: r.expected_tone !== null ? Number(r.expected_tone) : null,
+			failCount: Number(r.fail_count),
+			avgScore: Number(r.avg_score ?? 0),
+			lastFailedAt: Number(r.last_failed_at),
+			recentFeedbacks: feedbacks
+		};
+	});
+}
+
+export async function getMistakeStats(userId: number): Promise<MistakeStats> {
+	if (!db) return { totalMistakes: 0, uniqueWords: 0, toneErrors: {} };
+	await init();
+	const totalRes = await db.execute({
+		sql: `SELECT COUNT(*) AS total_count, COUNT(DISTINCT hanzi) AS unique_count
+		      FROM user_mistakes
+		      WHERE user_id = ?`,
+		args: [userId]
+	});
+	const toneRes = await db.execute({
+		sql: `SELECT expected_tone, COUNT(*) AS cnt
+		      FROM user_mistakes
+		      WHERE user_id = ? AND expected_tone IS NOT NULL
+		      GROUP BY expected_tone`,
+		args: [userId]
+	});
+	const toneErrors: Record<number, number> = {};
+	for (const row of toneRes.rows) {
+		toneErrors[Number(row.expected_tone)] = Number(row.cnt);
+	}
+	const totalRow = totalRes.rows[0];
+	return {
+		totalMistakes: totalRow ? Number(totalRow.total_count) : 0,
+		uniqueWords: totalRow ? Number(totalRow.unique_count) : 0,
+		toneErrors
+	};
+}
+
+export async function clearUserMistakes(userId: number): Promise<void> {
+	if (!db) return;
+	await init();
+	await db.execute({
+		sql: 'DELETE FROM user_mistakes WHERE user_id = ?',
+		args: [userId]
+	});
+}
+

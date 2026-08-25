@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield } from '@lucide/svelte';
+	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield, BarChart2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { progress } from '$lib/progress.svelte';
 	import { apiKey } from '$lib/apiKey.svelte';
@@ -77,6 +77,14 @@
 						<DropdownMenu.Item disabled>
 							<User class="size-4" />
 							{user.username}
+						</DropdownMenu.Item>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Item>
+							{#snippet child({ props })}
+								<a {...props} href="/analytics" class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent">
+									<BarChart2 class="size-4 text-emerald-600" /> วิเคราะห์ผู้เรียน
+								</a>
+							{/snippet}
 						</DropdownMenu.Item>
 						{#if user.isAdmin}
 							<DropdownMenu.Separator />

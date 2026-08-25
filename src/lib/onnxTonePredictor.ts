@@ -32,29 +32,58 @@ async function loadONNXRuntimeScript(): Promise<any> {
 		return (window as any).ort;
 	}
 
+	try {
+		// First try direct ES module import of onnxruntime-web
+		const ortPkg = await import('onnxruntime-web');
+		if (ortPkg && (ortPkg.InferenceSession || ortPkg.default?.InferenceSession)) {
+			const ortInstance = ortPkg.InferenceSession ? ortPkg : ortPkg.default;
+			(window as any).ort = ortInstance;
+			if (ortInstance.env?.wasm) {
+				ortInstance.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
+				ortInstance.env.wasm.numThreads = 1;
+			}
+			return ortInstance;
+		}
+	} catch (e) {
+		console.log('Direct onnxruntime-web import not available, falling back to script injection...');
+	}
+
 	return new Promise((resolve, reject) => {
 		const existingScript = document.querySelector('script[src*="onnxruntime-web"]');
 		if (existingScript) {
 			existingScript.addEventListener('load', () => resolve((window as any).ort));
-			existingScript.addEventListener('error', (e) => reject(e));
-			return;
+			if ((window as any).ort) return resolve((window as any).ort);
 		}
 
 		const script = document.createElement('script');
-		script.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js';
+		script.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.js';
 		script.async = true;
 		script.onload = () => {
 			if ((window as any).ort) {
 				// Configure ONNX wasm path
 				(window as any).ort.env.wasm.wasmPaths =
-					'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/';
+					'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
 				(window as any).ort.env.wasm.numThreads = 1;
 				resolve((window as any).ort);
 			} else {
 				reject(new Error('ONNX runtime loaded but `ort` is undefined'));
 			}
 		};
-		script.onerror = (err) => reject(err);
+		script.onerror = () => {
+			// Fallback to unpkg
+			const script2 = document.createElement('script');
+			script2.src = 'https://unpkg.com/onnxruntime-web@1.27.0/dist/ort.min.js';
+			script2.onload = () => {
+				if ((window as any).ort) {
+					(window as any).ort.env.wasm.wasmPaths = 'https://unpkg.com/onnxruntime-web@1.27.0/dist/';
+					resolve((window as any).ort);
+				} else {
+					reject(new Error('Failed to load onnxruntime-web from all CDNs'));
+				}
+			};
+			script2.onerror = (err) => reject(err);
+			document.head.appendChild(script2);
+		};
 		document.head.appendChild(script);
 	});
 }

@@ -84,7 +84,7 @@ export const TONE_PROFILES: Record<ToneNumber, {
 }> = {
 	1: {
 		name: '1st Tone (High Level)',
-		thaiName: 'วรรณยุกต์ 1 (เสียงสูงราบ)',
+		thaiName: 'เสียง 1',
 		chaoPitch: '55',
 		curve: [5.0, 5.0, 5.0, 5.0, 5.0],
 		description: 'High, level pitch contour at the top of your normal vocal range.',
@@ -92,7 +92,7 @@ export const TONE_PROFILES: Record<ToneNumber, {
 	},
 	2: {
 		name: '2nd Tone (Rising)',
-		thaiName: 'วรรณยุกต์ 2 (เสียงขึ้น)',
+		thaiName: 'เสียง 2',
 		chaoPitch: '35',
 		curve: [3.0, 3.4, 3.9, 4.4, 5.0],
 		description: 'Starts at mid-pitch and rises steadily to high pitch.',
@@ -100,7 +100,7 @@ export const TONE_PROFILES: Record<ToneNumber, {
 	},
 	3: {
 		name: '3rd Tone (Dipping)',
-		thaiName: 'วรรณยุกต์ 3 (เสียงตก-ขึ้น)',
+		thaiName: 'เสียง 3',
 		chaoPitch: '214',
 		curve: [2.2, 1.3, 1.0, 2.3, 4.0],
 		description: 'Dips down low in your vocal register, then rises up to mid-high.',
@@ -108,7 +108,7 @@ export const TONE_PROFILES: Record<ToneNumber, {
 	},
 	4: {
 		name: '4th Tone (High Falling)',
-		thaiName: 'วรรณยุกต์ 4 (เสียงตกเร็ว)',
+		thaiName: 'เสียง 4',
 		chaoPitch: '51',
 		curve: [5.0, 4.2, 3.1, 1.9, 1.0],
 		description: 'Starts high and drops sharply down to low pitch.',
@@ -426,7 +426,10 @@ export function analyzeToneContour(
 		durationMs: Math.round(durationMs),
 		contour: smoothed,
 		feedback,
-		slope
+		slope,
+		aiConfidence: aiPrediction?.confidence,
+		aiProbabilities: aiPrediction?.probabilities,
+		isAIModel: isAI
 	};
 }
 
