@@ -312,6 +312,23 @@
 				...wordStats,
 				[selectedPreset.id]: updatedStat
 			});
+
+			// If incorrect, record mistake to learner database
+			if (!isCorrect) {
+				fetch('/api/mistakes', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						hanzi: selectedPreset.hanzi,
+						pinyin: selectedPreset.pinyin,
+						meaning: selectedPreset.thai || selectedPreset.english,
+						expectedTone: selectedPreset.tone,
+						heardText: `ตรวจจับได้: วรรณยุกต์ ${res.detectedTone ?? '-'}`,
+						score: res.score,
+						feedback: res.feedback || 'ระดับเสียงวรรณยุกต์ยังไม่ตรงตามมาตรฐาน'
+					})
+				}).catch(() => {});
+			}
 		}
 	}
 

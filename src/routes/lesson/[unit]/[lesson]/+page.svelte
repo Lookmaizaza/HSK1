@@ -89,6 +89,19 @@
 				progress.addXp(10);
 			} else {
 				progress.loseHeart();
+				fetch('/api/mistakes', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						hanzi: current.hanzi,
+						pinyin: current.pinyin,
+						meaning: current.english || '',
+						expectedTone: lesson.tone ?? null,
+						heardText: heard,
+						score: score,
+						feedback: feedback
+					})
+				}).catch(() => {});
 			}
 		} catch (e) {
 			activeListener = null;
@@ -101,6 +114,20 @@
 						: `Error: ${msg}`;
 			score = 0;
 			status = 'incorrect';
+			progress.loseHeart();
+			fetch('/api/mistakes', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					hanzi: current.hanzi,
+					pinyin: current.pinyin,
+					meaning: current.english || '',
+					expectedTone: lesson.tone ?? null,
+					heardText: heard || '(ไม่ได้ยินเสียง)',
+					score: 0,
+					feedback: feedback
+				})
+			}).catch(() => {});
 		}
 	}
 
