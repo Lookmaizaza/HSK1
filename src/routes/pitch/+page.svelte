@@ -8,11 +8,15 @@
 	import {
 		RealtimePitchTracker,
 		analyzeToneContour,
+		analyzeMultiSyllableToneContour,
 		TONE_PROFILES,
 		type ToneNumber,
 		type TonePreset,
 		type PitchPoint,
-		type ToneAnalysisResult
+		type ToneAnalysisResult,
+		type MultiSyllableAnalysisResult,
+		type SyllableToneResult,
+		type SyllableInfo
 	} from '$lib/pitch';
 	import {
 		HSK1_VOCAB_PRESETS
@@ -39,7 +43,8 @@
 		BarChart3,
 		RotateCw,
 		Cpu,
-		Bot
+		Bot,
+		Layers
 	} from '@lucide/svelte';
 
 	// Storage key for word practice statistics
@@ -77,7 +82,7 @@
 	let isRecording = $state(false);
 	let pitchPoints = $state<PitchPoint[]>([]);
 	let currentHz = $state(0);
-	let analysisResult = $state<ToneAnalysisResult | null>(null);
+	let analysisResult = $state<MultiSyllableAnalysisResult | null>(null);
 	let errorMessage = $state<string | null>(null);
 
 	// Pitch Tracker & Timeouts
@@ -219,13 +224,13 @@
 			};
 		}
 
-		// Set max duration safety timeout (auto-stop after 3.8s)
+		// Set max duration safety timeout (auto-stop after 4.2s for multi-syllables)
 		if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
 		maxDurationTimeout = setTimeout(() => {
 			if (isRecording) {
 				stopRecording();
 			}
-		}, 3800);
+		}, 4200);
 
 		tracker.onPitchUpdate = (point, all) => {
 			pitchPoints = [...all];
@@ -247,7 +252,7 @@
 							if (isRecording) {
 								stopRecording();
 							}
-						}, 350);
+						}, 380);
 					}
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
@@ -278,20 +283,26 @@
 		isRecording = false;
 		currentHz = 0;
 
-		// Perform AI Deep Learning Tone Analysis (with fallback)
+		// Perform AI Deep Learning Multi-Syllable Tone Analysis (syllable-by-syllable)
 		if (recorded.length > 0) {
-			let aiPrediction = null;
-			try {
-				aiPrediction = await predictToneNeuralNetwork(recorded);
-			} catch (e) {
-				console.warn('AI prediction failed, falling back to rule engine:', e);
-			}
+			const syllablesToAnalyze = selectedPreset.syllables && selectedPreset.syllables.length > 0
+				? selectedPreset.syllables
+				: [{
+					hanzi: selectedPreset.hanzi,
+					pinyin: selectedPreset.pinyin,
+					baseTone: selectedPreset.tone,
+					surfaceTone: selectedPreset.tone
+				}];
 
-			const res = analyzeToneContour(recorded, selectedPreset.tone, aiPrediction);
+			const res = await analyzeMultiSyllableToneContour(
+				recorded,
+				syllablesToAnalyze,
+				predictToneNeuralNetwork
+			);
 			analysisResult = res;
 
 			// Automatically update practice statistics
-			const isCorrect = res.isMatch && res.score >= 70;
+			const isCorrect = res.isAllMatch && res.overallScore >= 70;
 			const current = wordStats[selectedPreset.id] || {
 				correctCount: 0,
 				wrongCount: 0,
@@ -303,7 +314,7 @@
 			const updatedStat: WordPracticeStat = {
 				correctCount: isCorrect ? current.correctCount + 1 : current.correctCount,
 				wrongCount: isCorrect ? current.wrongCount : current.wrongCount + 1,
-				lastScore: res.score,
+				lastScore: res.overallScore,
 				status: isCorrect ? 'passed' : 'struggling',
 				updatedAt: Date.now()
 			};
@@ -315,6 +326,10 @@
 
 			// If incorrect, record mistake to learner database
 			if (!isCorrect) {
+				const heardSummary = res.syllableResults.length > 1
+					? res.syllableResults.map((s) => `${s.hanzi}: เสียง ${s.detectedTone}`).join(', ')
+					: `ตรวจจับได้: วรรณยุกต์ ${res.syllableResults[0]?.detectedTone ?? '-'}`;
+
 				fetch('/api/mistakes', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -323,9 +338,9 @@
 						pinyin: selectedPreset.pinyin,
 						meaning: selectedPreset.thai || selectedPreset.english,
 						expectedTone: selectedPreset.tone,
-						heardText: `ตรวจจับได้: วรรณยุกต์ ${res.detectedTone ?? '-'}`,
-						score: res.score,
-						feedback: res.feedback || 'ระดับเสียงวรรณยุกต์ยังไม่ตรงตามมาตรฐาน'
+						heardText: heardSummary,
+						score: res.overallScore,
+						feedback: res.overallFeedback || 'ระดับเสียงวรรณยุกต์ยังไม่ตรงตามมาตรฐาน'
 					})
 				}).catch(() => {});
 			}
@@ -647,31 +662,71 @@
 				</div>
 			</div>
 
-			<!-- Target Tone Chao Badge -->
+			<!-- Target Tone / Tone Pattern Badge -->
 			<div class="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0">
 				<div class="rounded-2xl border bg-muted/50 px-4 py-2 text-left sm:text-right">
 					<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">เป้าหมายวรรณยุกต์</div>
 					<div class="font-extrabold text-foreground text-sm sm:text-base">
-						{TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`}
+						{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
+							รูปแบบเสียง {selectedPreset.tonePattern || selectedPreset.syllables.map((s) => s.surfaceTone).join('+')}
+						{:else}
+							{TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`}
+						{/if}
 					</div>
 					<div class="text-xs text-sky-600 dark:text-sky-400 font-mono font-bold">
-						Chao Scale: {TONE_PROFILES[selectedPreset.tone]?.chaoPitch || '--'}
+						{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
+							{selectedPreset.syllables.map((s) => `${s.hanzi}: เสียง ${s.surfaceTone}`).join(' • ')}
+						{:else}
+							Chao Scale: {TONE_PROFILES[selectedPreset.tone]?.chaoPitch || '--'}
+						{/if}
 					</div>
 				</div>
 			</div>
 		</div>
 
-		<!-- Tone Tip Box -->
-		{#if TONE_PROFILES[selectedPreset.tone]}
+		<!-- Syllables Breakdown Pills for Multi-syllable Words -->
+		{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
+			<div class="mt-4 pt-3 border-t flex flex-wrap items-center gap-2">
+				<span class="text-xs font-extrabold text-foreground flex items-center gap-1">
+					<Layers class="size-3.5 text-sky-600" /> แยกตรวจสอบรายพยางค์ ({selectedPreset.syllables.length} พยางค์):
+				</span>
+				<div class="flex flex-wrap items-center gap-2">
+					{#each selectedPreset.syllables as syl, sIdx (sIdx)}
+						{@const prof = TONE_PROFILES[syl.surfaceTone] || TONE_PROFILES[1]}
+						<div class="flex items-center gap-1.5 rounded-xl border bg-background/80 px-3 py-1.5 text-xs shadow-sm">
+							<span class="text-muted-foreground text-[10px] font-mono font-bold">{sIdx + 1}.</span>
+							<span class="text-base font-black text-foreground">{syl.hanzi}</span>
+							<span class="font-mono text-sky-600 dark:text-sky-400 font-extrabold">{syl.pinyin}</span>
+							<span class="rounded-full px-2 py-0.5 text-[10px] font-black {syl.surfaceTone === 1
+								? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+								: syl.surfaceTone === 2
+									? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+									: syl.surfaceTone === 3
+										? 'bg-fuchsia-100 dark:bg-fuchsia-950 text-fuchsia-700 dark:text-fuchsia-300'
+										: syl.surfaceTone === 4
+											? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+											: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}">
+								{prof.thaiName} ({prof.chaoPitch})
+							</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Tone Tip / Sandhi Rule Box -->
+		{#if selectedPreset.description || TONE_PROFILES[selectedPreset.tone]}
 			<div class="mt-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/50 p-3 text-xs text-sky-900 dark:text-sky-200 flex items-start gap-2">
 				<span class="text-base leading-none">💡</span>
 				<div>
-					<strong>เทคนิคการออกเสียง:</strong> {TONE_PROFILES[selectedPreset.tone].thaiTip}
 					{#if selectedPreset.description}
-						<div class="mt-1 font-semibold text-sky-700 dark:text-sky-300">
-							📌 {selectedPreset.description}
+						<div class="font-bold text-sky-800 dark:text-sky-200">
+							📌 <strong>กฎการออกเสียงคำรวม (Sandhi):</strong> {selectedPreset.description}
 						</div>
 					{/if}
+					<div class="mt-0.5">
+						<strong>เทคนิคการออกเสียง:</strong> {TONE_PROFILES[selectedPreset.tone]?.thaiTip || 'ออกเสียงต่อเนื่องตามลำดับวรรณยุกต์'}
+					</div>
 				</div>
 			</div>
 		{/if}
@@ -697,13 +752,13 @@
 		<div class="text-center">
 			<div class="text-sm font-extrabold {isRecording ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}">
 				{isRecording
-					? `กำลังฟังเสียง... พูดคำว่า "${selectedPreset.hanzi}" (แตะปุ่มเพื่อหยุด หรือระบบจะหยุดให้อัตโนมัติ)`
+					? `กำลังฟังเสียง... ออกเสียงคำว่า "${selectedPreset.hanzi}" (แตะปุ่มเพื่อหยุด หรือระบบจะหยุดให้อัตโนมัติ)`
 					: `แตะไมค์แล้วออกเสียง "${selectedPreset.hanzi}" (${selectedPreset.pinyin})`}
 			</div>
 			<div class="text-xs text-muted-foreground mt-0.5">
 				{isRecording
 					? 'ระบบตรวจจับเสียงพูดและหยุดให้อัตโนมัติเมื่อพูดจบ หรือกดปุ่มสี่เหลี่ยมเพื่อหยุดเอง'
-					: 'ระบบจะตรวจจับระดับเสียงและคำนวณคะแนนให้อัตโนมัติทันทีที่พูดจบ'}
+					: 'ออกเสียงคำศัพท์รวมทั้งคำ ระบบจะตัดแบ่งและตรวจความถูกต้องของแต่ละพยางค์ให้อัตโนมัติ'}
 			</div>
 		</div>
 	</div>
@@ -732,6 +787,7 @@
 		<PitchVisualizer
 			points={pitchPoints}
 			targetTone={selectedPreset.tone}
+			syllables={selectedPreset.syllables}
 			isLive={isRecording}
 			currentHz={currentHz}
 			height={250}
@@ -740,19 +796,21 @@
 
 	<!-- 7. ANALYSIS RESULTS & SCORE CARD -->
 	{#if analysisResult}
-		<div class="mb-8 overflow-hidden rounded-3xl border-2 {analysisResult.isMatch ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20'} p-6 shadow-md transition-all">
+		<div class="mb-8 overflow-hidden rounded-3xl border-2 {analysisResult.isAllMatch ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20'} p-6 shadow-md transition-all">
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/50 pb-4">
 				<div class="flex items-center gap-3">
-					{#if analysisResult.isMatch}
+					{#if analysisResult.isAllMatch}
 						<div class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow">
 							<CheckCircle2 class="size-7" />
 						</div>
 						<div>
 							<div class="text-xl font-extrabold text-emerald-900 dark:text-emerald-200">
-								วรรณยุกต์ถูกต้อง! (ผ่าน)
+								วรรณยุกต์ถูกต้องครบทุกพยางค์! (ผ่าน)
 							</div>
 							<div class="text-xs text-emerald-700 dark:text-emerald-300">
-								ตรวจพบ: {TONE_PROFILES[analysisResult.detectedTone]?.thaiName || `เสียง ${analysisResult.detectedTone}`} ({TONE_PROFILES[analysisResult.detectedTone]?.chaoPitch || ''})
+								{analysisResult.syllableResults.length > 1
+									? `ผ่านทั้ง ${analysisResult.syllableResults.length} พยางค์ตามมาตรฐานเสียงรวม`
+									: `ตรวจพบ: ${TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`}`}
 							</div>
 						</div>
 					{:else}
@@ -764,7 +822,11 @@
 								ยังไม่ตรงเป้าหมาย (ต้องฝึกเพิ่ม)
 							</div>
 							<div class="text-xs text-amber-700 dark:text-amber-300">
-								ตรวจพบเป็น: {TONE_PROFILES[analysisResult.detectedTone]?.thaiName || `เสียง ${analysisResult.detectedTone}`} (ต้องการ: {TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`})
+								{#if analysisResult.syllableResults.length > 1}
+									ผ่าน {analysisResult.syllableResults.filter((s) => s.isMatch).length} จาก {analysisResult.syllableResults.length} พยางค์
+								{:else}
+									ตรวจพบเป็น: {TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`} (ต้องการ: {TONE_PROFILES[selectedPreset.tone]?.thaiName})
+								{/if}
 							</div>
 						</div>
 					{/if}
@@ -772,70 +834,110 @@
 
 				<div class="flex items-center gap-3">
 					<div class="text-right">
-						<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">คะแนนความถูกต้อง</div>
-						<div class="text-3xl font-black {analysisResult.score >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
-							{analysisResult.score}%
+						<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">คะแนนรวมความถูกต้อง</div>
+						<div class="text-3xl font-black {analysisResult.overallScore >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
+							{analysisResult.overallScore}%
 						</div>
 					</div>
 				</div>
 			</div>
+
+			<!-- PER-SYLLABLE BREAKDOWN GRID (แสดงผลการตรวจสอบแยกทีละตัวอักษร) -->
+			{#if analysisResult.syllableResults && analysisResult.syllableResults.length > 1}
+				<div class="mt-4 pt-2">
+					<div class="mb-2.5 flex items-center justify-between">
+						<span class="text-xs font-extrabold text-foreground flex items-center gap-1.5">
+							<Layers class="size-4 text-primary" /> ผลการวิเคราะห์แยกทีละพยางค์:
+						</span>
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-{Math.min(3, analysisResult.syllableResults.length)} gap-3">
+						{#each analysisResult.syllableResults as syl (syl.syllableIndex)}
+							{@const targetProf = TONE_PROFILES[syl.targetTone] || TONE_PROFILES[1]}
+							{@const detectedProf = TONE_PROFILES[syl.detectedTone] || TONE_PROFILES[1]}
+							<div class="flex flex-col justify-between rounded-2xl border-2 p-3.5 transition-all {syl.isMatch
+								? 'border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/30'
+								: 'border-rose-300 dark:border-rose-800/60 bg-rose-50/40 dark:bg-rose-950/30'}">
+								<div>
+									<!-- Top Row: Syllable badge & Status -->
+									<div class="flex items-center justify-between mb-2">
+										<span class="text-[11px] font-extrabold text-muted-foreground">
+											พยางค์ที่ {syl.syllableIndex + 1}
+										</span>
+										<span class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black {syl.isMatch
+											? 'bg-emerald-500 text-white'
+											: 'bg-rose-500 text-white'}">
+											{syl.isMatch ? '✓ ถูกต้อง' : '✗ ต้องปรับ'}
+										</span>
+									</div>
+
+									<!-- Character + Pinyin + Score -->
+									<div class="flex items-baseline justify-between mb-2">
+										<div class="flex items-baseline gap-2">
+											<span class="text-3xl font-black tracking-tight">{syl.hanzi}</span>
+											<span class="text-lg font-bold text-sky-600 dark:text-sky-400 font-mono">{syl.pinyin}</span>
+										</div>
+										<span class="text-xl font-black {syl.score >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
+											{syl.score}%
+										</span>
+									</div>
+
+									<!-- Tone Comparison Detail -->
+									<div class="rounded-xl bg-background/80 p-2 text-xs mb-2 border border-border/40">
+										<div class="flex justify-between items-center text-muted-foreground text-[11px]">
+											<span>เป้าหมายวรรณยุกต์:</span>
+											<span class="font-extrabold text-foreground">{targetProf.thaiName} ({targetProf.chaoPitch})</span>
+										</div>
+										<div class="flex justify-between items-center text-muted-foreground text-[11px] mt-1">
+											<span>ตรวจจับได้:</span>
+											<span class="font-extrabold {syl.isMatch ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
+												{detectedProf.thaiName} ({detectedProf.chaoPitch})
+											</span>
+										</div>
+									</div>
+
+									<!-- Syllable Thai Feedback -->
+									<p class="text-xs leading-relaxed text-foreground/90">
+										{syl.feedback}
+									</p>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			<!-- AI Coach Feedback in Thai -->
 			<div class="mt-4 rounded-2xl bg-background/80 p-4 shadow-sm">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<div class="flex items-center gap-2 text-xs font-bold text-primary">
-						<Sparkles class="size-4" /> คำแนะนำการปรับเสียงจากระบบ AI Coach
+						<Sparkles class="size-4" /> คำแนะนำภาพรวมจากระบบ AI Coach
 					</div>
-					{#if analysisResult.isAIModel}
+					{#if analysisResult.syllableResults.some((s) => s.isAIModel)}
 						<div class="flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
 							<Bot class="size-3 text-emerald-600 dark:text-emerald-400" />
-							<span>1D-CNN + Bi-LSTM Neural Network {analysisResult.aiConfidence ? `(${Math.round(analysisResult.aiConfidence * 100)}%)` : ''}</span>
+							<span>1D-CNN + Bi-LSTM Neural Network</span>
 						</div>
 					{/if}
 				</div>
 				<p class="mt-1.5 text-sm leading-relaxed text-foreground">
-					{analysisResult.feedback}
+					{analysisResult.overallFeedback}
 				</p>
-
-				<!-- AI Tone Probabilities Breakdown -->
-				{#if analysisResult.aiProbabilities}
-					<div class="mt-3.5 pt-3 border-t border-border/50">
-						<div class="mb-2 flex items-center justify-between text-[11px] font-bold text-muted-foreground">
-							<span class="flex items-center gap-1"><Cpu class="size-3 text-primary" /> ความน่าจะเป็น 4 วรรณยุกต์ (Deep Learning):</span>
-						</div>
-						<div class="grid grid-cols-4 gap-1.5">
-							{#each [1, 2, 3, 4] as t}
-								{@const prob = Math.round((analysisResult.aiProbabilities[t as ToneNumber] || 0) * 100)}
-								{@const isSelected = analysisResult.detectedTone === t}
-								<div class="flex flex-col items-center rounded-xl p-1.5 border text-center transition-all {isSelected
-									? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-800 dark:text-emerald-200 font-extrabold shadow-sm'
-									: 'bg-background/60 border-border/60 text-muted-foreground'}">
-									<span class="text-[10px]">เสียง {t}</span>
-									<span class="text-xs font-black">{prob}%</span>
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
 			</div>
 
 			<!-- Acoustic Metrics Grid -->
-			<div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+			<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 text-center text-xs">
 				<div class="rounded-2xl border bg-background/60 p-2.5">
 					<div class="text-muted-foreground">ระดับเสียงเฉลี่ย</div>
 					<div class="mt-1 font-mono text-base font-extrabold text-foreground">{analysisResult.avgF0} Hz</div>
 				</div>
 				<div class="rounded-2xl border bg-background/60 p-2.5">
-					<div class="text-muted-foreground">ช่วงระดับเสียง</div>
-					<div class="mt-1 font-mono text-base font-extrabold text-foreground">{analysisResult.pitchRangeHz} Hz</div>
+					<div class="text-muted-foreground">ความยาวเสียงรวม</div>
+					<div class="mt-1 font-mono text-base font-extrabold text-foreground">{analysisResult.totalDurationMs} ms</div>
 				</div>
-				<div class="rounded-2xl border bg-background/60 p-2.5">
-					<div class="text-muted-foreground">ความถี่ต่ำสุด/สูงสุด</div>
-					<div class="mt-1 font-mono text-xs font-extrabold text-foreground">{analysisResult.minF0} - {analysisResult.maxF0} Hz</div>
-				</div>
-				<div class="rounded-2xl border bg-background/60 p-2.5">
-					<div class="text-muted-foreground">ความยาวเสียง</div>
-					<div class="mt-1 font-mono text-base font-extrabold text-foreground">{analysisResult.durationMs} ms</div>
+				<div class="rounded-2xl border bg-background/60 p-2.5 col-span-2 sm:col-span-1">
+					<div class="text-muted-foreground">จำนวนพยางค์ที่ตรวจ</div>
+					<div class="mt-1 font-mono text-base font-extrabold text-foreground">{analysisResult.syllableResults.length} พยางค์</div>
 				</div>
 			</div>
 

@@ -11,6 +11,14 @@ export type PitchPoint = {
 	chaoLevel: number; // 1.0 to 5.0 Chao pitch level
 };
 
+export type SyllableInfo = {
+	hanzi: string; // e.g. '白', '天'
+	pinyin: string; // e.g. 'bái', 'tiān'
+	baseTone: ToneNumber; // e.g. 2, 1
+	surfaceTone: ToneNumber; // Tone after sandhi applied, e.g. 2, 1
+	sandhiDescription?: string; // e.g. 'กฎ 3+3 เปลี่ยนเป็น 2+3'
+};
+
 export type ToneAnalysisResult = {
 	detectedTone: ToneNumber;
 	targetTone?: ToneNumber;
@@ -29,6 +37,38 @@ export type ToneAnalysisResult = {
 	isAIModel?: boolean;
 };
 
+export type SyllableToneResult = {
+	syllableIndex: number;
+	hanzi: string;
+	pinyin: string;
+	targetTone: ToneNumber;
+	detectedTone: ToneNumber;
+	score: number; // 0 - 100
+	isMatch: boolean;
+	contour: PitchPoint[];
+	startMs: number;
+	endMs: number;
+	avgF0: number;
+	minF0: number;
+	maxF0: number;
+	feedback: string;
+	slope: 'flat' | 'rising' | 'dipping' | 'falling' | 'neutral';
+	aiConfidence?: number;
+	aiProbabilities?: Record<ToneNumber, number>;
+	isAIModel?: boolean;
+};
+
+export type MultiSyllableAnalysisResult = {
+	overallScore: number;
+	isAllMatch: boolean;
+	syllableResults: SyllableToneResult[];
+	overallFeedback: string;
+	totalDurationMs: number;
+	avgF0: number;
+	contour: PitchPoint[];
+	primaryAnalysis?: ToneAnalysisResult; // Single analysis fallback compatibility
+};
+
 export type TonePreset = {
 	id: string;
 	hanzi: string;
@@ -38,6 +78,8 @@ export type TonePreset = {
 	tone: ToneNumber;
 	category: '1st' | '2nd' | '3rd' | '4th' | 'sandhi' | 'pair';
 	description?: string;
+	syllables?: SyllableInfo[];
+	tonePattern?: string; // e.g. '2+1', '2+3', '4+5'
 };
 
 export const TONE_PRESETS: TonePreset[] = [
@@ -430,6 +472,284 @@ export function analyzeToneContour(
 		aiConfidence: aiPrediction?.confidence,
 		aiProbabilities: aiPrediction?.probabilities,
 		isAIModel: isAI
+	};
+}
+
+/**
+ * Automatically segments continuous F0 pitch points into discrete syllable segments
+ * based on energy dips, clarity drops, time gaps, and acoustic boundaries.
+ */
+export function segmentPitchPointsIntoSyllables(
+	rawPoints: PitchPoint[],
+	syllableCount: number
+): PitchPoint[][] {
+	if (syllableCount <= 1) {
+		return [rawPoints];
+	}
+
+	const voiced = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.35 && p.volume > 0.008);
+	if (voiced.length < syllableCount * 3) {
+		// Not enough voiced points to split reliably; divide rawPoints evenly
+		const chunks: PitchPoint[][] = [];
+		const chunkSize = Math.ceil(rawPoints.length / syllableCount);
+		for (let i = 0; i < syllableCount; i++) {
+			chunks.push(rawPoints.slice(i * chunkSize, (i + 1) * chunkSize));
+		}
+		return chunks;
+	}
+
+	// 1. Find natural pauses / unvoiced dips in the voiced points stream
+	const clusters: PitchPoint[][] = [];
+	let currentCluster: PitchPoint[] = [voiced[0]];
+
+	for (let i = 1; i < voiced.length; i++) {
+		const prev = voiced[i - 1];
+		const curr = voiced[i];
+		const timeGap = curr.timeMs - prev.timeMs;
+
+		// Significant time gap (> 55ms) indicates a distinct syllable boundary
+		if (timeGap > 55) {
+			if (currentCluster.length > 0) {
+				clusters.push(currentCluster);
+			}
+			currentCluster = [curr];
+		} else {
+			currentCluster.push(curr);
+		}
+	}
+	if (currentCluster.length > 0) {
+		clusters.push(currentCluster);
+	}
+
+	// 2. If cluster count matches expected syllable count exactly
+	if (clusters.length === syllableCount) {
+		return clusters;
+	}
+
+	// 3. If too many micro-clusters (due to consonant stops), merge the closest clusters
+	if (clusters.length > syllableCount) {
+		const merged = [...clusters];
+		while (merged.length > syllableCount) {
+			let minGap = Infinity;
+			let mergeIdx = 0;
+			for (let i = 0; i < merged.length - 1; i++) {
+				const gap = merged[i + 1][0].timeMs - merged[i][merged[i].length - 1].timeMs;
+				if (gap < minGap) {
+					minGap = gap;
+					mergeIdx = i;
+				}
+			}
+			const combined = [...merged[mergeIdx], ...merged[mergeIdx + 1]];
+			merged.splice(mergeIdx, 2, combined);
+		}
+		return merged;
+	}
+
+	// 4. If continuous voicing without pauses, find local energy troughs / dips
+	const allVoiced = voiced;
+	const splitIndices: number[] = [];
+	const segmentFraction = 1 / syllableCount;
+
+	for (let s = 1; s < syllableCount; s++) {
+		const targetIdx = Math.floor(allVoiced.length * (s * segmentFraction));
+		const windowStart = Math.max(1, Math.floor(targetIdx - allVoiced.length * 0.2));
+		const windowEnd = Math.min(allVoiced.length - 2, Math.floor(targetIdx + allVoiced.length * 0.2));
+
+		let lowestScore = Infinity;
+		let bestCut = targetIdx;
+
+		for (let idx = windowStart; idx <= windowEnd; idx++) {
+			const pt = allVoiced[idx];
+			const dipScore = pt.volume * 0.6 + pt.clarity * 0.4;
+			if (dipScore < lowestScore) {
+				lowestScore = dipScore;
+				bestCut = idx;
+			}
+		}
+		splitIndices.push(bestCut);
+	}
+
+	const resultSegments: PitchPoint[][] = [];
+	let startIdx = 0;
+	for (let i = 0; i < splitIndices.length; i++) {
+		const endIdx = splitIndices[i];
+		resultSegments.push(allVoiced.slice(startIdx, endIdx));
+		startIdx = endIdx;
+	}
+	resultSegments.push(allVoiced.slice(startIdx));
+
+	return resultSegments;
+}
+
+/**
+ * Analyzes multi-syllable Mandarin words syllable-by-syllable from a single continuous utterance.
+ * Respects Mandarin tone sandhi (3+3 -> 2+3, bu4+4 -> 2+4, neutral tones, etc.)
+ */
+export async function analyzeMultiSyllableToneContour(
+	rawPoints: PitchPoint[],
+	syllables: SyllableInfo[],
+	aiPredictorFn?: (pts: PitchPoint[]) => Promise<any>
+): Promise<MultiSyllableAnalysisResult> {
+	if (!syllables || syllables.length === 0) {
+		const singleRes = analyzeToneContour(rawPoints);
+		return {
+			overallScore: singleRes.score,
+			isAllMatch: singleRes.isMatch,
+			syllableResults: [],
+			overallFeedback: singleRes.feedback,
+			totalDurationMs: singleRes.durationMs,
+			avgF0: singleRes.avgF0,
+			contour: singleRes.contour,
+			primaryAnalysis: singleRes
+		};
+	}
+
+	if (syllables.length === 1) {
+		let aiPred = null;
+		if (aiPredictorFn) {
+			try {
+				aiPred = await aiPredictorFn(rawPoints);
+			} catch {}
+		}
+		const singleRes = analyzeToneContour(rawPoints, syllables[0].surfaceTone, aiPred);
+		const sylResult: SyllableToneResult = {
+			syllableIndex: 0,
+			hanzi: syllables[0].hanzi,
+			pinyin: syllables[0].pinyin,
+			targetTone: syllables[0].surfaceTone,
+			detectedTone: singleRes.detectedTone,
+			score: singleRes.score,
+			isMatch: singleRes.isMatch,
+			contour: singleRes.contour,
+			startMs: singleRes.contour[0]?.timeMs || 0,
+			endMs: singleRes.contour[singleRes.contour.length - 1]?.timeMs || 0,
+			avgF0: singleRes.avgF0,
+			minF0: singleRes.minF0,
+			maxF0: singleRes.maxF0,
+			feedback: singleRes.feedback,
+			slope: singleRes.slope,
+			aiConfidence: singleRes.aiConfidence,
+			aiProbabilities: singleRes.aiProbabilities,
+			isAIModel: singleRes.isAIModel
+		};
+
+		return {
+			overallScore: singleRes.score,
+			isAllMatch: singleRes.isMatch,
+			syllableResults: [sylResult],
+			overallFeedback: singleRes.feedback,
+			totalDurationMs: singleRes.durationMs,
+			avgF0: singleRes.avgF0,
+			contour: singleRes.contour,
+			primaryAnalysis: singleRes
+		};
+	}
+
+	// Multi-syllable segmentation
+	const segments = segmentPitchPointsIntoSyllables(rawPoints, syllables.length);
+	const syllableResults: SyllableToneResult[] = [];
+	let totalScore = 0;
+	let totalVoicedCount = 0;
+	let sumAvgF0 = 0;
+
+	for (let i = 0; i < syllables.length; i++) {
+		const syl = syllables[i];
+		const segPoints = segments[i] || [];
+
+		let aiPred = null;
+		if (aiPredictorFn && segPoints.length >= 4) {
+			try {
+				aiPred = await aiPredictorFn(segPoints);
+			} catch {}
+		}
+
+		const analysis = analyzeToneContour(segPoints, syl.surfaceTone, aiPred);
+
+		// Syllable specific feedback
+		const targetProf = TONE_PROFILES[syl.surfaceTone] || TONE_PROFILES[1];
+		const detectedProf = TONE_PROFILES[analysis.detectedTone] || TONE_PROFILES[1];
+		let sylFeedback = '';
+		if (analysis.isMatch) {
+			sylFeedback = `พยางค์ที่ ${i + 1} (${syl.hanzi} ${syl.pinyin}): ออกเสียง ${targetProf.thaiName} (${targetProf.chaoPitch}) ถูกต้องแม่นยำ`;
+		} else {
+			sylFeedback = `พยางค์ที่ ${i + 1} (${syl.hanzi} ${syl.pinyin}): ตรวจพบเป็น ${detectedProf.thaiName} (${detectedProf.chaoPitch}) แต่เป้าหมายคือ ${targetProf.thaiName} (${targetProf.chaoPitch})${syl.sandhiDescription ? ` [${syl.sandhiDescription}]` : ''} — ${targetProf.thaiTip}`;
+		}
+
+		const sylResult: SyllableToneResult = {
+			syllableIndex: i,
+			hanzi: syl.hanzi,
+			pinyin: syl.pinyin,
+			targetTone: syl.surfaceTone,
+			detectedTone: analysis.detectedTone,
+			score: analysis.score,
+			isMatch: analysis.isMatch,
+			contour: analysis.contour,
+			startMs: segPoints[0]?.timeMs || 0,
+			endMs: segPoints[segPoints.length - 1]?.timeMs || 0,
+			avgF0: analysis.avgF0,
+			minF0: analysis.minF0,
+			maxF0: analysis.maxF0,
+			feedback: sylFeedback,
+			slope: analysis.slope,
+			aiConfidence: analysis.aiConfidence,
+			aiProbabilities: analysis.aiProbabilities,
+			isAIModel: analysis.isAIModel
+		};
+
+		syllableResults.push(sylResult);
+		totalScore += analysis.score;
+		sumAvgF0 += analysis.avgF0;
+		if (segPoints.length >= 4) totalVoicedCount++;
+	}
+
+	const overallScore = Math.round(totalScore / syllables.length);
+	const isAllMatch = syllableResults.every((s) => s.isMatch);
+	const passedCount = syllableResults.filter((s) => s.isMatch).length;
+
+	// Overall composite feedback
+	let overallFeedback = '';
+	if (isAllMatch) {
+		if (overallScore >= 90) {
+			overallFeedback = `ยอดเยี่ยมมาก! ออกเสียงถูกต้องแม่นยำครบทั้ง ${syllables.length} พยางค์ตามมาตรฐานเสียงรวมของคำศัพท์`;
+		} else {
+			overallFeedback = `ดีมาก! วรรณยุกต์ถูกต้องครบทั้ง ${syllables.length} พยางค์ เส้นเสียงมีความชัดเจน`;
+		}
+	} else if (passedCount > 0) {
+		const failedSyls = syllableResults
+			.filter((s) => !s.isMatch)
+			.map((s) => `พยางค์ที่ ${s.syllableIndex + 1} (${s.hanzi})`)
+			.join(', ');
+		overallFeedback = `ใกล้เคียงมาก! ออกเสียงถูกต้อง ${passedCount}/${syllables.length} พยางค์ (โปรดปรับวรรณยุกต์ที่ ${failedSyls} ตามคำแนะนำ)`;
+	} else {
+		overallFeedback = `ยังไม่ตรงตามเป้าหมายวรรณยุกต์ทั้ง ${syllables.length} พยางค์ แนะนำให้ดูเส้นกราฟและลองออกเสียงใหม่อีกครั้ง`;
+	}
+
+	const voicedAll = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.4);
+	const totalDurationMs = voicedAll.length > 0 ? (voicedAll[voicedAll.length - 1].timeMs - voicedAll[0].timeMs) : 0;
+	const avgF0 = totalVoicedCount > 0 ? Math.round(sumAvgF0 / totalVoicedCount) : 0;
+
+	return {
+		overallScore,
+		isAllMatch,
+		syllableResults,
+		overallFeedback,
+		totalDurationMs,
+		avgF0,
+		contour: voicedAll,
+		primaryAnalysis: syllableResults[0] ? {
+			detectedTone: syllableResults[0].detectedTone,
+			targetTone: syllableResults[0].targetTone,
+			score: overallScore,
+			isMatch: isAllMatch,
+			minF0: Math.min(...syllableResults.map((s) => s.minF0 || 999)),
+			maxF0: Math.max(...syllableResults.map((s) => s.maxF0 || 0)),
+			avgF0,
+			pitchRangeHz: 0,
+			durationMs: totalDurationMs,
+			contour: voicedAll,
+			feedback: overallFeedback,
+			slope: syllableResults[0].slope
+		} : undefined
 	};
 }
 

@@ -5,7 +5,7 @@
 import rawHsk1Csv from '$lib/data/hsk1_pronunciation.csv?raw';
 import rawHsk2Csv from '$lib/data/hsk2_pronunciation.csv?raw';
 import rawHsk3Csv from '$lib/data/hsk3_pronunciation.csv?raw';
-import { type ToneNumber, type TonePreset } from '$lib/pitch';
+import { type ToneNumber, type TonePreset, type SyllableInfo } from '$lib/pitch';
 import { browser } from '$app/environment';
 
 export type HskLevel = 1 | 2 | 3;
@@ -43,6 +43,137 @@ export function extractToneFromPinyin(pinyin: string): ToneNumber {
 	}
 
 	return 5; // Neutral
+}
+
+/**
+ * Splits continuous or spaced pinyin into individual syllable strings matching the hanzi length.
+ */
+export function splitPinyinIntoSyllableTokens(pinyin: string, expectedCount: number): string[] {
+	if (!pinyin) return Array(expectedCount).fill('');
+	const clean = pinyin.trim();
+
+	// 1. If already space, hyphen, or apostrophe separated
+	const separated = clean.split(/[\s\-']+/).filter((s) => s.length > 0);
+	if (separated.length === expectedCount) {
+		return separated;
+	}
+
+	if (expectedCount <= 1) {
+		return [clean];
+	}
+
+	// 2. Regex splitting for combined Chinese pinyin (e.g. 'báitiān' -> ['bái', 'tiān'], 'bàba' -> ['bà', 'ba'])
+	// Match standard Mandarin initials + vowels + tone diacritics
+	const pinyinRegex = /(?:[bcdfghjklmnpqrstwxyzBCDFGHJKLMNPQRSTWXYZ]{1,2}|)(?:[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüv]+(?:ng|n|r)?)/gi;
+	const matches = clean.match(pinyinRegex);
+	if (matches && matches.length === expectedCount) {
+		return matches;
+	}
+
+	// 3. Fallback: split by approximate string length
+	const avgLen = Math.ceil(clean.length / expectedCount);
+	const fallback: string[] = [];
+	for (let i = 0; i < expectedCount; i++) {
+		fallback.push(clean.slice(i * avgLen, (i + 1) * avgLen));
+	}
+	return fallback;
+}
+
+/**
+ * Parses and computes detailed per-syllable information with Mandarin Tone Sandhi & Neutral Tone rules.
+ */
+export function parseSyllables(
+	hanzi: string,
+	pinyin: string,
+	rawTonePattern?: string
+): SyllableInfo[] {
+	const chars = Array.from(hanzi);
+	const count = chars.length;
+	if (count === 0) return [];
+
+	const pinyinTokens = splitPinyinIntoSyllableTokens(pinyin, count);
+	const syllables: SyllableInfo[] = [];
+
+	for (let i = 0; i < count; i++) {
+		const char = chars[i];
+		const token = pinyinTokens[i] || '';
+		const baseTone = extractToneFromPinyin(token);
+		let surfaceTone = baseTone;
+		let sandhiDescription: string | undefined = undefined;
+
+		// 1. Reduplication / suffix neutral tone rule (e.g. 爸爸 bàba, 杯子 bēizi, 朋友 péngyou)
+		const isSecondReduplicated = i === 1 && count === 2 && char === chars[0];
+		const isNeutralSuffix =
+			(char === '子' || char === '们' || char === '的' || char === '得' || char === '地' || char === '了' || char === '吗' || char === '呢' || char === '吧') &&
+			i > 0;
+
+		if (isSecondReduplicated || isNeutralSuffix || baseTone === 5) {
+			surfaceTone = 5;
+			sandhiDescription = 'เสียงเบา / สั้น (轻声)';
+		}
+
+		syllables.push({
+			hanzi: char,
+			pinyin: token,
+			baseTone,
+			surfaceTone,
+			sandhiDescription
+		});
+	}
+
+	// 2. Apply Mandarin Tone Sandhi Rules across adjacent syllables:
+	for (let i = 0; i < syllables.length; i++) {
+		const current = syllables[i];
+		const next = syllables[i + 1];
+
+		// A. 3rd Tone Sandhi: 3 + 3 -> 2 + 3 (e.g. 你好 nǐ hǎo -> ní hǎo, 手表 shǒubiǎo -> shóubiǎo)
+		if (current.baseTone === 3 && next && next.baseTone === 3) {
+			current.surfaceTone = 2;
+			current.sandhiDescription = 'กฎ 3+3 (คำหน้าเปลี่ยนเป็นเสียง 2)';
+		}
+
+		// B. 不 (bù) Sandhi: 不 + 4th tone -> 2nd tone (e.g. 不要 bú yào, 不是 bú shì, 不客气 bú kèqi)
+		if (current.hanzi === '不') {
+			if (next && next.surfaceTone === 4) {
+				current.surfaceTone = 2;
+				current.sandhiDescription = 'กฎ 不 นำหน้าเสียง 4 เปลี่ยนเป็นเสียง 2';
+			} else {
+				current.surfaceTone = 4;
+			}
+		}
+
+		// C. 一 (yī) Sandhi:
+		// When followed by 4th tone -> 2nd tone (e.g. 一样 yí yàng, 一定 yí dìng)
+		// When followed by 1st, 2nd, 3rd tone -> 4th tone (e.g. 一天 yì tiān, 一起 yì qǐ)
+		// Unless ordinal like 第一 (dì-yī)
+		if (current.hanzi === '一') {
+			const isOrdinal = i > 0 && syllables[i - 1]?.hanzi === '第';
+			if (!isOrdinal && next) {
+				if (next.surfaceTone === 4) {
+					current.surfaceTone = 2;
+					current.sandhiDescription = 'กฎ 一 นำหน้าเสียง 4 เปลี่ยนเป็นเสียง 2';
+				} else if (next.surfaceTone >= 1 && next.surfaceTone <= 3) {
+					current.surfaceTone = 4;
+					current.sandhiDescription = 'กฎ 一 นำหน้าเสียง 1, 2, 3 เปลี่ยนเป็นเสียง 4';
+				}
+			}
+		}
+	}
+
+	// 3. Respect explicit surface_tone_pattern from CSV if provided (e.g. '2+4' for 不客气, '2+3' for 你好)
+	if (rawTonePattern && rawTonePattern.includes('+')) {
+		const patternTones = rawTonePattern
+			.split('+')
+			.map((t) => parseInt(t.trim(), 10))
+			.filter((t) => t >= 1 && t <= 5);
+		if (patternTones.length === syllables.length) {
+			for (let i = 0; i < syllables.length; i++) {
+				syllables[i].surfaceTone = patternTones[i] as ToneNumber;
+			}
+		}
+	}
+
+	return syllables;
 }
 
 /**
@@ -119,22 +250,14 @@ export function parseVocabCsv(
 		const rawPattern = patternIdx >= 0 && row[patternIdx] ? row[patternIdx] : '';
 		let rawTone = toneIdx >= 0 && row[toneIdx] ? row[toneIdx] : '';
 
-		// Accurate tone extraction:
-		// 1. If pinyin has explicit diacritic marks (ā, á, ǎ, à), extract from pinyin for standard pronunciation.
-		// 2. Otherwise fallback to rawTone column.
-		let toneNumber: ToneNumber = 1;
-		const pinyinTone = extractToneFromPinyin(pinyin);
-		if (pinyinTone >= 1 && pinyinTone <= 4) {
-			toneNumber = pinyinTone;
-		} else {
-			const toneMatch = rawTone.match(/[1-5]/);
-			if (toneMatch) {
-				toneNumber = parseInt(toneMatch[0], 10) as ToneNumber;
-			}
-		}
+		// Decompose into individual syllables and compute surface tones with Sandhi
+		const syllables = parseSyllables(hanzi, pinyin, rawPattern);
+		const primaryTone = syllables[0]?.surfaceTone || extractToneFromPinyin(pinyin);
+		const tonePattern = syllables.map((s) => s.surfaceTone).join('+');
 
 		// Detect Sandhi or Multi-syllable category (e.g. 3+3 -> 2+3 or 2+4)
 		const isSandhi =
+			syllables.some((s) => !!s.sandhiDescription) ||
 			rawTone.includes('2+3') ||
 			rawTone.includes('3 | 3') ||
 			rawPattern.includes('2+3') ||
@@ -143,15 +266,22 @@ export function parseVocabCsv(
 
 		const category: TonePreset['category'] = isSandhi
 			? 'sandhi'
-			: toneNumber === 1
-				? '1st'
-				: toneNumber === 2
-					? '2nd'
-					: toneNumber === 3
-						? '3rd'
-						: toneNumber === 4
-							? '4th'
-							: '1st';
+			: syllables.length > 1
+				? 'pair'
+				: primaryTone === 1
+					? '1st'
+					: primaryTone === 2
+						? '2nd'
+						: primaryTone === 3
+							? '3rd'
+							: primaryTone === 4
+								? '4th'
+								: '1st';
+
+		const sandhiNotes = syllables
+			.filter((s) => s.sandhiDescription)
+			.map((s) => `${s.hanzi}: ${s.sandhiDescription}`)
+			.join(' | ');
 
 		presets.push({
 			id: `hsk${defaultLevel}_${i}_${encodeURIComponent(hanzi)}`,
@@ -159,11 +289,11 @@ export function parseVocabCsv(
 			pinyin: pinyin || hanzi,
 			thai: thai || english || 'คำศัพท์ภาษาจีน',
 			english: english || thai,
-			tone: isSandhi ? 2 : toneNumber,
+			tone: primaryTone,
 			category,
-			description: isSandhi
-				? `กฎเปลี่ยนเสียง Sandhi 3+3 → 2+3 (คำหน้าออกเสียง 2)`
-				: undefined
+			syllables,
+			tonePattern,
+			description: isSandhi ? sandhiNotes || 'กฎเปลี่ยนเสียงวรรณยุกต์ Sandhi' : undefined
 		});
 	}
 

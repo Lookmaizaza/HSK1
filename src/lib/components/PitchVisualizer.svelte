@@ -3,12 +3,14 @@
 	import {
 		type PitchPoint,
 		type ToneNumber,
+		type SyllableInfo,
 		TONE_PROFILES
 	} from '$lib/pitch';
 
 	let {
 		points = [] as PitchPoint[],
 		targetTone = undefined as ToneNumber | undefined,
+		syllables = undefined as SyllableInfo[] | undefined,
 		isLive = false,
 		height = 240,
 		showTargetCurve = true,
@@ -16,6 +18,7 @@
 	}: {
 		points?: PitchPoint[];
 		targetTone?: ToneNumber | undefined;
+		syllables?: SyllableInfo[] | undefined;
 		isLive?: boolean;
 		height?: number;
 		showTargetCurve?: boolean;
@@ -30,6 +33,7 @@
 		// Triggers reactivity
 		const pts = points;
 		const tone = targetTone;
+		const syls = syllables;
 		const live = isLive;
 		const hz = currentHz;
 		render();
@@ -112,36 +116,101 @@
 			ctx.fillText(l.sub, padding.left + graphWidth + 8, y + 3.5);
 		});
 
-		// 2. Draw Target Tone Curve if specified
-		if (showTargetCurve && targetTone && TONE_PROFILES[targetTone]) {
-			const profile = TONE_PROFILES[targetTone];
-			const curve = profile.curve;
+		// 2. Draw Target Tone Curve(s)
+		if (showTargetCurve) {
+			const activeSyllables = syllables && syllables.length > 0 ? syllables : undefined;
 
-			ctx.save();
-			ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)'; // Bright Sky glow
-			ctx.lineWidth = 4;
-			ctx.lineCap = 'round';
-			ctx.lineJoin = 'round';
-			ctx.setLineDash([6, 6]);
+			if (activeSyllables && activeSyllables.length > 1) {
+				// Multi-syllable target curve rendering
+				const sylCount = activeSyllables.length;
+				const sylWidth = graphWidth / sylCount;
 
-			ctx.beginPath();
-			for (let i = 0; i < curve.length; i++) {
-				const x = padding.left + (i / (curve.length - 1)) * graphWidth;
-				const normY = (5 - curve[i]) / 4; // 5 -> 0, 1 -> 1
-				const y = padding.top + normY * graphHeight;
-				if (i === 0) ctx.moveTo(x, y);
-				else ctx.lineTo(x, y);
+				for (let k = 0; k < sylCount; k++) {
+					const syl = activeSyllables[k];
+					const secLeft = padding.left + k * sylWidth;
+					const secRight = secLeft + sylWidth;
+					const innerPad = 12;
+					const curveWidth = sylWidth - innerPad * 2;
+					const profile = TONE_PROFILES[syl.surfaceTone] || TONE_PROFILES[1];
+					const curve = profile.curve;
+
+					// Vertical separator line between syllables
+					if (k > 0) {
+						ctx.save();
+						ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+						ctx.lineWidth = 1.5;
+						ctx.setLineDash([3, 3]);
+						ctx.beginPath();
+						ctx.moveTo(secLeft, padding.top - 6);
+						ctx.lineTo(secLeft, padding.top + graphHeight + 4);
+						ctx.stroke();
+						ctx.restore();
+					}
+
+					// Syllable header tag
+					ctx.save();
+					ctx.fillStyle = '#38bdf8';
+					ctx.font = 'bold 10px ui-sans-serif, system-ui, sans-serif';
+					ctx.textAlign = 'center';
+					ctx.fillText(
+						`พยางค์ ${k + 1}: ${syl.hanzi} (${syl.pinyin}) ${profile.thaiName}`,
+						secLeft + sylWidth / 2,
+						padding.top - 8
+					);
+					ctx.restore();
+
+					// Syllable Target curve
+					ctx.save();
+					ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)'; // Bright Sky glow
+					ctx.lineWidth = 3.5;
+					ctx.lineCap = 'round';
+					ctx.lineJoin = 'round';
+					ctx.setLineDash([5, 5]);
+
+					ctx.beginPath();
+					for (let i = 0; i < curve.length; i++) {
+						const x = secLeft + innerPad + (i / (curve.length - 1)) * curveWidth;
+						const normY = (5 - curve[i]) / 4; // 5 -> 0, 1 -> 1
+						const y = padding.top + normY * graphHeight;
+						if (i === 0) ctx.moveTo(x, y);
+						else ctx.lineTo(x, y);
+					}
+					ctx.stroke();
+					ctx.restore();
+				}
+			} else {
+				// Single target tone
+				const activeTone = targetTone || (activeSyllables && activeSyllables[0]?.surfaceTone);
+				if (activeTone && TONE_PROFILES[activeTone]) {
+					const profile = TONE_PROFILES[activeTone];
+					const curve = profile.curve;
+
+					ctx.save();
+					ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)'; // Bright Sky glow
+					ctx.lineWidth = 4;
+					ctx.lineCap = 'round';
+					ctx.lineJoin = 'round';
+					ctx.setLineDash([6, 6]);
+
+					ctx.beginPath();
+					for (let i = 0; i < curve.length; i++) {
+						const x = padding.left + (i / (curve.length - 1)) * graphWidth;
+						const normY = (5 - curve[i]) / 4; // 5 -> 0, 1 -> 1
+						const y = padding.top + normY * graphHeight;
+						if (i === 0) ctx.moveTo(x, y);
+						else ctx.lineTo(x, y);
+					}
+					ctx.stroke();
+					ctx.setLineDash([]);
+
+					// Label target
+					ctx.fillStyle = '#38bdf8';
+					ctx.font = '10px sans-serif';
+					ctx.textAlign = 'center';
+					ctx.fillText(`Target: ${profile.thaiName} (${profile.chaoPitch})`, padding.left + graphWidth * 0.5, padding.top - 8);
+					ctx.restore();
+				}
 			}
-			ctx.stroke();
-			ctx.setLineDash([]);
-
-			// Label target
-			ctx.fillStyle = '#38bdf8';
-			ctx.font = '10px sans-serif';
-			ctx.textAlign = 'center';
-			const startY = padding.top + ((5 - curve[0]) / 4) * graphHeight;
-			ctx.fillText(`Target: ${profile.chaoPitch}`, padding.left + graphWidth * 0.5, padding.top - 8);
-			ctx.restore();
 		}
 
 		// 3. Draw User Pitch Points ($F_0$ Contour)
