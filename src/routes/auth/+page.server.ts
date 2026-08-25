@@ -66,14 +66,27 @@ export const actions: Actions = {
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
-		if (username.length < 2) return fail(400, { error: 'Username too short', username });
+		if (username.length < 2) return fail(400, { error: 'Username must be at least 2 characters', username });
 		if (password.length < 6) return fail(400, { error: 'Password must be at least 6 characters', username });
-		if (await findUserByUsername(username)) return fail(400, { error: 'Username already taken', username });
 
-		const user = await createUser(username, password);
-		await mergeLocalProgress(user.id, local);
-		const session = await createSession(user.id);
-		setSessionCookie(cookies, session.token, session.expiresAt);
+		try {
+			if (await findUserByUsername(username)) {
+				return fail(400, { error: 'Username already taken', username });
+			}
+
+			const user = await createUser(username, password);
+			await mergeLocalProgress(user.id, local);
+			const session = await createSession(user.id);
+			setSessionCookie(cookies, session.token, session.expiresAt);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			return fail(500, {
+				error: msg.includes('Database not available')
+					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า (ต้องใส่ TURSO_DATABASE_URL ใน Vercel)'
+					: `เกิดข้อผิดพลาด: ${msg}`,
+				username
+			});
+		}
 		throw redirect(303, '/');
 	},
 
@@ -82,13 +95,23 @@ export const actions: Actions = {
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
-		const row = await findUserByUsername(username);
-		if (!row || !verifyPassword(password, row.password_hash)) {
-			return fail(400, { error: 'Invalid username or password', username });
+		try {
+			const row = await findUserByUsername(username);
+			if (!row || !verifyPassword(password, row.password_hash)) {
+				return fail(400, { error: 'Invalid username or password', username });
+			}
+			await mergeLocalProgress(row.id, local);
+			const session = await createSession(row.id);
+			setSessionCookie(cookies, session.token, session.expiresAt);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			return fail(500, {
+				error: msg.includes('Database not available')
+					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า (ต้องใส่ TURSO_DATABASE_URL ใน Vercel)'
+					: `เกิดข้อผิดพลาด: ${msg}`,
+				username
+			});
 		}
-		await mergeLocalProgress(row.id, local);
-		const session = await createSession(row.id);
-		setSessionCookie(cookies, session.token, session.expiresAt);
 		throw redirect(303, '/');
 	}
 };
