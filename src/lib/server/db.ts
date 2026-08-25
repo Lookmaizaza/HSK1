@@ -82,6 +82,20 @@ CREATE TABLE IF NOT EXISTS user_mistakes (
 	feedback TEXT,
 	created_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS pronunciation_evaluations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	pinyin TEXT NOT NULL,
+	attempt_number INTEGER NOT NULL DEFAULT 1,
+	audio_duration_sec REAL NOT NULL DEFAULT 0,
+	gop_overall REAL NOT NULL DEFAULT 0,
+	per_overall REAL NOT NULL DEFAULT 0,
+	tone_score REAL NOT NULL DEFAULT 0,
+	phoneme_details TEXT NOT NULL,
+	created_at INTEGER NOT NULL
+);
 `;
 
 let initPromise: Promise<void> | null = null;
@@ -500,6 +514,148 @@ export async function clearUserMistakes(userId: number): Promise<void> {
 		sql: 'DELETE FROM user_mistakes WHERE user_id = ?',
 		args: [userId]
 	});
+}
+
+// Pronunciation Evaluation Queries & Logs
+export async function recordPronunciationEvaluation(payload: {
+	user_id: string;
+	word_id: string;
+	pinyin: string;
+	attempt_number?: number;
+	audio_duration_sec?: number;
+	scores: {
+		gop_overall: number;
+		per_overall: number;
+		tone_score: number;
+		phoneme_details: any[];
+	};
+}): Promise<void> {
+	const client = getDb();
+	if (!client) return;
+	await init();
+	await client.execute({
+		sql: `INSERT INTO pronunciation_evaluations 
+		      (user_id, word_id, pinyin, attempt_number, audio_duration_sec, gop_overall, per_overall, tone_score, phoneme_details, created_at)
+		      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		args: [
+			String(payload.user_id),
+			String(payload.word_id),
+			String(payload.pinyin),
+			Number(payload.attempt_number ?? 1),
+			Number(payload.audio_duration_sec ?? 0),
+			Number(payload.scores.gop_overall ?? 0),
+			Number(payload.scores.per_overall ?? 0),
+			Number(payload.scores.tone_score ?? 0),
+			JSON.stringify(payload.scores.phoneme_details ?? []),
+			Date.now()
+		]
+	});
+}
+
+export async function getPronunciationEvaluations(
+	userId: string,
+	limit = 50
+): Promise<Array<{
+	id: number;
+	user_id: string;
+	word_id: string;
+	pinyin: string;
+	attempt_number: number;
+	audio_duration_sec: number;
+	scores: {
+		gop_overall: number;
+		per_overall: number;
+		tone_score: number;
+		phoneme_details: any[];
+	};
+	created_at: number;
+}>> {
+	const client = getDb();
+	if (!client) return [];
+	await init();
+	const result = await client.execute({
+		sql: `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
+		             gop_overall, per_overall, tone_score, phoneme_details, created_at
+		      FROM pronunciation_evaluations
+		      WHERE user_id = ?
+		      ORDER BY created_at DESC
+		      LIMIT ?`,
+		args: [String(userId), limit]
+	});
+
+	return result.rows.map((r) => {
+		let phonemeDetails = [];
+		try {
+			phonemeDetails = JSON.parse(String(r.phoneme_details || '[]'));
+		} catch {
+			phonemeDetails = [];
+		}
+		return {
+			id: Number(r.id),
+			user_id: String(r.user_id),
+			word_id: String(r.word_id),
+			pinyin: String(r.pinyin),
+			attempt_number: Number(r.attempt_number),
+			audio_duration_sec: Number(r.audio_duration_sec),
+			scores: {
+				gop_overall: Number(r.gop_overall),
+				per_overall: Number(r.per_overall),
+				tone_score: Number(r.tone_score),
+				phoneme_details: phonemeDetails
+			},
+			created_at: Number(r.created_at)
+		};
+	});
+}
+
+export async function getPronunciationPhonemeErrorStats(userId: string): Promise<{
+	totalAttempts: number;
+	avgGop: number;
+	avgPer: number;
+	avgToneScore: number;
+	frequentSubstitutions: Array<{ target: string; recognized: string; count: number }>;
+}> {
+	const list = await getPronunciationEvaluations(userId, 500);
+	if (list.length === 0) {
+		return {
+			totalAttempts: 0,
+			avgGop: 0,
+			avgPer: 0,
+			avgToneScore: 0,
+			frequentSubstitutions: []
+		};
+	}
+
+	let totalGop = 0;
+	let totalPer = 0;
+	let totalTone = 0;
+	const substitutionMap: Record<string, { target: string; recognized: string; count: number }> = {};
+
+	for (const item of list) {
+		totalGop += item.scores.gop_overall;
+		totalPer += item.scores.per_overall;
+		totalTone += item.scores.tone_score;
+
+		for (const p of item.scores.phoneme_details) {
+			if (p.status === 'substitution' && p.target && p.recognized && p.target !== p.recognized) {
+				const key = `${p.target}->${p.recognized}`;
+				if (!substitutionMap[key]) {
+					substitutionMap[key] = { target: p.target, recognized: p.recognized, count: 0 };
+				}
+				substitutionMap[key].count++;
+			}
+		}
+	}
+
+	const frequentSubstitutions = Object.values(substitutionMap).sort((a, b) => b.count - a.count).slice(0, 10);
+
+	return {
+		totalAttempts: list.length,
+		avgGop: Number((totalGop / list.length).toFixed(1)),
+		avgPer: Number((totalPer / list.length).toFixed(2)),
+		avgToneScore: Number((totalTone / list.length).toFixed(1)),
+		frequentSubstitutions
+	};
 }
 
 

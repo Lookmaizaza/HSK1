@@ -1,0 +1,210 @@
+// Pronunciation Assessment & Phoneme-level Error Analysis types and utilities.
+// Standardized for Computer-Assisted Pronunciation Training (CAPT), GOP (Goodness of Pronunciation),
+// and PER (Phoneme Error Rate) analytics.
+
+export type PhonemeType = 'initial' | 'final' | 'final_tone';
+
+export type PhonemeStatus = 'correct' | 'substitution' | 'omission' | 'insertion';
+
+export interface PhonemeDetail {
+	phoneme: string; // Target phoneme string, e.g. "zh", "i1"
+	type: PhonemeType; // 'initial' or 'final_tone'
+	gop: number; // Goodness of Pronunciation score (0 - 100)
+	target: string; // Expected phoneme representation
+	recognized: string; // Actually recognized phoneme from ASR / Acoustic model
+	status: PhonemeStatus; // Assessment result: 'correct' | 'substitution' | 'omission' | 'insertion'
+}
+
+export interface PronunciationScores {
+	gop_overall: number; // Average GOP score across all phonemes (0 - 100)
+	per_overall: number; // Phoneme Error Rate: (Substitutions + Deletions + Insertions) / Total Targets (0.0 - 1.0)
+	tone_score: number; // Tone pitch accuracy score (0 - 100)
+	phoneme_details: PhonemeDetail[]; // Granular phoneme breakdown
+}
+
+export interface LearnerPronunciationPayload {
+	user_id: string; // Learner ID or UUID, e.g. "usr_uuid_987654321"
+	word_id: string; // Vocabulary or lesson item ID, e.g. "chi_042"
+	pinyin: string; // Target pinyin string with marks or numbers, e.g. "zhī shi"
+	attempt_number: number; // Number of attempt for this session/word
+	audio_duration_sec: number; // Recorded audio duration in seconds
+	scores: PronunciationScores; // Detailed scores and phoneme breakdown
+}
+
+export interface PhonemeErrorStats {
+	totalAttempts: number;
+	avgGop: number;
+	avgPer: number;
+	avgToneScore: number;
+	mostFrequentErrors: {
+		target: string;
+		recognized: string;
+		type: PhonemeType;
+		count: number;
+	}[];
+}
+
+// Initial consonants in Standard Mandarin Chinese Pinyin
+export const PINYIN_INITIALS = [
+	'b', 'p', 'm', 'f', 'd', 't', 'n', 'l',
+	'g', 'k', 'h', 'j', 'q', 'x',
+	'zh', 'ch', 'sh', 'r', 'z', 'c', 's',
+	'y', 'w'
+] as const;
+
+// Tone mark mappings
+const TONE_MAP: Record<string, { base: string; tone: number }> = {
+	ā: { base: 'a', tone: 1 },
+	á: { base: 'a', tone: 2 },
+	ǎ: { base: 'a', tone: 3 },
+	à: { base: 'a', tone: 4 },
+	ē: { base: 'e', tone: 1 },
+	é: { base: 'e', tone: 2 },
+	ě: { base: 'e', tone: 3 },
+	è: { base: 'e', tone: 4 },
+	ī: { base: 'i', tone: 1 },
+	í: { base: 'i', tone: 2 },
+	ǐ: { base: 'i', tone: 3 },
+	ì: { base: 'i', tone: 4 },
+	ō: { base: 'o', tone: 1 },
+	ó: { base: 'o', tone: 2 },
+	ǒ: { base: 'o', tone: 3 },
+	ò: { base: 'o', tone: 4 },
+	ū: { base: 'u', tone: 1 },
+	ú: { base: 'u', tone: 2 },
+	ǔ: { base: 'u', tone: 3 },
+	ù: { base: 'u', tone: 4 },
+	ǖ: { base: 'v', tone: 1 },
+	ǘ: { base: 'v', tone: 2 },
+	ǚ: { base: 'v', tone: 3 },
+	ǜ: { base: 'v', tone: 4 },
+	ü: { base: 'v', tone: 0 }
+};
+
+/**
+ * Splits a single pinyin syllable (with tone mark or tone number) into Initial + FinalWithTone.
+ * e.g. "zhī" -> { initial: "zh", finalTone: "i1", tone: 1 }
+ *      "shi" -> { initial: "sh", finalTone: "i0", tone: 0 }
+ *      "ài"  -> { initial: "", finalTone: "ai4", tone: 4 }
+ */
+export function splitPinyinSyllable(rawSyllable: string): {
+	initial: string;
+	finalTone: string;
+	tone: number;
+} {
+	let s = rawSyllable.trim().toLowerCase();
+	if (!s) return { initial: '', finalTone: '', tone: 0 };
+
+	// Check if ends with a tone number (e.g. zhi1)
+	let detectedTone = 0;
+	const numMatch = s.match(/([1-5])$/);
+	if (numMatch) {
+		detectedTone = Number(numMatch[1]) % 5; // 5 or 0 is neutral
+		s = s.slice(0, -1);
+	}
+
+	// Replace accented vowel characters with base vowel and record tone
+	let cleanStr = '';
+	for (const ch of s) {
+		if (TONE_MAP[ch]) {
+			if (detectedTone === 0) detectedTone = TONE_MAP[ch].tone;
+			cleanStr += TONE_MAP[ch].base;
+		} else {
+			cleanStr += ch;
+		}
+	}
+
+	// Find longest matching initial
+	let initial = '';
+	// Check two-letter initials first ('zh', 'ch', 'sh')
+	if (cleanStr.startsWith('zh') || cleanStr.startsWith('ch') || cleanStr.startsWith('sh')) {
+		initial = cleanStr.slice(0, 2);
+	} else if (cleanStr.length > 0 && PINYIN_INITIALS.includes(cleanStr[0] as any)) {
+		initial = cleanStr[0];
+	}
+
+	const finalBody = cleanStr.slice(initial.length);
+	const finalTone = `${finalBody}${detectedTone}`;
+
+	return {
+		initial,
+		finalTone,
+		tone: detectedTone
+	};
+}
+
+/**
+ * Parses a full pinyin string (e.g. "zhī shi" or "nǐ hǎo") into target phoneme segments.
+ */
+export function extractTargetPhonemes(pinyin: string): Array<{ phoneme: string; type: PhonemeType }> {
+	const syllables = pinyin.trim().split(/\s+/).filter(Boolean);
+	const result: Array<{ phoneme: string; type: PhonemeType }> = [];
+
+	for (const syl of syllables) {
+		const { initial, finalTone } = splitPinyinSyllable(syl);
+		if (initial) {
+			result.push({ phoneme: initial, type: 'initial' });
+		}
+		if (finalTone) {
+			result.push({ phoneme: finalTone, type: 'final_tone' });
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Calculates overall GOP (0-100) and PER (0.0-1.0) from phoneme details list.
+ */
+export function calculatePronunciationMetrics(details: PhonemeDetail[]): {
+	gop_overall: number;
+	per_overall: number;
+} {
+	if (!details || details.length === 0) {
+		return { gop_overall: 0, per_overall: 0 };
+	}
+
+	let totalGop = 0;
+	let errorCount = 0;
+
+	for (const p of details) {
+		totalGop += p.gop;
+		if (p.status !== 'correct') {
+			errorCount += 1;
+		}
+	}
+
+	const gop_overall = Number((totalGop / details.length).toFixed(1));
+	const per_overall = Number((errorCount / details.length).toFixed(2));
+
+	return { gop_overall, per_overall };
+}
+
+/**
+ * Helper to construct a complete LearnerPronunciationPayload object.
+ */
+export function buildPronunciationPayload(params: {
+	userId: string;
+	wordId: string;
+	pinyin: string;
+	attemptNumber?: number;
+	audioDurationSec: number;
+	toneScore?: number;
+	phonemeDetails: PhonemeDetail[];
+}): LearnerPronunciationPayload {
+	const { gop_overall, per_overall } = calculatePronunciationMetrics(params.phonemeDetails);
+
+	return {
+		user_id: params.userId,
+		word_id: params.wordId,
+		pinyin: params.pinyin,
+		attempt_number: params.attemptNumber ?? 1,
+		audio_duration_sec: Number(params.audioDurationSec.toFixed(2)),
+		scores: {
+			gop_overall,
+			per_overall,
+			tone_score: Number((params.toneScore ?? 100).toFixed(1)),
+			phoneme_details: params.phonemeDetails
+		}
+	};
+}
