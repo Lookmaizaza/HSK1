@@ -33,33 +33,35 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	});
 };
 
-// POST /api/mistakes - บันทึกคำที่ผิดแบบกำหนดเอง (Custom Recording)
+// POST /api/mistakes - บันทึกคำที่ผิด (รองรับทั้งแบบชิ้นเดียว และ Array หลายคำ)
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
 		throw error(401, 'Unauthorized: Please log in to record mistakes.');
 	}
 
 	const body = await request.json();
-	const { hanzi, pinyin, meaning, expectedTone, heardText, score, feedback } = body;
+	const items = Array.isArray(body) ? body : Array.isArray(body.items) ? body.items : [body];
 
-	if (!hanzi || typeof hanzi !== 'string') {
-		throw error(400, 'Invalid request: "hanzi" is required.');
+	for (const item of items) {
+		const { hanzi, pinyin, meaning, expectedTone, heardText, score, feedback } = item;
+		if (hanzi && typeof hanzi === 'string') {
+			await recordMistake({
+				userId: locals.user.id,
+				hanzi: hanzi.trim(),
+				pinyin: (pinyin || '').trim(),
+				meaning: (meaning || '').trim(),
+				expectedTone: typeof expectedTone === 'number' ? expectedTone : null,
+				heardText: typeof heardText === 'string' ? heardText : '',
+				score: typeof score === 'number' ? score : 0,
+				feedback: typeof feedback === 'string' ? feedback : ''
+			});
+		}
 	}
-
-	await recordMistake({
-		userId: locals.user.id,
-		hanzi: hanzi.trim(),
-		pinyin: (pinyin || '').trim(),
-		meaning: (meaning || '').trim(),
-		expectedTone: typeof expectedTone === 'number' ? expectedTone : null,
-		heardText: typeof heardText === 'string' ? heardText : '',
-		score: typeof score === 'number' ? score : 0,
-		feedback: typeof feedback === 'string' ? feedback : ''
-	});
 
 	return json({
 		success: true,
-		message: 'Mistake recorded successfully.'
+		count: items.length,
+		message: 'Mistakes recorded successfully.'
 	});
 };
 

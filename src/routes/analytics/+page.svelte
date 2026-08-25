@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import AppHeader from '$lib/components/AppHeader.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { speak } from '$lib/speech';
+	import { HSK1_VOCAB_PRESETS } from '$lib/vocabLoader';
 	import {
 		Volume2,
 		AlertTriangle,
@@ -12,7 +15,8 @@
 		BookOpen,
 		CheckCircle2,
 		Copy,
-		Check
+		Check,
+		RefreshCw
 	} from '@lucide/svelte';
 
 	let { data } = $props();
@@ -27,6 +31,7 @@
 
 	let activeTab = $state<'top' | 'recent' | 'api'>('top');
 	let isTestingApi = $state(false);
+	let isSyncing = $state(false);
 	let apiResponse = $state<string | null>(null);
 	let copied = $state(false);
 
@@ -47,6 +52,62 @@
 			isTestingApi = false;
 		}
 	}
+
+	async function syncLocalMistakes() {
+		if (!browser) return;
+		try {
+			isSyncing = true;
+			const raw = localStorage.getItem('hsk_vocab_pronunciation_stats_v1');
+			if (!raw) return;
+			const localStats = JSON.parse(raw);
+			const itemsToSync: Array<{
+				hanzi: string;
+				pinyin: string;
+				meaning: string;
+				expectedTone: number;
+				heardText: string;
+				score: number;
+				feedback: string;
+			}> = [];
+
+			for (const [id, stat] of Object.entries(localStats)) {
+				const s = stat as { wrongCount: number; status: string; lastScore: number };
+				if (s && (s.wrongCount > 0 || s.status === 'struggling')) {
+					const preset = HSK1_VOCAB_PRESETS.find((p) => p.id === id);
+					if (preset) {
+						itemsToSync.push({
+							hanzi: preset.hanzi,
+							pinyin: preset.pinyin,
+							meaning: preset.thai || preset.english || '',
+							expectedTone: preset.tone,
+							heardText: 'ตรวจจับได้: ผิดวรรณยุกต์',
+							score: s.lastScore || 0,
+							feedback: 'ระดับเสียงวรรณยุกต์ยังไม่ตรงตามมาตรฐาน'
+						});
+					}
+				}
+			}
+
+			if (itemsToSync.length > 0) {
+				await fetch('/api/mistakes', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ items: itemsToSync })
+				});
+				await refreshFromApi();
+			}
+		} catch (e) {
+			console.error('Failed to sync local mistakes:', e);
+		} finally {
+			isSyncing = false;
+		}
+	}
+
+	onMount(() => {
+		if (data.stats.totalMistakes === 0) {
+			syncLocalMistakes();
+		}
+	});
 
 	async function clearHistory() {
 		if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างประวัติคำที่ผิดทั้งหมด?')) return;
@@ -90,11 +151,17 @@ console.log(data.stats);        // สถิติรวมและ Tone error 
 					รวมคำศัพท์และวรรณยุกต์ที่ออกเสียงผิดบ่อย สำหรับนำไปฝึกซ้ำและวิเคราะห์พัฒนาการ
 				</p>
 			</div>
-			{#if stats.totalMistakes > 0}
-				<Button variant="outline" size="sm" class="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onclick={clearHistory}>
-					<RotateCcw class="mr-1.5 size-4" /> ล้างประวัติ
+			<div class="flex items-center gap-2">
+				<Button variant="outline" size="sm" onclick={syncLocalMistakes} disabled={isSyncing}>
+					<RefreshCw class="mr-1.5 size-4 {isSyncing ? 'animate-spin' : ''}" />
+					{isSyncing ? 'กำลังซิงค์...' : 'ซิงค์ข้อมูลจากเครื่องนี้'}
 				</Button>
-			{/if}
+				{#if stats.totalMistakes > 0}
+					<Button variant="outline" size="sm" class="text-rose-600 hover:bg-rose-50 hover:text-rose-700" onclick={clearHistory}>
+						<RotateCcw class="mr-1.5 size-4" /> ล้างประวัติ
+					</Button>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Summary Stats Grid -->
