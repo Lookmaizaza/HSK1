@@ -50,7 +50,10 @@
 		RotateCw,
 		Cpu,
 		Bot,
-		Layers
+		Layers,
+		ChevronLeft,
+		ChevronRight,
+		ArrowRight
 	} from '@lucide/svelte';
 
 	// Storage key for word practice statistics
@@ -91,6 +94,12 @@
 	let analysisResult = $state<MultiSyllableAnalysisResult | null>(null);
 	let errorMessage = $state<string | null>(null);
 	let recognizedWord = $state<string>('');
+
+	// Auto Advance & Navigation State
+	let autoAdvanceEnabled = $state(true);
+	let autoAdvanceSeconds = $state<number | null>(null);
+	let autoAdvanceTimeout: ReturnType<typeof setTimeout> | null = null;
+	let autoAdvanceInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Pitch Tracker & Speech Recognizer
 	let tracker: RealtimePitchTracker | null = null;
@@ -186,11 +195,46 @@
 		})
 	);
 
+	function cancelAutoAdvance() {
+		if (autoAdvanceTimeout) {
+			clearTimeout(autoAdvanceTimeout);
+			autoAdvanceTimeout = null;
+		}
+		if (autoAdvanceInterval) {
+			clearInterval(autoAdvanceInterval);
+			autoAdvanceInterval = null;
+		}
+		autoAdvanceSeconds = null;
+	}
+
+	function goToNextWord() {
+		cancelAutoAdvance();
+		const list = filteredPresets.length > 0 ? filteredPresets : vocabList;
+		const currentIndex = list.findIndex((p) => p.id === selectedPreset.id);
+		if (currentIndex !== -1 && currentIndex + 1 < list.length) {
+			selectPreset(list[currentIndex + 1]);
+		} else if (list.length > 0) {
+			selectPreset(list[0]);
+		}
+	}
+
+	function goToPrevWord() {
+		cancelAutoAdvance();
+		const list = filteredPresets.length > 0 ? filteredPresets : vocabList;
+		const currentIndex = list.findIndex((p) => p.id === selectedPreset.id);
+		if (currentIndex > 0) {
+			selectPreset(list[currentIndex - 1]);
+		} else if (list.length > 0) {
+			selectPreset(list[list.length - 1]);
+		}
+	}
+
 	/**
 	 * Select a word preset from the grid.
 	 * IMPORTANT: Does NOT auto-play audio so it doesn't make sudden loud noise.
 	 */
 	function selectPreset(preset: TonePreset) {
+		cancelAutoAdvance();
 		selectedPreset = preset;
 		resetAnalysis();
 	}
@@ -205,6 +249,7 @@
 	}
 
 	function resetAnalysis() {
+		cancelAutoAdvance();
 		if (isRecording) stopRecording();
 		pitchPoints = [];
 		currentHz = 0;
@@ -427,6 +472,27 @@
 				[selectedPreset.id]: updatedStat
 			});
 
+			// If passed and auto-advance is enabled, automatically move to next word after 2 seconds
+			if (isPassed && autoAdvanceEnabled) {
+				cancelAutoAdvance();
+				autoAdvanceSeconds = 2;
+				autoAdvanceInterval = setInterval(() => {
+					if (autoAdvanceSeconds && autoAdvanceSeconds > 1) {
+						autoAdvanceSeconds--;
+					} else {
+						if (autoAdvanceInterval) {
+							clearInterval(autoAdvanceInterval);
+							autoAdvanceInterval = null;
+						}
+					}
+				}, 1000);
+
+				autoAdvanceTimeout = setTimeout(() => {
+					goToNextWord();
+					autoAdvanceSeconds = null;
+				}, 2000);
+			}
+
 			// If incorrect, record mistake to learner database
 			if (!isPassed) {
 				const heardSummary = finalHeard
@@ -453,6 +519,7 @@
 	}
 
 	onDestroy(() => {
+		cancelAutoAdvance();
 		if (silenceTimeout) clearTimeout(silenceTimeout);
 		if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
 		if (speechRecognizer) {
@@ -773,11 +840,43 @@
 				</div>
 			</div>
 
-			<!-- Target Tone / Tone Pattern Badge -->
-			<div class="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0">
-				<div class="rounded-2xl border bg-muted/50 px-4 py-2 text-left sm:text-right">
-					<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">เป้าหมายวรรณยุกต์</div>
-					<div class="font-extrabold text-foreground text-sm sm:text-base">
+			<!-- Target Tone / Tone Pattern Badge & Next/Prev Controls -->
+			<div class="flex flex-col sm:items-end justify-between gap-2.5 border-t sm:border-t-0 pt-3 sm:pt-0">
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						onclick={goToPrevWord}
+						class="flex size-9 items-center justify-center rounded-xl border bg-muted/40 hover:bg-muted text-foreground transition active:scale-95 shadow-sm"
+						title="คำก่อนหน้า"
+						aria-label="คำก่อนหน้า"
+					>
+						<ChevronLeft class="size-5" />
+					</button>
+
+					<button
+						type="button"
+						onclick={goToNextWord}
+						class="flex h-9 items-center gap-1.5 rounded-xl border bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3.5 text-xs font-extrabold hover:opacity-90 transition active:scale-95 shadow-sm"
+						title="คำถัดไป"
+					>
+						<span>คำถัดไป</span>
+						<ChevronRight class="size-4" />
+					</button>
+				</div>
+
+				<div class="rounded-2xl border bg-muted/50 px-4 py-2 text-left sm:text-right w-full sm:w-auto">
+					<div class="flex items-center justify-between sm:justify-end gap-2">
+						<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">เป้าหมายวรรณยุกต์</div>
+						<button
+							type="button"
+							onclick={() => (autoAdvanceEnabled = !autoAdvanceEnabled)}
+							class="text-[9px] font-bold rounded-full px-2 py-0.5 transition {autoAdvanceEnabled ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30' : 'bg-muted text-muted-foreground border'}"
+							title="เปิด/ปิด การเปลี่ยนไปคำถัดไปอัตโนมัติเมื่อพูดผ่าน"
+						>
+							{autoAdvanceEnabled ? '⚡ ไปคำถัดไปอัตโนมัติ: เปิด' : 'ไปคำถัดไปอัตโนมัติ: ปิด'}
+						</button>
+					</div>
+					<div class="font-extrabold text-foreground text-sm sm:text-base mt-0.5">
 						{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
 							รูปแบบเสียง {selectedPreset.tonePattern || selectedPreset.syllables.map((s) => s.surfaceTone).join('+')}
 						{:else}
@@ -1105,13 +1204,53 @@
 				</div>
 			</div>
 
-			<div class="mt-4 flex justify-end gap-2">
-				<Button variant="outline" size="sm" onclick={playAudio}>
-					<Volume2 class="mr-1.5 size-3.5" /> ฟังเสียงตัวอย่าง
-				</Button>
-				<Button size="sm" onclick={resetAnalysis} class="bg-primary text-primary-foreground">
-					<RotateCcw class="mr-1.5 size-3.5" /> ทดสอบใหม่อีกครั้ง
-				</Button>
+			<!-- Auto-Advance Live Countdown Banner (When Passed) -->
+			{#if autoAdvanceSeconds !== null}
+				<div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-sky-500/15 border border-emerald-500/30 p-3.5 shadow-sm animate-pulse">
+					<div class="flex items-center gap-2.5 text-xs font-bold text-emerald-800 dark:text-emerald-200">
+						<span class="flex size-7 items-center justify-center rounded-full bg-emerald-500 text-white font-black text-xs shadow">
+							{autoAdvanceSeconds}
+						</span>
+						<span>✨ ยอดเยี่ยมมาก! ระบบจะเปลี่ยนไปคำถัดไปอัตโนมัติใน {autoAdvanceSeconds} วินาที...</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							class="rounded-xl border bg-background/80 hover:bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition shadow-sm"
+							onclick={cancelAutoAdvance}
+						>
+							ยกเลิกการข้าม
+						</button>
+						<button
+							type="button"
+							class="flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-black transition shadow-sm active:scale-95"
+							onclick={goToNextWord}
+						>
+							<span>ไปคำถัดไปทันที</span>
+							<ArrowRight class="size-3.5" />
+						</button>
+					</div>
+				</div>
+			{/if}
+
+			<div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+				<div class="flex items-center gap-1.5">
+					<Button variant="outline" size="sm" onclick={goToPrevWord} class="text-xs">
+						<ChevronLeft class="mr-1 size-3.5" /> คำก่อนหน้า
+					</Button>
+					<Button variant="outline" size="sm" onclick={goToNextWord} class="text-xs">
+						คำถัดไป <ChevronRight class="ml-1 size-3.5" />
+					</Button>
+				</div>
+
+				<div class="flex items-center gap-2">
+					<Button variant="outline" size="sm" onclick={playAudio}>
+						<Volume2 class="mr-1.5 size-3.5" /> ฟังเสียงตัวอย่าง
+					</Button>
+					<Button size="sm" onclick={resetAnalysis} class="bg-primary text-primary-foreground">
+						<RotateCcw class="mr-1.5 size-3.5" /> ทดสอบใหม่อีกครั้ง
+					</Button>
+				</div>
 			</div>
 		</div>
 	{/if}
