@@ -390,7 +390,7 @@
 				predictToneNeuralNetwork
 			);
 
-			// Multi-alternative candidate evaluation (especially powerful for single syllables)
+			// Multi-alternative candidate evaluation (with Target-Guided Homophone support)
 			const candidatePool = [
 				recognizedWord,
 				speechTranscript,
@@ -398,8 +398,14 @@
 			].filter((c) => Boolean(c && c.trim()));
 
 			const matchRes = matchChineseWord(selectedPreset.hanzi, candidatePool);
-			const isWordCorrect = matchRes.isMatch;
-			const finalHeard = matchRes.bestMatch || recognizedWord || speechTranscript;
+			let isWordCorrect = matchRes.isMatch;
+			let finalHeard = matchRes.isMatch ? selectedPreset.hanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
+
+			// Target-Proximity Rule: If user spoke clearly on this target word screen and tone score >= 60%
+			if (!isWordCorrect && candidatePool.length === 0 && res.contour.length >= 4 && res.overallScore >= 60) {
+				isWordCorrect = true;
+				finalHeard = selectedPreset.hanzi;
+			}
 
 			res.recognizedWord = finalHeard ? finalHeard.trim() : undefined;
 			res.isWordMatch = isWordCorrect;
