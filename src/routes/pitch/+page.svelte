@@ -9,7 +9,8 @@
 		createRecognizer,
 		isSpeechRecognitionSupported,
 		normalizeChinese,
-		quickSimilarity
+		quickSimilarity,
+		matchChineseWord
 	} from '$lib/speech';
 	import {
 		RealtimePitchTracker,
@@ -95,16 +96,11 @@
 	let errorMessage = $state<string | null>(null);
 	let recognizedWord = $state<string>('');
 
-	// Auto Advance & Navigation State
-	let autoAdvanceEnabled = $state(true);
-	let autoAdvanceSeconds = $state<number | null>(null);
-	let autoAdvanceTimeout: ReturnType<typeof setTimeout> | null = null;
-	let autoAdvanceInterval: ReturnType<typeof setInterval> | null = null;
-
 	// Pitch Tracker & Speech Recognizer
 	let tracker: RealtimePitchTracker | null = null;
 	let speechRecognizer: ReturnType<typeof createRecognizer> = null;
 	let speechTranscript = '';
+	let speechCandidates: string[] = [];
 	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
 	let maxDurationTimeout: ReturnType<typeof setTimeout> | null = null;
 	let hasVoicedSpeech = false;
@@ -195,20 +191,7 @@
 		})
 	);
 
-	function cancelAutoAdvance() {
-		if (autoAdvanceTimeout) {
-			clearTimeout(autoAdvanceTimeout);
-			autoAdvanceTimeout = null;
-		}
-		if (autoAdvanceInterval) {
-			clearInterval(autoAdvanceInterval);
-			autoAdvanceInterval = null;
-		}
-		autoAdvanceSeconds = null;
-	}
-
 	function goToNextWord() {
-		cancelAutoAdvance();
 		const list = filteredPresets.length > 0 ? filteredPresets : vocabList;
 		const currentIndex = list.findIndex((p) => p.id === selectedPreset.id);
 		if (currentIndex !== -1 && currentIndex + 1 < list.length) {
@@ -219,7 +202,6 @@
 	}
 
 	function goToPrevWord() {
-		cancelAutoAdvance();
 		const list = filteredPresets.length > 0 ? filteredPresets : vocabList;
 		const currentIndex = list.findIndex((p) => p.id === selectedPreset.id);
 		if (currentIndex > 0) {
@@ -234,7 +216,6 @@
 	 * IMPORTANT: Does NOT auto-play audio so it doesn't make sudden loud noise.
 	 */
 	function selectPreset(preset: TonePreset) {
-		cancelAutoAdvance();
 		selectedPreset = preset;
 		resetAnalysis();
 	}
@@ -249,7 +230,6 @@
 	}
 
 	function resetAnalysis() {
-		cancelAutoAdvance();
 		if (isRecording) stopRecording();
 		pitchPoints = [];
 		currentHz = 0;
@@ -257,6 +237,7 @@
 		errorMessage = null;
 		recognizedWord = '';
 		speechTranscript = '';
+		speechCandidates = [];
 	}
 
 	async function toggleRecording() {
@@ -272,6 +253,7 @@
 		errorMessage = null;
 		hasVoicedSpeech = false;
 		speechTranscript = '';
+		speechCandidates = [];
 		recognizedWord = '';
 
 		if (!tracker) {
@@ -291,6 +273,14 @@
 						let interim = '';
 						for (let i = event.resultIndex; i < event.results.length; i++) {
 							const res = event.results[i];
+							if (!res) continue;
+							// Collect all alternative hypothesis strings
+							for (let a = 0; a < res.length; a++) {
+								const cand = res[a]?.transcript?.trim();
+								if (cand && !speechCandidates.includes(cand)) {
+									speechCandidates.push(cand);
+								}
+							}
 							const alt = res[0];
 							if (!alt) continue;
 							if (res.isFinal) {
@@ -302,6 +292,9 @@
 						const currentHeard = (speechTranscript || interim).trim();
 						if (currentHeard) {
 							recognizedWord = currentHeard;
+							if (!speechCandidates.includes(currentHeard)) {
+								speechCandidates.push(currentHeard);
+							}
 						}
 					};
 					speechRecognizer.onerror = () => {};
@@ -397,21 +390,18 @@
 				predictToneNeuralNetwork
 			);
 
-			// Evaluate word recognition against target word
-			const finalHeard = (recognizedWord || speechTranscript).trim();
-			const cleanTarget = normalizeChinese(selectedPreset.hanzi);
-			const cleanHeard = normalizeChinese(finalHeard);
-			const similarity = cleanTarget && cleanHeard ? quickSimilarity(cleanTarget, cleanHeard) : 0;
-			const isWordCorrect = Boolean(
-				cleanTarget && cleanHeard && (
-					cleanHeard === cleanTarget ||
-					cleanHeard.includes(cleanTarget) ||
-					cleanTarget.includes(cleanHeard) ||
-					similarity >= 50
-				)
-			);
+			// Multi-alternative candidate evaluation (especially powerful for single syllables)
+			const candidatePool = [
+				recognizedWord,
+				speechTranscript,
+				...speechCandidates
+			].filter((c) => Boolean(c && c.trim()));
 
-			res.recognizedWord = finalHeard || undefined;
+			const matchRes = matchChineseWord(selectedPreset.hanzi, candidatePool);
+			const isWordCorrect = matchRes.isMatch;
+			const finalHeard = matchRes.bestMatch || recognizedWord || speechTranscript;
+
+			res.recognizedWord = finalHeard ? finalHeard.trim() : undefined;
 			res.isWordMatch = isWordCorrect;
 
 			const isTonePerfect = res.isAllMatch && res.overallScore >= 70;
@@ -433,11 +423,11 @@
 					res.overallFeedback = `เก่งมาก! ออกเสียงคำศัพท์ "${selectedPreset.hanzi}" ได้ถูกต้อง (ระบบให้ผ่านเกณฑ์คำศัพท์) — สามารถปรับระดับวรรณยุกต์ตามเส้นกราฟแนะนำ เพื่อให้สำเนียงสมบูรณ์แบบยิ่งขึ้น`;
 				}
 			} else {
-				// Word was not recognized or differed
-				if (isTonePerfect && res.overallScore >= 78) {
-					// Tone pitch contour was accurate
+				// Single-syllable acoustic fallback: If tone pitch is accurate
+				if (isTonePerfect && res.overallScore >= 75) {
 					isPassed = true;
 					finalScore = res.overallScore;
+					res.overallFeedback = `ดีมาก! ระดับเสียงวรรณยุกต์ตรงตามมาตรฐาน (${TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`}) ชัดเจน`;
 				} else {
 					isPassed = false;
 					finalScore = res.overallScore;
@@ -472,27 +462,6 @@
 				[selectedPreset.id]: updatedStat
 			});
 
-			// If passed and auto-advance is enabled, automatically move to next word after 2 seconds
-			if (isPassed && autoAdvanceEnabled) {
-				cancelAutoAdvance();
-				autoAdvanceSeconds = 2;
-				autoAdvanceInterval = setInterval(() => {
-					if (autoAdvanceSeconds && autoAdvanceSeconds > 1) {
-						autoAdvanceSeconds--;
-					} else {
-						if (autoAdvanceInterval) {
-							clearInterval(autoAdvanceInterval);
-							autoAdvanceInterval = null;
-						}
-					}
-				}, 1000);
-
-				autoAdvanceTimeout = setTimeout(() => {
-					goToNextWord();
-					autoAdvanceSeconds = null;
-				}, 2000);
-			}
-
 			// If incorrect, record mistake to learner database
 			if (!isPassed) {
 				const heardSummary = finalHeard
@@ -519,7 +488,6 @@
 	}
 
 	onDestroy(() => {
-		cancelAutoAdvance();
 		if (silenceTimeout) clearTimeout(silenceTimeout);
 		if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
 		if (speechRecognizer) {
@@ -865,17 +833,7 @@
 				</div>
 
 				<div class="rounded-2xl border bg-muted/50 px-4 py-2 text-left sm:text-right w-full sm:w-auto">
-					<div class="flex items-center justify-between sm:justify-end gap-2">
-						<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">เป้าหมายวรรณยุกต์</div>
-						<button
-							type="button"
-							onclick={() => (autoAdvanceEnabled = !autoAdvanceEnabled)}
-							class="text-[9px] font-bold rounded-full px-2 py-0.5 transition {autoAdvanceEnabled ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30' : 'bg-muted text-muted-foreground border'}"
-							title="เปิด/ปิด การเปลี่ยนไปคำถัดไปอัตโนมัติเมื่อพูดผ่าน"
-						>
-							{autoAdvanceEnabled ? '⚡ ไปคำถัดไปอัตโนมัติ: เปิด' : 'ไปคำถัดไปอัตโนมัติ: ปิด'}
-						</button>
-					</div>
+					<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">เป้าหมายวรรณยุกต์</div>
 					<div class="font-extrabold text-foreground text-sm sm:text-base mt-0.5">
 						{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
 							รูปแบบเสียง {selectedPreset.tonePattern || selectedPreset.syllables.map((s) => s.surfaceTone).join('+')}
@@ -1203,35 +1161,6 @@
 					<div class="mt-1 font-mono text-base font-extrabold text-foreground">{analysisResult.syllableResults.length} พยางค์</div>
 				</div>
 			</div>
-
-			<!-- Auto-Advance Live Countdown Banner (When Passed) -->
-			{#if autoAdvanceSeconds !== null}
-				<div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-sky-500/15 border border-emerald-500/30 p-3.5 shadow-sm animate-pulse">
-					<div class="flex items-center gap-2.5 text-xs font-bold text-emerald-800 dark:text-emerald-200">
-						<span class="flex size-7 items-center justify-center rounded-full bg-emerald-500 text-white font-black text-xs shadow">
-							{autoAdvanceSeconds}
-						</span>
-						<span>✨ ยอดเยี่ยมมาก! ระบบจะเปลี่ยนไปคำถัดไปอัตโนมัติใน {autoAdvanceSeconds} วินาที...</span>
-					</div>
-					<div class="flex items-center gap-2">
-						<button
-							type="button"
-							class="rounded-xl border bg-background/80 hover:bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition shadow-sm"
-							onclick={cancelAutoAdvance}
-						>
-							ยกเลิกการข้าม
-						</button>
-						<button
-							type="button"
-							class="flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-black transition shadow-sm active:scale-95"
-							onclick={goToNextWord}
-						>
-							<span>ไปคำถัดไปทันที</span>
-							<ArrowRight class="size-3.5" />
-						</button>
-					</div>
-				</div>
-			{/if}
 
 			<div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-4">
 				<div class="flex items-center gap-1.5">

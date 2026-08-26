@@ -42,11 +42,11 @@ export function createRecognizer(): SpeechRecognitionLike | null {
 	if (!Ctor) return null;
 	const r = new Ctor();
 	r.lang = 'zh-CN';
-	// continuous=true + interimResults=true makes Android Chrome reliably emit
-	// transcripts even when the final-result event would otherwise be dropped.
+	// continuous=true + interimResults=true makes Android/Desktop Chrome reliably emit
+	// transcripts even when single syllable audio has very short duration.
 	r.continuous = true;
 	r.interimResults = true;
-	r.maxAlternatives = 3;
+	r.maxAlternatives = 5;
 	return r;
 }
 
@@ -164,4 +164,60 @@ export function quickSimilarity(target: string, said: string): number {
 	let hit = 0;
 	for (const ch of setB) if (setA.has(ch)) hit++;
 	return Math.round((hit / setA.size) * 100);
+}
+
+/**
+ * Multi-alternative Chinese word matching for ASR results.
+ * Highly robust for single-syllable and multi-syllable Mandarin words.
+ */
+export function matchChineseWord(
+	targetHanzi: string,
+	candidates: string[]
+): {
+	isMatch: boolean;
+	bestMatch: string;
+	similarity: number;
+} {
+	const cleanTarget = normalizeChinese(targetHanzi);
+	if (!cleanTarget) return { isMatch: false, bestMatch: '', similarity: 0 };
+
+	const cleanCandidates = candidates
+		.map((c) => normalizeChinese(c))
+		.filter((c) => c.length > 0);
+
+	if (cleanCandidates.length === 0) {
+		return { isMatch: false, bestMatch: '', similarity: 0 };
+	}
+
+	// 1. Exact match in any candidate
+	for (const cand of cleanCandidates) {
+		if (cand === cleanTarget) {
+			return { isMatch: true, bestMatch: cand, similarity: 100 };
+		}
+	}
+
+	// 2. Substring match (candidate contains target or target contains candidate)
+	for (const cand of cleanCandidates) {
+		if (cand.includes(cleanTarget) || cleanTarget.includes(cand)) {
+			return { isMatch: true, bestMatch: cand, similarity: 100 };
+		}
+	}
+
+	// 3. Jaccard similarity across candidates
+	let highestSim = 0;
+	let bestCand = cleanCandidates[0];
+
+	for (const cand of cleanCandidates) {
+		const sim = quickSimilarity(cleanTarget, cand);
+		if (sim > highestSim) {
+			highestSim = sim;
+			bestCand = cand;
+		}
+	}
+
+	if (highestSim >= 50) {
+		return { isMatch: true, bestMatch: bestCand, similarity: highestSim };
+	}
+
+	return { isMatch: false, bestMatch: cleanCandidates[0] || '', similarity: highestSim };
 }
