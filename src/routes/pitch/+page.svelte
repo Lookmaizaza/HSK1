@@ -96,6 +96,10 @@
 	let errorMessage = $state<string | null>(null);
 	let recognizedWord = $state<string>('');
 
+	// Listening Behavior Telemetry State (กดฟังเสียงตัวอย่างกี่ครั้ง/ลำดับเวลา)
+	let listenCount = $state(0);
+	let listenTimestamps = $state<number[]>([]);
+
 	// Pitch Tracker & Speech Recognizer
 	let tracker: RealtimePitchTracker | null = null;
 	let speechRecognizer: ReturnType<typeof createRecognizer> = null;
@@ -216,14 +220,19 @@
 	 * IMPORTANT: Does NOT auto-play audio so it doesn't make sudden loud noise.
 	 */
 	function selectPreset(preset: TonePreset) {
+		listenCount = 0;
+		listenTimestamps = [];
 		selectedPreset = preset;
 		resetAnalysis();
 	}
 
 	/**
 	 * User explicitly clicks to listen to reference audio pronunciation.
+	 * Tracks listening sequence and count for learning telemetry & xAPI.
 	 */
 	function playAudio() {
+		listenCount++;
+		listenTimestamps = [...listenTimestamps, Date.now()];
 		if (selectedPreset?.hanzi) {
 			speak(selectedPreset.hanzi);
 		}
@@ -466,6 +475,58 @@
 			saveStats({
 				...wordStats,
 				[selectedPreset.id]: updatedStat
+			});
+
+			// 1. Send comprehensive JSON telemetry payload to /api/v1/telemetry/score-ingest for xAPI translation
+			const telemetryPayload = {
+				eventType: 'pronunciation_evaluation',
+				timestamp: new Date().toISOString(),
+				word: {
+					id: selectedPreset.id,
+					hanzi: selectedPreset.hanzi,
+					pinyin: selectedPreset.pinyin,
+					meaning: selectedPreset.thai || selectedPreset.english,
+					expectedTone: selectedPreset.tone,
+					tonePattern: selectedPreset.tonePattern
+				},
+				behavior: {
+					listenedToExample: listenCount > 0,
+					listenCount: listenCount,
+					listenTimestamps: [...listenTimestamps]
+				},
+				assessment: {
+					isPassed: isPassed,
+					overallScore: finalScore,
+					rawScore: res.overallScore,
+					isToneMatch: isTonePerfect,
+					isWordMatch: isWordCorrect,
+					recognizedWord: finalHeard || undefined,
+					speechCandidates: [...speechCandidates],
+					syllableResults: res.syllableResults.map((s) => ({
+						syllableIndex: s.syllableIndex,
+						hanzi: s.hanzi,
+						pinyin: s.pinyin,
+						targetTone: s.targetTone,
+						detectedTone: s.detectedTone,
+						isMatch: s.isMatch,
+						score: s.score,
+						feedback: s.feedback,
+						isAIModel: s.isAIModel
+					})),
+					acoustics: {
+						avgF0: res.avgF0,
+						totalDurationMs: res.totalDurationMs
+					},
+					overallFeedback: res.overallFeedback
+				}
+			};
+
+			fetch('/api/v1/telemetry/score-ingest', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(telemetryPayload)
+			}).catch((err) => {
+				console.warn('Failed to send telemetry to /api/v1/telemetry/score-ingest:', err);
 			});
 
 			// If incorrect, record mistake to learner database
@@ -792,11 +853,11 @@
 					onclick={playAudio}
 					class="group relative flex size-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25 transition active:scale-95 hover:shadow-lg hover:shadow-sky-500/40 hover:scale-105"
 					aria-label="กดฟังเสียง"
-					title="กดฟังเสียงต้นแบบเจ้าของภาษา"
+					title="กดฟังเสียงต้นแบบเจ้าของภาษา (คลิกเพื่อฟัง)"
 				>
 					<Volume2 class="size-8 transition-transform group-hover:scale-110" />
-					<span class="absolute -bottom-2 rounded-full bg-slate-900 px-2 py-0.5 text-[9px] font-bold text-white shadow">
-						กดฟังเสียง
+					<span class="absolute -bottom-2 rounded-full px-2 py-0.5 text-[9px] font-bold text-white shadow transition-all {listenCount > 0 ? 'bg-emerald-600' : 'bg-slate-900'}">
+						{listenCount > 0 ? `ฟังแล้ว ${listenCount} ครั้ง` : 'กดฟังเสียง'}
 					</span>
 				</button>
 
