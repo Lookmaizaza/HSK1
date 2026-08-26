@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { initProgress } from '$lib/progress.svelte';
 	import InAppBrowserGuard from '$lib/components/InAppBrowserGuard.svelte';
+	import PdpaConsentModal from '$lib/components/PdpaConsentModal.svelte';
 
 	let { children, data } = $props();
 
@@ -17,3 +18,4 @@
 </svelte:head>
 {@render children()}
 <InAppBrowserGuard />
+<PdpaConsentModal />
