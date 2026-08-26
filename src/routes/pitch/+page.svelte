@@ -1069,16 +1069,21 @@
 				</div>
 			</div>
 
-			<!-- PER-SYLLABLE BREAKDOWN GRID (แสดงผลการตรวจสอบแยกทีละตัวอักษร) -->
-			{#if analysisResult.syllableResults && analysisResult.syllableResults.length > 1}
+			<!-- PER-SYLLABLE BREAKDOWN GRID (แสดงผลการตรวจสอบแยกทีละตัวอักษร ทั้งคำเดี่ยวและคำประสม) -->
+			{#if analysisResult.syllableResults && analysisResult.syllableResults.length >= 1}
 				<div class="mt-4 pt-2">
 					<div class="mb-2.5 flex items-center justify-between">
 						<span class="text-xs font-extrabold text-foreground flex items-center gap-1.5">
-							<Layers class="size-4 text-primary" /> ผลการวิเคราะห์แยกทีละพยางค์:
+							<Layers class="size-4 text-primary" />
+							{#if analysisResult.syllableResults.length > 1}
+								ผลการวิเคราะห์แยกทีละพยางค์ ({analysisResult.syllableResults.length} พยางค์):
+							{:else}
+								ผลการวิเคราะห์วรรณยุกต์รายพยางค์:
+							{/if}
 						</span>
 					</div>
 
-					<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-{Math.min(3, analysisResult.syllableResults.length)} gap-3">
+					<div class="grid grid-cols-1 {analysisResult.syllableResults.length > 1 ? 'sm:grid-cols-2 md:grid-cols-' + Math.min(3, analysisResult.syllableResults.length) : ''} gap-3">
 						{#each analysisResult.syllableResults as syl (syl.syllableIndex)}
 							{@const targetProf = TONE_PROFILES[syl.targetTone] || TONE_PROFILES[1]}
 							{@const detectedProf = TONE_PROFILES[syl.detectedTone] || TONE_PROFILES[1]}
@@ -1089,7 +1094,11 @@
 									<!-- Top Row: Syllable badge & Status -->
 									<div class="flex items-center justify-between mb-2">
 										<span class="text-[11px] font-extrabold text-muted-foreground">
-											พยางค์ที่ {syl.syllableIndex + 1}
+											{#if analysisResult.syllableResults.length > 1}
+												พยางค์ที่ {syl.syllableIndex + 1}
+											{:else}
+												พยางค์หลัก ({syl.hanzi})
+											{/if}
 										</span>
 										<span class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black {syl.isMatch
 											? 'bg-emerald-500 text-white'
