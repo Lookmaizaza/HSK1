@@ -4,7 +4,13 @@
 	import AppHeader from '$lib/components/AppHeader.svelte';
 	import PitchVisualizer from '$lib/components/PitchVisualizer.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { speak } from '$lib/speech';
+	import {
+		speak,
+		createRecognizer,
+		isSpeechRecognitionSupported,
+		normalizeChinese,
+		quickSimilarity
+	} from '$lib/speech';
 	import {
 		RealtimePitchTracker,
 		analyzeToneContour,
@@ -84,9 +90,12 @@
 	let currentHz = $state(0);
 	let analysisResult = $state<MultiSyllableAnalysisResult | null>(null);
 	let errorMessage = $state<string | null>(null);
+	let recognizedWord = $state<string>('');
 
-	// Pitch Tracker & Timeouts
+	// Pitch Tracker & Speech Recognizer
 	let tracker: RealtimePitchTracker | null = null;
+	let speechRecognizer: ReturnType<typeof createRecognizer> = null;
+	let speechTranscript = '';
 	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
 	let maxDurationTimeout: ReturnType<typeof setTimeout> | null = null;
 	let hasVoicedSpeech = false;
@@ -201,6 +210,8 @@
 		currentHz = 0;
 		analysisResult = null;
 		errorMessage = null;
+		recognizedWord = '';
+		speechTranscript = '';
 	}
 
 	async function toggleRecording() {
@@ -215,6 +226,8 @@
 		resetAnalysis();
 		errorMessage = null;
 		hasVoicedSpeech = false;
+		speechTranscript = '';
+		recognizedWord = '';
 
 		if (!tracker) {
 			tracker = new RealtimePitchTracker();
@@ -222,6 +235,37 @@
 				errorMessage = `ไมโครโฟนไม่พร้อมใช้งาน: ${err.message}`;
 				stopRecording();
 			};
+		}
+
+		// Start Web Speech API Recognition in Chinese (zh-CN) concurrently
+		if (isSpeechRecognitionSupported()) {
+			try {
+				speechRecognizer = createRecognizer();
+				if (speechRecognizer) {
+					speechRecognizer.onresult = (event) => {
+						let interim = '';
+						for (let i = event.resultIndex; i < event.results.length; i++) {
+							const res = event.results[i];
+							const alt = res[0];
+							if (!alt) continue;
+							if (res.isFinal) {
+								speechTranscript += alt.transcript;
+							} else {
+								interim += alt.transcript;
+							}
+						}
+						const currentHeard = (speechTranscript || interim).trim();
+						if (currentHeard) {
+							recognizedWord = currentHeard;
+						}
+					};
+					speechRecognizer.onerror = () => {};
+					speechRecognizer.onend = () => {};
+					speechRecognizer.start();
+				}
+			} catch {
+				// Speech recognition start failure is non-fatal; tracker will still function
+			}
 		}
 
 		// Set max duration safety timeout (auto-stop after 4.2s for multi-syllables)
@@ -277,6 +321,14 @@
 			maxDurationTimeout = null;
 		}
 
+		// Stop Speech Recognition
+		if (speechRecognizer) {
+			try {
+				speechRecognizer.stop();
+			} catch {}
+			speechRecognizer = null;
+		}
+
 		if (!tracker || !isRecording) return;
 
 		const recorded = tracker.stop();
@@ -299,10 +351,61 @@
 				syllablesToAnalyze,
 				predictToneNeuralNetwork
 			);
+
+			// Evaluate word recognition against target word
+			const finalHeard = (recognizedWord || speechTranscript).trim();
+			const cleanTarget = normalizeChinese(selectedPreset.hanzi);
+			const cleanHeard = normalizeChinese(finalHeard);
+			const similarity = cleanTarget && cleanHeard ? quickSimilarity(cleanTarget, cleanHeard) : 0;
+			const isWordCorrect = Boolean(
+				cleanTarget && cleanHeard && (
+					cleanHeard === cleanTarget ||
+					cleanHeard.includes(cleanTarget) ||
+					cleanTarget.includes(cleanHeard) ||
+					similarity >= 50
+				)
+			);
+
+			res.recognizedWord = finalHeard || undefined;
+			res.isWordMatch = isWordCorrect;
+
+			const isTonePerfect = res.isAllMatch && res.overallScore >= 70;
+			let isPassed = false;
+			let finalScore = res.overallScore;
+
+			// Core Rule: If the spoken word is correct, grant pass even if tone is not 100% exact
+			if (isWordCorrect) {
+				if (isTonePerfect) {
+					isPassed = true;
+					finalScore = Math.max(90, res.overallScore);
+					res.overallScore = finalScore;
+					res.overallFeedback = `ยอดเยี่ยมมาก! ออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ถูกต้องชัดเจน และระดับวรรณยุกต์ตรงตามมาตรฐานอย่างแม่นยำ`;
+				} else {
+					// Word is correct, tone slightly off: Give a passing score (78-88) with helpful tone advice
+					isPassed = true;
+					finalScore = Math.max(78, Math.min(88, Math.round(res.overallScore + 25)));
+					res.overallScore = finalScore;
+					res.overallFeedback = `เก่งมาก! ออกเสียงคำศัพท์ "${selectedPreset.hanzi}" ได้ถูกต้อง (ระบบให้ผ่านเกณฑ์คำศัพท์) — สามารถปรับระดับวรรณยุกต์ตามเส้นกราฟแนะนำ เพื่อให้สำเนียงสมบูรณ์แบบยิ่งขึ้น`;
+				}
+			} else {
+				// Word was not recognized or differed
+				if (isTonePerfect && res.overallScore >= 78) {
+					// Tone pitch contour was accurate
+					isPassed = true;
+					finalScore = res.overallScore;
+				} else {
+					isPassed = false;
+					finalScore = res.overallScore;
+					if (finalHeard) {
+						res.overallFeedback = `ยังไม่ตรงเป้าหมาย (ระบบได้ยินเป็น: "${finalHeard}") — แนะนำให้ออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ใหม่อีกครั้ง`;
+					}
+				}
+			}
+
+			res.isPassed = isPassed;
 			analysisResult = res;
 
 			// Automatically update practice statistics
-			const isCorrect = res.isAllMatch && res.overallScore >= 70;
 			const current = wordStats[selectedPreset.id] || {
 				correctCount: 0,
 				wrongCount: 0,
@@ -312,10 +415,10 @@
 			};
 
 			const updatedStat: WordPracticeStat = {
-				correctCount: isCorrect ? current.correctCount + 1 : current.correctCount,
-				wrongCount: isCorrect ? current.wrongCount : current.wrongCount + 1,
-				lastScore: res.overallScore,
-				status: isCorrect ? 'passed' : 'struggling',
+				correctCount: isPassed ? current.correctCount + 1 : current.correctCount,
+				wrongCount: isPassed ? current.wrongCount : current.wrongCount + 1,
+				lastScore: finalScore,
+				status: isPassed ? 'passed' : 'struggling',
 				updatedAt: Date.now()
 			};
 
@@ -325,10 +428,12 @@
 			});
 
 			// If incorrect, record mistake to learner database
-			if (!isCorrect) {
-				const heardSummary = res.syllableResults.length > 1
-					? res.syllableResults.map((s) => `${s.hanzi}: เสียง ${s.detectedTone}`).join(', ')
-					: `ตรวจจับได้: วรรณยุกต์ ${res.syllableResults[0]?.detectedTone ?? '-'}`;
+			if (!isPassed) {
+				const heardSummary = finalHeard
+					? `คำที่ได้ยิน: "${finalHeard}"`
+					: (res.syllableResults.length > 1
+						? res.syllableResults.map((s) => `${s.hanzi}: เสียง ${s.detectedTone}`).join(', ')
+						: `ตรวจจับได้: วรรณยุกต์ ${res.syllableResults[0]?.detectedTone ?? '-'}`);
 
 				fetch('/api/mistakes', {
 					method: 'POST',
@@ -339,8 +444,8 @@
 						meaning: selectedPreset.thai || selectedPreset.english,
 						expectedTone: selectedPreset.tone,
 						heardText: heardSummary,
-						score: res.overallScore,
-						feedback: res.overallFeedback || 'ระดับเสียงวรรณยุกต์ยังไม่ตรงตามมาตรฐาน'
+						score: finalScore,
+						feedback: res.overallFeedback || 'การออกเสียงหรือวรรณยุกต์ยังไม่ตรงตามมาตรฐาน'
 					})
 				}).catch(() => {});
 			}
@@ -350,6 +455,12 @@
 	onDestroy(() => {
 		if (silenceTimeout) clearTimeout(silenceTimeout);
 		if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
+		if (speechRecognizer) {
+			try {
+				speechRecognizer.stop();
+			} catch {}
+			speechRecognizer = null;
+		}
 		if (tracker) {
 			tracker.destroy();
 			tracker = null;
@@ -796,21 +907,28 @@
 
 	<!-- 7. ANALYSIS RESULTS & SCORE CARD -->
 	{#if analysisResult}
-		<div class="mb-8 overflow-hidden rounded-3xl border-2 {analysisResult.isAllMatch ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20'} p-6 shadow-md transition-all">
+		<div class="mb-8 overflow-hidden rounded-3xl border-2 {analysisResult.isPassed ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20'} p-6 shadow-md transition-all">
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/50 pb-4">
 				<div class="flex items-center gap-3">
-					{#if analysisResult.isAllMatch}
+					{#if analysisResult.isPassed}
 						<div class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow">
 							<CheckCircle2 class="size-7" />
 						</div>
 						<div>
 							<div class="text-xl font-extrabold text-emerald-900 dark:text-emerald-200">
-								วรรณยุกต์ถูกต้องครบทุกพยางค์! (ผ่าน)
+								{#if analysisResult.isAllMatch}
+									ยอดเยี่ยมมาก! ออกเสียงคำและวรรณยุกต์ถูกต้องครบถ้วน (ผ่าน)
+								{:else}
+									ผ่านเกณฑ์! พูดคำศัพท์ถูกต้อง (แนะนำปรับวรรณยุกต์ตามกราฟ)
+								{/if}
 							</div>
-							<div class="text-xs text-emerald-700 dark:text-emerald-300">
+							<div class="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+								{#if analysisResult.recognizedWord}
+									ระบบได้ยินคำว่า: <strong>"{analysisResult.recognizedWord}"</strong> •
+								{/if}
 								{analysisResult.syllableResults.length > 1
-									? `ผ่านทั้ง ${analysisResult.syllableResults.length} พยางค์ตามมาตรฐานเสียงรวม`
-									: `ตรวจพบ: ${TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`}`}
+									? `วรรณยุกต์ตรง ${analysisResult.syllableResults.filter((s) => s.isMatch).length}/${analysisResult.syllableResults.length} พยางค์`
+									: `วรรณยุกต์ที่ตรวจพบ: ${TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`}`}
 							</div>
 						</div>
 					{:else}
@@ -821,11 +939,14 @@
 							<div class="text-xl font-extrabold text-amber-900 dark:text-amber-200">
 								ยังไม่ตรงเป้าหมาย (ต้องฝึกเพิ่ม)
 							</div>
-							<div class="text-xs text-amber-700 dark:text-amber-300">
+							<div class="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+								{#if analysisResult.recognizedWord}
+									ระบบได้ยินเป็น: <strong>"{analysisResult.recognizedWord}"</strong> (ต้องการ: "{selectedPreset.hanzi}") •
+								{/if}
 								{#if analysisResult.syllableResults.length > 1}
-									ผ่าน {analysisResult.syllableResults.filter((s) => s.isMatch).length} จาก {analysisResult.syllableResults.length} พยางค์
+									วรรณยุกต์ผ่าน {analysisResult.syllableResults.filter((s) => s.isMatch).length}/{analysisResult.syllableResults.length} พยางค์
 								{:else}
-									ตรวจพบเป็น: {TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`} (ต้องการ: {TONE_PROFILES[selectedPreset.tone]?.thaiName})
+									วรรณยุกต์: {TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`} (ต้องการ: {TONE_PROFILES[selectedPreset.tone]?.thaiName})
 								{/if}
 							</div>
 						</div>
@@ -835,10 +956,53 @@
 				<div class="flex items-center gap-3">
 					<div class="text-right">
 						<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">คะแนนรวมความถูกต้อง</div>
-						<div class="text-3xl font-black {analysisResult.overallScore >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
+						<div class="text-3xl font-black {analysisResult.overallScore >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
 							{analysisResult.overallScore}%
 						</div>
 					</div>
+				</div>
+			</div>
+
+			<!-- Word Recognition & Tone Dual Check Badges -->
+			<div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+				<!-- Word Match Status -->
+				<div class="flex items-center justify-between rounded-2xl border bg-background/80 px-3.5 py-2 text-xs shadow-sm">
+					<div class="flex items-center gap-2">
+						<span class="text-base">🎯</span>
+						<div>
+							<span class="text-muted-foreground text-[10px] block">การตรวจคำศัพท์ (Speech Recognition)</span>
+							<span class="font-black text-foreground">
+								{analysisResult.recognizedWord ? `ได้ยิน: "${analysisResult.recognizedWord}"` : `เป้าหมาย: "${selectedPreset.hanzi}"`}
+							</span>
+						</div>
+					</div>
+					<span class="rounded-full px-2.5 py-0.5 text-[10px] font-black {analysisResult.isWordMatch
+						? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+						: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'}">
+						{analysisResult.isWordMatch ? '✓ คำศัพท์ถูกต้อง' : 'คำยังไม่ชัดเจน'}
+					</span>
+				</div>
+
+				<!-- Tone Match Status -->
+				<div class="flex items-center justify-between rounded-2xl border bg-background/80 px-3.5 py-2 text-xs shadow-sm">
+					<div class="flex items-center gap-2">
+						<span class="text-base">🎵</span>
+						<div>
+							<span class="text-muted-foreground text-[10px] block">การตรวจวรรณยุกต์ (Tone Pitch)</span>
+							<span class="font-black text-foreground">
+								{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
+									{selectedPreset.syllables.map((s) => `${s.hanzi}: เสียง ${s.surfaceTone}`).join(' • ')}
+								{:else}
+									{TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`}
+								{/if}
+							</span>
+						</div>
+					</div>
+					<span class="rounded-full px-2.5 py-0.5 text-[10px] font-black {analysisResult.isAllMatch
+						? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+						: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'}">
+						{analysisResult.isAllMatch ? '✓ วรรณยุกต์ตรงเป๊ะ' : 'แนะนำปรับระดับเสียง'}
+					</span>
 				</div>
 			</div>
 

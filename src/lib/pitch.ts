@@ -67,6 +67,9 @@ export type MultiSyllableAnalysisResult = {
 	avgF0: number;
 	contour: PitchPoint[];
 	primaryAnalysis?: ToneAnalysisResult; // Single analysis fallback compatibility
+	recognizedWord?: string;
+	isWordMatch?: boolean;
+	isPassed?: boolean;
 };
 
 export type TonePreset = {
