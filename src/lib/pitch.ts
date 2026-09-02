@@ -259,7 +259,8 @@ export function detectPitchYIN(
 	const f0 = sampleRate / betterLag;
 	const clarity = Math.max(0, Math.min(1, 1 - yinBuffer[bestLag]));
 
-	if (f0 >= minF0 && f0 <= maxF0 && clarity > 0.4) {
+	// Lowered clarity threshold from 0.4 to 0.25 to catch vocal fry (Tone 3) and quiet tails
+	if (f0 >= minF0 && f0 <= maxF0 && clarity > 0.25) {
 		return { f0, clarity, volume: rms };
 	}
 
@@ -294,8 +295,9 @@ export function analyzeToneContour(
 		isAIModel: boolean;
 	} | null
 ): ToneAnalysisResult {
-	// 1. Filter out unvoiced frames (f0 <= 0 or low clarity)
-	const voiced = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.4 && p.volume > 0.01);
+	// 1. Filter out unvoiced frames (f0 <= 0 or low clarity). 
+	// Lowered thresholds to preserve vocal fry and Tone 4 tails.
+	const voiced = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.25 && p.volume > 0.003);
 
 	if (voiced.length < 4) {
 		return {
@@ -343,8 +345,9 @@ export function analyzeToneContour(
 	const durationMs = smoothed[smoothed.length - 1].timeMs - smoothed[0].timeMs;
 
 	// Calculate user baseline for Chao mapping
-	const userMin = Math.max(70, minF0 * 0.9);
-	const userMax = Math.max(userMin + 40, maxF0 * 1.1);
+	// Ensure at least a ~1 octave (factor of 2) dynamic range to prevent scale-stretching on flat tones
+	const userMin = Math.max(60, minF0 * 0.85);
+	const userMax = Math.max(userMin * 1.8, maxF0 * 1.15);
 	for (const p of smoothed) {
 		p.chaoLevel = hzToChao(p.f0, userMin, userMax);
 	}
@@ -383,13 +386,14 @@ export function analyzeToneContour(
 		}
 
 		// Tone 3 check: noticeable dip in first half or middle, then rise
-		const hasDip = minIndex >= 2 && minIndex <= 7 && minSampleLevel < startLevel - 0.7 && endLevel > minSampleLevel + 0.6;
+		const hasDip = minIndex >= 1 && minIndex <= 8 && minSampleLevel < startLevel - 0.4 && endLevel > minSampleLevel + 0.3;
 		// Tone 2 check: steady rising contour
-		const isRising = deltaTotal >= 1.0 && endLevel > 3.6 && endLevel > startLevel + 0.8;
+		const isRising = deltaTotal >= 0.8 && endLevel > 3.4 && endLevel > startLevel + 0.6;
 		// Tone 4 check: sharp falling contour
-		const isFalling = deltaTotal <= -1.1 && startLevel >= 3.8 && endLevel < 3.0;
+		const isFalling = deltaTotal <= -0.9 && startLevel >= 3.5 && endLevel < 3.2;
 		// Tone 1 check: high, relatively flat contour
-		const isFlatHigh = Math.abs(deltaTotal) < 1.0 && avgF0 >= userMin + pitchRangeHz * 0.4 && minSampleLevel >= 3.0;
+		const isVeryFlat = pitchRangeHz < 40; // Extremely narrow absolute frequency range
+		const isFlatHigh = (Math.abs(deltaTotal) < 1.3 && minSampleLevel >= 2.5) || isVeryFlat;
 
 		if (hasDip) {
 			detectedTone = 3;
@@ -490,7 +494,7 @@ export function segmentPitchPointsIntoSyllables(
 		return [rawPoints];
 	}
 
-	const voiced = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.35 && p.volume > 0.008);
+	const voiced = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.25 && p.volume > 0.003);
 	if (voiced.length < syllableCount * 3) {
 		// Not enough voiced points to split reliably; divide rawPoints evenly
 		const chunks: PitchPoint[][] = [];
@@ -727,7 +731,7 @@ export async function analyzeMultiSyllableToneContour(
 		overallFeedback = `ยังไม่ตรงตามเป้าหมายวรรณยุกต์ทั้ง ${syllables.length} พยางค์ แนะนำให้ดูเส้นกราฟและลองออกเสียงใหม่อีกครั้ง`;
 	}
 
-	const voicedAll = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.4);
+	const voicedAll = rawPoints.filter((p) => p.f0 > 0 && p.clarity > 0.25 && p.volume > 0.003);
 	const totalDurationMs = voicedAll.length > 0 ? (voicedAll[voicedAll.length - 1].timeMs - voicedAll[0].timeMs) : 0;
 	const avgF0 = totalVoicedCount > 0 ? Math.round(sumAvgF0 / totalVoicedCount) : 0;
 
