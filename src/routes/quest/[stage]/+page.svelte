@@ -13,7 +13,7 @@
 	} from '$lib/pitch';
 	import { predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
 	import { Heart, Mic, CheckCircle2, AlertCircle, Sparkles, X, Volume2, ArrowRight } from '@lucide/svelte';
-	import { speak } from '$lib/speech';
+	import { speak, createRecognizer, isSpeechRecognitionSupported, matchChineseWord } from '$lib/speech';
 
 	const stageId = $page.params.stage;
 	const stageData: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
@@ -33,6 +33,11 @@
 	let phase = $state<'challenge' | 'flashcard' | 'victory'>('challenge');
 	let flashcardIndex = $state(0);
 	let showHint = $state(false); // For toggling pinyin/thai
+	
+	let speechRecognizer: ReturnType<typeof createRecognizer> = null;
+	let speechTranscript = '';
+	let speechCandidates: string[] = [];
+	let recognizedWord = $state<string>('');
 	
 	onMount(() => {
 		if (!stageData) {
@@ -107,9 +112,50 @@
 		feedbackType = 'none';
 		feedbackMessage = '';
 		hasVoicedSpeech = false;
+		speechTranscript = '';
+		speechCandidates = [];
+		recognizedWord = '';
 
 		if (!tracker) {
 			tracker = new RealtimePitchTracker();
+		}
+
+		if (isSpeechRecognitionSupported()) {
+			try {
+				speechRecognizer = createRecognizer();
+				if (speechRecognizer) {
+					speechRecognizer.onresult = (event) => {
+						let interim = '';
+						for (let i = event.resultIndex; i < event.results.length; i++) {
+							const res = event.results[i];
+							if (!res) continue;
+							for (let a = 0; a < res.length; a++) {
+								const cand = res[a]?.transcript?.trim();
+								if (cand && !speechCandidates.includes(cand)) {
+									speechCandidates.push(cand);
+								}
+							}
+							const alt = res[0];
+							if (!alt) continue;
+							if (res.isFinal) {
+								speechTranscript += alt.transcript;
+							} else {
+								interim += alt.transcript;
+							}
+						}
+						const currentHeard = (speechTranscript || interim).trim();
+						if (currentHeard) {
+							recognizedWord = currentHeard;
+							if (!speechCandidates.includes(currentHeard)) {
+								speechCandidates.push(currentHeard);
+							}
+						}
+					};
+					speechRecognizer.onerror = () => {};
+					speechRecognizer.onend = () => {};
+					speechRecognizer.start();
+				}
+			} catch {}
 		}
 
 		tracker.onPitchUpdate = (point, all) => {
@@ -136,6 +182,13 @@
 		if (silenceTimeout) clearTimeout(silenceTimeout);
 		if (!tracker || !isRecording) return;
 
+		if (speechRecognizer) {
+			try {
+				speechRecognizer.stop();
+			} catch {}
+			speechRecognizer = null;
+		}
+
 		const recorded = tracker.stop();
 		isRecording = false;
 
@@ -152,16 +205,41 @@
 				syllables,
 				predictToneNeuralNetwork
 			);
+			
+			const targetHanzi = currentChallenge.type === 'sentence_build' ? currentChallenge.sentenceHanzi : currentChallenge.word.hanzi;
+			const candidatePool = [
+				recognizedWord,
+				speechTranscript,
+				...speechCandidates
+			].filter((c) => Boolean(c && c.trim()));
 
-			if (res.isAllMatch && res.overallScore >= 70) {
+			const matchRes = matchChineseWord(targetHanzi || '', candidatePool);
+			let isWordCorrect = matchRes.isMatch;
+			let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
+
+			// Target-Proximity Rule: If user spoke clearly on this target word screen and tone score >= 60%
+			if (!isWordCorrect && candidatePool.length === 0 && res.contour.length >= 4 && res.overallScore >= 60) {
+				isWordCorrect = true;
+				finalHeard = targetHanzi;
+			}
+
+			const isTonePerfect = res.isAllMatch && res.overallScore >= 70;
+
+			if (isWordCorrect) {
 				feedbackType = 'success';
-				feedbackMessage = 'ยอดเยี่ยม! ' + (res.overallFeedback || '');
+				feedbackMessage = isTonePerfect ? 'ยอดเยี่ยม! เสียงและวรรณยุกต์เป๊ะมาก' : 'ดีมาก! ออกเสียงถูก (ปรับวรรณยุกต์อีกนิดจะเพอร์เฟกต์)';
 				setTimeout(nextChallenge, 1500);
 			} else {
-				feedbackType = 'error';
-				feedbackMessage = res.overallFeedback || 'ลองใหม่อีกครั้ง';
-				progress.loseHeart();
-				checkGameOver();
+				if (isTonePerfect && res.overallScore >= 75) {
+					feedbackType = 'success';
+					feedbackMessage = 'ดีมาก! วรรณยุกต์ตรงเป๊ะ';
+					setTimeout(nextChallenge, 1500);
+				} else {
+					feedbackType = 'error';
+					feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
+					progress.loseHeart();
+					checkGameOver();
+				}
 			}
 		} else {
 			feedbackType = 'error';

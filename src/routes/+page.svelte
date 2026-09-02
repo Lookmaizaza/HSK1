@@ -77,7 +77,6 @@
 					<!-- Label Tooltip -->
 					<div class="mt-3 rounded-xl bg-card px-3 py-1.5 text-center shadow-md border">
 						<div class="text-xs font-extrabold leading-tight whitespace-nowrap">{stage.title}</div>
-						<div class="text-[10px] text-muted-foreground">{stage.description}</div>
 					</div>
 				</a>
 			</div>

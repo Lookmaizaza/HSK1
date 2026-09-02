@@ -21,7 +21,6 @@ export type QuestStage = {
 	hskLevel: number;
 	stageIndex: number;
 	title: string;
-	description: string;
 	words: TonePreset[];
 	challenges: Challenge[];
 };
@@ -118,7 +117,6 @@ function chunkPresets(presets: TonePreset[], hskLevel: number): QuestStage[] {
 			hskLevel,
 			stageIndex,
 			title: `ด่านที่ ${stageIndex}`,
-			description: `ฝึก 10 คำ (${shuffledChallenges.length} ข้อ)`,
 			words: chunk,
 			challenges: shuffledChallenges
 		});
