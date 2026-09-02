@@ -26,7 +26,9 @@
 		type SyllableInfo
 	} from '$lib/pitch';
 	import {
-		HSK1_VOCAB_PRESETS
+		HSK1_VOCAB_PRESETS,
+		HSK2_VOCAB_PRESETS,
+		HSK3_VOCAB_PRESETS
 	} from '$lib/vocabLoader';
 	import {
 		initToneNeuralNetwork,
@@ -68,7 +70,8 @@
 		updatedAt: number;
 	};
 
-	// Vocabulary List State (HSK 1 active, 2-6 coming soon)
+	// Vocabulary List State
+	let currentLevel = $state<number>(1);
 	let vocabList = $state<TonePreset[]>(HSK1_VOCAB_PRESETS);
 	let searchQuery = $state('');
 	let activeToneFilter = $state<ToneNumber | 'all'>('all');
@@ -224,6 +227,17 @@
 		listenTimestamps = [];
 		selectedPreset = preset;
 		resetAnalysis();
+	}
+
+	function setLevel(lvl: number) {
+		currentLevel = lvl;
+		if (lvl === 1) vocabList = HSK1_VOCAB_PRESETS;
+		else if (lvl === 2) vocabList = HSK2_VOCAB_PRESETS;
+		else if (lvl === 3) vocabList = HSK3_VOCAB_PRESETS;
+		
+		if (vocabList.length > 0) {
+			selectPreset(vocabList[0]);
+		}
 	}
 
 	/**
@@ -593,15 +607,20 @@
 
 	<!-- 1. HSK LEVEL PILLS BAR (TOP) -->
 	<div class="mb-4 flex flex-wrap items-center gap-2">
-		<button
-			type="button"
-			class="flex items-center gap-1.5 rounded-full bg-slate-900 dark:bg-white px-4 py-1.5 text-xs font-extrabold text-white dark:text-slate-900 shadow-sm"
-		>
-			<span>HSK 1</span>
-			<span class="text-[10px] opacity-80">({vocabList.length} คำ)</span>
-		</button>
+		{#each [1, 2, 3] as lvl (lvl)}
+			<button
+				type="button"
+				onclick={() => setLevel(lvl)}
+				class="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-extrabold transition-all {currentLevel === lvl ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' : 'bg-muted/40 border border-border/80 text-muted-foreground hover:bg-muted'}"
+			>
+				<span>HSK {lvl}</span>
+				{#if currentLevel === lvl}
+					<span class="text-[10px] opacity-80">({vocabList.length} คำ)</span>
+				{/if}
+			</button>
+		{/each}
 
-		{#each [2, 3, 4, 5, 6] as lvl (lvl)}
+		{#each [4, 5, 6] as lvl (lvl)}
 			<div
 				class="flex items-center gap-1 rounded-full border border-border/80 bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-muted-foreground opacity-75"
 			>
@@ -710,7 +729,7 @@
 		<div class="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
 				<BookOpen class="size-4 text-primary shrink-0" />
-				<h2 class="text-lg sm:text-xl font-black tracking-tight">คลังคำศัพท์ HSK 1</h2>
+				<h2 class="text-lg sm:text-xl font-black tracking-tight">คลังคำศัพท์ HSK {currentLevel}</h2>
 				<span class="text-xs text-muted-foreground font-semibold">({filteredPresets.length} คำที่แสดง)</span>
 			</div>
 

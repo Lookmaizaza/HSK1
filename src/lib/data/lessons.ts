@@ -1,7 +1,11 @@
+import { hsk2Units } from './hsk2';
+import { hsk3Units } from './hsk3';
+
 export type Phrase = {
 	hanzi: string;
 	pinyin: string;
 	english: string;
+	thai?: string;
 };
 
 export type Lesson = {
@@ -482,7 +486,9 @@ export const units: Unit[] = [
 				]
 			}
 		]
-	}
+	},
+	...hsk2Units,
+	...hsk3Units
 ];
 
 export function findLesson(unitId: string, lessonId: string): { unit: Unit; lesson: Lesson } | null {
