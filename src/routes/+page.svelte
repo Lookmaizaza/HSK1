@@ -31,11 +31,11 @@
 	<div class="mb-8 flex gap-3">
 		<a href="/pitch" class="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-600 p-4 text-white shadow-lg transition hover:scale-[1.02]">
 			<div class="text-2xl mb-1">📈</div>
-			<div class="text-sm font-bold">ฝึกอิสระ</div>
+			<div class="text-sm font-bold">วิเคราะห์การออกเสียง</div>
 		</a>
 		<a href="/talk" class="flex-1 rounded-2xl bg-gradient-to-br from-violet-500 to-pink-500 p-4 text-white shadow-lg transition hover:scale-[1.02]">
 			<div class="text-2xl mb-1">💬</div>
-			<div class="text-sm font-bold">คุยกับ AI</div>
+			<div class="text-sm font-bold">สถานการณ์จำลอง</div>
 		</a>
 	</div>
 
