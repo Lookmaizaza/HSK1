@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { progress } from '$lib/progress.svelte';
 	import AppHeader from '$lib/components/AppHeader.svelte';
-	import { Star, Gamepad2, Heart, Zap } from '@lucide/svelte';
+	import { Star, Gamepad2, Heart, Zap, BookOpen } from '@lucide/svelte';
 	import { ALL_QUEST_STAGES } from '$lib/data/questLevels';
+
+	let selectedLevel = $state<number>(1);
+	const filteredStages = $derived(ALL_QUEST_STAGES.filter(s => s.hskLevel === selectedLevel));
 </script>
 
 <AppHeader />
@@ -36,9 +39,23 @@
 		</a>
 	</div>
 
-	<div class="text-center mb-8">
+	<div class="text-center mb-6">
 		<h1 class="text-3xl font-extrabold tracking-tight">HSK Quest</h1>
 		<p class="mt-2 text-sm text-muted-foreground">พิชิตด่านคำศัพท์ด้วยเสียงของคุณ</p>
+	</div>
+
+	<!-- Level Selector Tabs -->
+	<div class="mb-8 flex flex-wrap justify-center gap-2">
+		{#each [1, 2, 3] as lvl (lvl)}
+			<button
+				type="button"
+				onclick={() => selectedLevel = lvl}
+				class="flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-extrabold transition-all {selectedLevel === lvl ? 'bg-primary text-primary-foreground shadow-md scale-105' : 'bg-muted/40 border text-muted-foreground hover:bg-muted'}"
+			>
+				<BookOpen class="size-4" />
+				<span>HSK {lvl}</span>
+			</button>
+		{/each}
 	</div>
 
 	<!-- Journey Map -->
@@ -46,8 +63,8 @@
 		<!-- Background dashed line -->
 		<div class="absolute top-10 bottom-10 left-1/2 -ml-[2px] w-1 border-l-4 border-dashed border-muted-foreground/20 -z-10"></div>
 
-		{#each ALL_QUEST_STAGES as stage, i}
-			{@const isUnlocked = i === 0 || (progress.completed[ALL_QUEST_STAGES[i-1].id] ?? 0) > 0}
+		{#each filteredStages as stage, i}
+			{@const isUnlocked = i === 0 || (progress.completed[filteredStages[i-1].id] ?? 0) > 0}
 			{@const stars = progress.completed[stage.id] ?? 0}
 			{@const offset = Math.sin(i * 1.2) * 50}
 			

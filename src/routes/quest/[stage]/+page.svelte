@@ -98,7 +98,9 @@
 				feedbackType = 'error';
 				feedbackMessage = 'ผิด! คำแปลที่ถูกคือ: ' + currentChallenge.word.thai;
 				progress.loseHeart();
-				checkGameOver();
+				if (!checkGameOver()) {
+					setTimeout(nextChallenge, 2500);
+				}
 			}
 		}
 	}
@@ -238,12 +240,19 @@
 					feedbackType = 'error';
 					feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
 					progress.loseHeart();
-					checkGameOver();
+					if (!checkGameOver()) {
+						setTimeout(() => {
+							feedbackType = 'none';
+						}, 2000);
+					}
 				}
 			}
 		} else {
 			feedbackType = 'error';
 			feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
+			setTimeout(() => {
+				feedbackType = 'none';
+			}, 1500);
 		}
 	}
 
@@ -251,7 +260,9 @@
 		if (progress.hearts === 0) {
 			alert('หัวใจหมดแล้ว! กลับไปพักผ่อนแล้วมาท้าทายใหม่นะ');
 			goto('/');
+			return true;
 		}
+		return false;
 	}
 
 	function nextFlashcard() {
