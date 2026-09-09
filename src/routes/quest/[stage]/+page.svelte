@@ -15,7 +15,7 @@
 	import { Heart, Mic, CheckCircle2, AlertCircle, Sparkles, X, Volume2, ArrowRight } from '@lucide/svelte';
 	import { speak, createRecognizer, isSpeechRecognitionSupported, matchChineseWord } from '$lib/speech';
 
-	const stageId = $page.params.stage;
+	const stageId = $page.params.stage || '';
 	const stageData: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
 
 	let currentIndex = $state(0);
@@ -282,7 +282,7 @@
 	function triggerVictory() {
 		phase = 'victory';
 		progress.addXp(25);
-		progress.completeLesson(stageId, 3);
+		if (stageId) progress.completeLesson(stageId, 3);
 	}
 
 </script>
