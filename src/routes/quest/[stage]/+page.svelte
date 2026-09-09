@@ -13,7 +13,14 @@
 	} from '$lib/pitch';
 	import { predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
 	import { Heart, Mic, CheckCircle2, AlertCircle, Sparkles, X, Volume2, ArrowRight } from '@lucide/svelte';
-	import { speak, createRecognizer, isSpeechRecognitionSupported, matchChineseWord } from '$lib/speech';
+	import { 
+		speak, 
+		createRecognizer, 
+		isSpeechRecognitionSupported, 
+		matchChineseWord,
+		verifySentenceReading,
+		type SentenceVerificationResult
+	} from '$lib/speech';
 
 	const stageId = $page.params.stage || '';
 	const stageData: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
@@ -21,6 +28,7 @@
 	let currentIndex = $state(0);
 	let isRecording = $state(false);
 	let currentScore = $state(0);
+	let sentenceCheckResult = $state<SentenceVerificationResult | null>(null);
 	
 	let tracker: RealtimePitchTracker | null = null;
 	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -81,6 +89,7 @@
 		if (stageData && currentIndex < stageData.challenges.length - 1) {
 			currentIndex++;
 			feedbackType = 'none';
+			sentenceCheckResult = null;
 			playAudioIfListenSpeak();
 		} else {
 			phase = 'flashcard'; // Go to flashcards instead of victory
@@ -113,6 +122,7 @@
 	async function startRecording() {
 		feedbackType = 'none';
 		feedbackMessage = '';
+		sentenceCheckResult = null;
 		hasVoicedSpeech = false;
 		speechTranscript = '';
 		speechCandidates = [];
@@ -195,6 +205,36 @@
 		isRecording = false;
 
 		if (recorded.length > 0 && currentChallenge) {
+			const candidatePool = [
+				recognizedWord,
+				speechTranscript,
+				...speechCandidates
+			].filter((c) => Boolean(c && c.trim()));
+
+			// 1. Sentence reading challenge: verify every single word in the sentence
+			if (currentChallenge.type === 'sentence_build') {
+				const targetSentence = currentChallenge.sentenceHanzi || '';
+				const sentenceRes = verifySentenceReading(targetSentence, candidatePool);
+				sentenceCheckResult = sentenceRes;
+
+				if (sentenceRes.isAllCorrect) {
+					feedbackType = 'success';
+					feedbackMessage = sentenceRes.feedback;
+					setTimeout(nextChallenge, 1800);
+				} else {
+					feedbackType = 'error';
+					feedbackMessage = sentenceRes.feedback;
+					progress.loseHeart();
+					if (!checkGameOver()) {
+						setTimeout(() => {
+							feedbackType = 'none';
+						}, 2500);
+					}
+				}
+				return;
+			}
+
+			// 2. Single word vocabulary challenge
 			let syllables = currentChallenge.word.syllables || [{
 				hanzi: currentChallenge.word.hanzi,
 				pinyin: currentChallenge.word.pinyin,
@@ -208,13 +248,7 @@
 				predictToneNeuralNetwork
 			);
 			
-			const targetHanzi = currentChallenge.type === 'sentence_build' ? currentChallenge.sentenceHanzi : currentChallenge.word.hanzi;
-			const candidatePool = [
-				recognizedWord,
-				speechTranscript,
-				...speechCandidates
-			].filter((c) => Boolean(c && c.trim()));
-
+			const targetHanzi = currentChallenge.word.hanzi;
 			const matchRes = matchChineseWord(targetHanzi || '', candidatePool);
 			let isWordCorrect = matchRes.isMatch;
 			let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
@@ -360,7 +394,24 @@
 				<!-- Main Challenge Display -->
 				{#if currentChallenge.type === 'sentence_build'}
 					<button onclick={toggleHint} class="group relative rounded-3xl bg-card border shadow-sm px-6 py-10 text-center transition hover:border-primary w-full">
-						<h2 class="text-4xl font-black mb-4 text-foreground">{currentChallenge.sentenceHanzi}</h2>
+						{#if sentenceCheckResult && sentenceCheckResult.charResults.length > 0}
+							<div class="flex flex-wrap items-center justify-center gap-2 mb-4">
+								{#each sentenceCheckResult.charResults as c}
+									<span 
+										class="text-4xl sm:text-5xl font-black px-2.5 py-1.5 rounded-2xl transition-all shadow-sm {c.isCorrect ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-500/40' : 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border-2 border-rose-500/40 underline decoration-rose-500 decoration-wavy'}"
+										title={c.isCorrect ? 'ออกเสียงถูกต้อง' : 'คำนี้ยังออกเสียงไม่ชัดเจนหรืออ่านข้าม'}
+									>
+										{c.char}
+									</span>
+								{/each}
+							</div>
+							<div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold mb-3 {sentenceCheckResult.isAllCorrect ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}">
+								<span>อ่านถูกต้อง {sentenceCheckResult.correctCharsCount} จาก {sentenceCheckResult.totalChars} คำ ({sentenceCheckResult.accuracy}%)</span>
+							</div>
+						{:else}
+							<h2 class="text-4xl sm:text-5xl font-black mb-4 text-foreground tracking-wide">{currentChallenge.sentenceHanzi}</h2>
+						{/if}
+
 						{#if showHint}
 							<div class="text-xl font-semibold text-muted-foreground mb-2 animate-in fade-in">{currentChallenge.sentencePinyin}</div>
 							<div class="text-sm text-muted-foreground animate-in fade-in">{currentChallenge.sentenceThai}</div>

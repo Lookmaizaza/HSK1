@@ -362,3 +362,149 @@ export function matchChineseWord(
 
 	return { isMatch: false, bestMatch: cleanCandidates[0] || '', similarity: highestSim };
 }
+
+export type SentenceWordCheck = {
+	char: string;
+	isCorrect: boolean;
+	recognizedAs?: string;
+};
+
+export type SentenceVerificationResult = {
+	isAllCorrect: boolean;
+	accuracy: number; // 0 to 100%
+	totalChars: number;
+	correctCharsCount: number;
+	charResults: SentenceWordCheck[];
+	bestCandidate: string;
+	missingChars: string[];
+	feedback: string;
+};
+
+/**
+ * Strict character-by-character sentence reading verifier.
+ * Verifies whether EVERY single word/character in the target sentence was pronounced,
+ * using sequential alignment with phonetic homophone tolerance.
+ */
+export function verifySentenceReading(
+	targetSentence: string,
+	candidatePool: string[]
+): SentenceVerificationResult {
+	const cleanTarget = normalizeChinese(targetSentence);
+	const targetChars = Array.from(cleanTarget);
+
+	if (targetChars.length === 0) {
+		return {
+			isAllCorrect: true,
+			accuracy: 100,
+			totalChars: 0,
+			correctCharsCount: 0,
+			charResults: [],
+			bestCandidate: '',
+			missingChars: [],
+			feedback: 'ประโยคว่างเปล่า'
+		};
+	}
+
+	const cleanCandidates = candidatePool
+		.map((c) => normalizeChinese(c))
+		.filter((c) => c.length > 0);
+
+	if (cleanCandidates.length === 0) {
+		const emptyResults: SentenceWordCheck[] = targetChars.map((ch) => ({
+			char: ch,
+			isCorrect: false
+		}));
+		return {
+			isAllCorrect: false,
+			accuracy: 0,
+			totalChars: targetChars.length,
+			correctCharsCount: 0,
+			charResults: emptyResults,
+			bestCandidate: '',
+			missingChars: targetChars,
+			feedback: 'ไม่พบสัญญาณเสียงพูด กรุณาอ่านประโยคให้ชัดเจน'
+		};
+	}
+
+	// Helper to check if two characters match directly or phonetically
+	const isCharMatch = (tChar: string, cChar: string): boolean => {
+		if (tChar === cChar) return true;
+		const homophones = PHONETIC_HOMOPHONE_MAP[tChar];
+		return !!(homophones && homophones.includes(cChar));
+	};
+
+	let bestMatchedIndices = new Set<number>();
+	let bestCandStr = cleanCandidates[0];
+	let maxMatchCount = -1;
+
+	for (const cand of cleanCandidates) {
+		const candChars = Array.from(cand);
+		const n = targetChars.length;
+		const m = candChars.length;
+
+		// Dynamic Programming table for Longest Common Subsequence with homophone support
+		const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+
+		for (let i = 1; i <= n; i++) {
+			for (let j = 1; j <= m; j++) {
+				if (isCharMatch(targetChars[i - 1], candChars[j - 1])) {
+					dp[i][j] = dp[i - 1][j - 1] + 1;
+				} else {
+					dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+				}
+			}
+		}
+
+		// Backtrack to extract which target indices were successfully matched
+		const matched = new Set<number>();
+		let i = n;
+		let j = m;
+		while (i > 0 && j > 0) {
+			if (isCharMatch(targetChars[i - 1], candChars[j - 1]) && dp[i][j] === dp[i - 1][j - 1] + 1) {
+				matched.add(i - 1);
+				i--;
+				j--;
+			} else if (dp[i - 1][j] >= dp[i][j - 1]) {
+				i--;
+			} else {
+				j--;
+			}
+		}
+
+		if (matched.size > maxMatchCount) {
+			maxMatchCount = matched.size;
+			bestMatchedIndices = matched;
+			bestCandStr = cand;
+		}
+	}
+
+	const charResults: SentenceWordCheck[] = targetChars.map((ch, idx) => ({
+		char: ch,
+		isCorrect: bestMatchedIndices.has(idx)
+	}));
+
+	const correctCharsCount = charResults.filter((c) => c.isCorrect).length;
+	const totalChars = targetChars.length;
+	const accuracy = Math.round((correctCharsCount / totalChars) * 100);
+	const isAllCorrect = correctCharsCount === totalChars;
+	const missingChars = charResults.filter((c) => !c.isCorrect).map((c) => c.char);
+
+	let feedback = '';
+	if (isAllCorrect) {
+		feedback = `ยอดเยี่ยมมาก! อ่านถูกต้องครบถ้วนทุกคำ (${totalChars}/${totalChars} คำ)`;
+	} else {
+		feedback = `ยังอ่านไม่ครบ (ตรวจพบ ${correctCharsCount}/${totalChars} คำ — คำที่ยังไม่ชัด: ${missingChars.map((c) => `"${c}"`).join(', ')}) กรุณาอ่านใหม่อีกครั้ง`;
+	}
+
+	return {
+		isAllCorrect,
+		accuracy,
+		totalChars,
+		correctCharsCount,
+		charResults,
+		bestCandidate: bestCandStr,
+		missingChars,
+		feedback
+	};
+}
+
