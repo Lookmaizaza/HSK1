@@ -13,8 +13,8 @@ let db: Client | null = null;
 
 export function getDb(): Client | null {
 	if (db) return db;
-	const rawUrl = env.TURSO_DATABASE_URL?.trim();
-	const authToken = env.TURSO_AUTH_TOKEN?.trim();
+	const rawUrl = env.TURSO_DATABASE_URL?.trim() || process.env.TURSO_DATABASE_URL?.trim();
+	const authToken = env.TURSO_AUTH_TOKEN?.trim() || process.env.TURSO_AUTH_TOKEN?.trim();
 	const url = rawUrl || (isServerless ? '' : 'file:data/hsk.db');
 
 	if (!url) {
@@ -96,6 +96,27 @@ CREATE TABLE IF NOT EXISTS pronunciation_evaluations (
 	phoneme_details TEXT NOT NULL,
 	created_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS user_consents (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	consent_type TEXT NOT NULL DEFAULT 'pdpa_research_telemetry',
+	granted INTEGER NOT NULL DEFAULT 1,
+	ip_address TEXT,
+	user_agent TEXT,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS learning_events (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	statement_id TEXT NOT NULL UNIQUE,
+	xapi_statement TEXT NOT NULL,
+	created_at INTEGER NOT NULL
+);
 `;
 
 let initPromise: Promise<void> | null = null;
@@ -103,7 +124,38 @@ function init(): Promise<void> {
 	const client = getDb();
 	if (!client) return Promise.resolve();
 	if (!initPromise) {
-		initPromise = client.executeMultiple(SCHEMA).catch((e) => {
+		initPromise = (async () => {
+			await client.executeMultiple(SCHEMA);
+			// Migrate any legacy encoded word_ids (e.g. hsk1_1_%E7%88%B1 -> 爱)
+			try {
+				const legacyRows = await client.execute(
+					"SELECT DISTINCT word_id FROM pronunciation_evaluations WHERE word_id LIKE 'hsk%_%'"
+				);
+				for (const row of legacyRows.rows) {
+					const raw = String(row.word_id);
+					let clean = raw;
+					try {
+						clean = decodeURIComponent(clean);
+					} catch {}
+					if (clean.includes('_')) {
+						const parts = clean.split('_');
+						const hanzi = parts[parts.length - 1];
+						if (hanzi && hanzi !== raw) {
+							await client.execute({
+								sql: 'UPDATE pronunciation_evaluations SET word_id = ? WHERE word_id = ?',
+								args: [hanzi, raw]
+							});
+							await client.execute({
+								sql: 'UPDATE learning_events SET word_id = ? WHERE word_id = ?',
+								args: [hanzi, raw]
+							});
+						}
+					}
+				}
+			} catch (e) {
+				console.warn('⚠️ [DB Migration Warning]:', e);
+			}
+		})().catch((e) => {
 			initPromise = null; // allow retry on next call
 			console.error('⚠️ [DB Init Error]:', e);
 			throw e;
@@ -304,7 +356,6 @@ export async function completeLesson(userId: number, lessonKey: string, stars: n
 }
 
 // Admin queries
-
 export type AdminUserRow = {
 	id: number;
 	username: string;
@@ -353,7 +404,6 @@ export async function listAllCompletions(): Promise<{ userId: number; lessonKey:
 }
 
 // Mistakes & Learner Analytics
-
 export type MistakeRecord = {
 	id: number;
 	userId: number;
@@ -553,7 +603,7 @@ export async function recordPronunciationEvaluation(payload: {
 }
 
 export async function getPronunciationEvaluations(
-	userId: string,
+	userId: string | string[],
 	limit = 50
 ): Promise<Array<{
 	id: number;
@@ -573,14 +623,17 @@ export async function getPronunciationEvaluations(
 	const client = getDb();
 	if (!client) return [];
 	await init();
+	const userIds = Array.isArray(userId) ? userId : [userId];
+	if (userIds.length === 0) return [];
+	const placeholders = userIds.map(() => '?').join(',');
 	const result = await client.execute({
 		sql: `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
 		             gop_overall, per_overall, tone_score, phoneme_details, created_at
 		      FROM pronunciation_evaluations
-		      WHERE user_id = ?
+		      WHERE user_id IN (${placeholders})
 		      ORDER BY created_at DESC
 		      LIMIT ?`,
-		args: [String(userId), limit]
+		args: [...userIds.map(String), limit]
 	});
 
 	return result.rows.map((r) => {
@@ -608,7 +661,7 @@ export async function getPronunciationEvaluations(
 	});
 }
 
-export async function getPronunciationPhonemeErrorStats(userId: string): Promise<{
+export async function getPronunciationPhonemeErrorStats(userId: string | string[]): Promise<{
 	totalAttempts: number;
 	avgGop: number;
 	avgPer: number;
@@ -658,4 +711,361 @@ export async function getPronunciationPhonemeErrorStats(userId: string): Promise
 	};
 }
 
+// -------------------------------------------------------------
+// Learning Events (xAPI Statements Storage - Zero Audio Storage at Rest)
+// -------------------------------------------------------------
 
+export async function recordLearningEvent(params: {
+	userId: string;
+	eventType: string; // 'pronounced' | 'listened_to_example' | 'hesitated'
+	wordId: string;
+	statementId: string;
+	xapiStatement: any;
+}): Promise<void> {
+	const client = getDb();
+	if (!client) return;
+	await init();
+	await client.execute({
+		sql: `INSERT INTO learning_events (user_id, event_type, word_id, statement_id, xapi_statement, created_at)
+		      VALUES (?, ?, ?, ?, ?, ?)
+		      ON CONFLICT (statement_id) DO UPDATE SET xapi_statement = excluded.xapi_statement`,
+		args: [
+			String(params.userId),
+			String(params.eventType),
+			String(params.wordId),
+			String(params.statementId),
+			JSON.stringify(params.xapiStatement),
+			Date.now()
+		]
+	});
+}
+
+export async function getLearningEvents(
+	userId: string | string[],
+	eventType?: string,
+	limit = 100
+): Promise<Array<{
+	id: number;
+	userId: string;
+	eventType: string;
+	wordId: string;
+	statementId: string;
+	xapiStatement: any;
+	createdAt: number;
+}>> {
+	const client = getDb();
+	if (!client) return [];
+	await init();
+
+	const userIds = Array.isArray(userId) ? userId : [userId];
+	if (userIds.length === 0) return [];
+	const placeholders = userIds.map(() => '?').join(',');
+
+	const sql = eventType
+		? `SELECT id, user_id, event_type, word_id, statement_id, xapi_statement, created_at
+		   FROM learning_events
+		   WHERE user_id IN (${placeholders}) AND event_type = ?
+		   ORDER BY created_at DESC
+		   LIMIT ?`
+		: `SELECT id, user_id, event_type, word_id, statement_id, xapi_statement, created_at
+		   FROM learning_events
+		   WHERE user_id IN (${placeholders})
+		   ORDER BY created_at DESC
+		   LIMIT ?`;
+
+	const args = eventType ? [...userIds.map(String), eventType, limit] : [...userIds.map(String), limit];
+	const result = await client.execute({ sql, args });
+
+	return result.rows.map((r) => {
+		let parsedStatement = null;
+		try {
+			parsedStatement = JSON.parse(String(r.xapi_statement || '{}'));
+		} catch {
+			parsedStatement = {};
+		}
+		return {
+			id: Number(r.id),
+			userId: String(r.user_id),
+			eventType: String(r.event_type),
+			wordId: String(r.word_id),
+			statementId: String(r.statement_id),
+			xapiStatement: parsedStatement,
+			createdAt: Number(r.created_at)
+		};
+	});
+}
+
+// -------------------------------------------------------------
+// PDPA User Consents
+// -------------------------------------------------------------
+
+export async function recordUserConsent(params: {
+	userId: string;
+	consentType?: string;
+	granted?: boolean;
+	ipAddress?: string;
+	userAgent?: string;
+}): Promise<void> {
+	const client = getDb();
+	if (!client) return;
+	await init();
+	const consentType = params.consentType || 'pdpa_research_telemetry';
+	const granted = params.granted !== false ? 1 : 0;
+	const now = Date.now();
+
+	await client.execute({
+		sql: `INSERT INTO user_consents (user_id, consent_type, granted, ip_address, user_agent, created_at, updated_at)
+		      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		args: [
+			String(params.userId),
+			consentType,
+			granted,
+			params.ipAddress || null,
+			params.userAgent || null,
+			now,
+			now
+		]
+	});
+}
+
+export async function getUserConsent(
+	userId: string,
+	consentType = 'pdpa_research_telemetry'
+): Promise<boolean> {
+	const client = getDb();
+	if (!client) return true; // default in dev
+	await init();
+	const result = await client.execute({
+		sql: `SELECT granted FROM user_consents WHERE user_id = ? AND consent_type = ? ORDER BY updated_at DESC LIMIT 1`,
+		args: [String(userId), consentType]
+	});
+	if (result.rows.length === 0) return true;
+	return Number(result.rows[0].granted) === 1;
+}
+
+// -------------------------------------------------------------
+// Comprehensive Diagnostic Analytics (LQ5, LQ6, Phoneme & Tone Breakdown)
+// -------------------------------------------------------------
+
+export type DiagnosticAnalytics = {
+	hasData: boolean;
+	totalAttempts: number;
+	overallAccuracy: number | null;
+	avgPer: number | null;
+	avgToneScore: number | null;
+	toneAccuracy: Record<
+		'tone1' | 'tone2' | 'tone3' | 'tone4',
+		{ name: string; accuracy: number | null; count: number; isWeak: boolean }
+	>;
+	listeningImpact: {
+		withListeningAvgScore: number | null;
+		withoutListeningAvgScore: number | null;
+		scoreDelta: number | null;
+		sampleWith: number;
+		sampleWithout: number;
+	};
+	hesitationStats: { avgLatencyMs: number | null; sampleCount: number };
+	phonemeBreakdown: Array<{ phoneme: string; type: string; avgGop: number; totalAttempts: number }>;
+	frequentSubstitutions: Array<{
+		target: string;
+		recognized: string;
+		type: string;
+		count: number;
+		avgGop: number;
+	}>;
+	weakPhonemes: string[];
+	weakTones: number[];
+};
+
+const TONE_NAMES: Record<number, string> = {
+	1: 'เสียง 1 (ราบสูง 55)',
+	2: 'เสียง 2 (เสียงขึ้น 35)',
+	3: 'เสียง 3 (ต่ำ-ขึ้น 214)',
+	4: 'เสียง 4 (ตกฮวบ 51)'
+};
+
+export async function getDiagnosticAnalytics(userId: string | string[]): Promise<DiagnosticAnalytics | null> {
+	const client = getDb();
+	if (!client) {
+		return null;
+	}
+	await init();
+
+	// 1. Fetch Pronunciation Evaluations
+	const evalList = await getPronunciationEvaluations(userId, 200);
+
+	// 2. Fetch Learning Events (xAPI statements)
+	const events = await getLearningEvents(userId, undefined, 500);
+
+	const totalAttempts = evalList.length;
+	const toneStats: Record<number, { total: number; sumScore: number }> = {
+		1: { total: 0, sumScore: 0 },
+		2: { total: 0, sumScore: 0 },
+		3: { total: 0, sumScore: 0 },
+		4: { total: 0, sumScore: 0 }
+	};
+
+	const VALID_INITIALS = new Set([
+		'b', 'p', 'm', 'f', 'd', 't', 'n', 'l',
+		'g', 'k', 'h', 'j', 'q', 'x',
+		'zh', 'ch', 'sh', 'r', 'z', 'c', 's',
+		'y', 'w'
+	]);
+
+	const substitutionsMap: Record<string, { target: string; recognized: string; type: string; count: number; totalGop: number }> = {};
+	const phonemeScoresMap: Record<string, { phoneme: string; type: string; total: number; sumGop: number }> = {};
+
+	let totalGop = 0;
+	let totalPer = 0;
+	let totalTone = 0;
+
+	for (const ev of evalList) {
+		totalGop += ev.scores.gop_overall;
+		totalPer += ev.scores.per_overall;
+		totalTone += ev.scores.tone_score;
+
+		for (const p of ev.scores.phoneme_details) {
+			const pName = p.phoneme || p.target;
+			if (!pName) continue;
+
+			// Tone stats from final_tone or syllable
+			if (p.type === 'final_tone' || p.targetTone) {
+				const toneNum = Number(p.targetTone || p.phoneme?.slice(-1));
+				if (toneNum >= 1 && toneNum <= 4) {
+					toneStats[toneNum].total++;
+					toneStats[toneNum].sumScore += Number(p.gop ?? 0);
+				}
+			}
+
+			//แบบที่ 3: กรองแสดงเฉพาะพยัญชนะต้นจริง (เช่น /b/, /d/, /zh/, /sh/)
+			// ตัดพวกสระโค้ดตัวเลขทิ้งไปให้หมด
+			const cleanInitial = pName.toLowerCase().replace(/[^a-z]/g, '');
+			if (VALID_INITIALS.has(cleanInitial)) {
+				// Phoneme breakdown aggregation (เฉพาะพยัญชนะต้นจริง)
+				if (!phonemeScoresMap[cleanInitial]) {
+					phonemeScoresMap[cleanInitial] = { phoneme: cleanInitial, type: 'initial', total: 0, sumGop: 0 };
+				}
+				phonemeScoresMap[cleanInitial].total++;
+				phonemeScoresMap[cleanInitial].sumGop += Number(p.gop ?? 0);
+
+				// Substitution errors
+				if (p.status === 'substitution' && p.target && p.recognized && p.target !== p.recognized) {
+					const cleanTarget = p.target.toLowerCase().replace(/[^a-z]/g, '');
+					const cleanRecognized = p.recognized.toLowerCase().replace(/[^a-z]/g, '');
+					if (VALID_INITIALS.has(cleanTarget) && VALID_INITIALS.has(cleanRecognized)) {
+						const key = `${cleanTarget}->${cleanRecognized}`;
+						if (!substitutionsMap[key]) {
+							substitutionsMap[key] = { target: cleanTarget, recognized: cleanRecognized, type: 'initial', count: 0, totalGop: 0 };
+						}
+						substitutionsMap[key].count++;
+						substitutionsMap[key].totalGop += Number(p.gop ?? 0);
+					}
+				}
+			}
+		}
+	}
+
+	// LQ5 Analysis: Score with listening vs without listening
+	const pronouncedEvents = events.filter((e) => e.eventType === 'pronounced');
+	const listeningEvents = events.filter((e) => e.eventType === 'listened_to_example');
+	const hesitationEvents = events.filter((e) => e.eventType === 'hesitated');
+
+	const listenedScores: number[] = [];
+	const notListenedScores: number[] = [];
+	for (const p of pronouncedEvents) {
+		const score = Number(p.xapiStatement?.result?.score?.raw ?? 0);
+		const word = p.wordId;
+		const hadListened = listeningEvents.some(
+			(l) => l.wordId === word && Math.abs(l.createdAt - p.createdAt) < 60000
+		);
+		if (hadListened) {
+			listenedScores.push(score);
+		} else {
+			notListenedScores.push(score);
+		}
+	}
+
+	const avg = (arr: number[]): number | null =>
+		arr.length > 0 ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
+
+	const withListeningAvg = avg(listenedScores);
+	const withoutListeningAvg = avg(notListenedScores);
+	const scoreDelta =
+		withListeningAvg !== null && withoutListeningAvg !== null
+			? Number((withListeningAvg - withoutListeningAvg).toFixed(1))
+			: null;
+
+	// LQ6 Analysis: Hesitation latency breakdown
+	const hesitationLatencies = hesitationEvents
+		.map((h) => Number(h.xapiStatement?.result?.extensions?.['https://hsk.app/xapi/ext/hesitation-latency-ms'] ?? 0))
+		.filter((lat) => lat > 0);
+	const avgHesitationMs =
+		hesitationLatencies.length > 0
+			? Math.round(hesitationLatencies.reduce((a, b) => a + b, 0) / hesitationLatencies.length)
+			: null;
+
+	// Phoneme breakdown, sorted weakest first
+	const phonemeBreakdown = Object.values(phonemeScoresMap)
+		.map((p) => ({
+			phoneme: p.phoneme,
+			type: p.type,
+			avgGop: Number((p.sumGop / p.total).toFixed(1)),
+			totalAttempts: p.total
+		}))
+		.sort((a, b) => a.avgGop - b.avgGop);
+
+	const frequentSubstitutions = Object.values(substitutionsMap)
+		.map((s) => ({
+			target: s.target,
+			recognized: s.recognized,
+			type: s.type,
+			count: s.count,
+			avgGop: Number((s.totalGop / s.count).toFixed(1))
+		}))
+		.sort((a, b) => b.count - a.count)
+		.slice(0, 8);
+
+	// Tone accuracy (null when never attempted)
+	const toneAccuracy = Object.fromEntries(
+		([1, 2, 3, 4] as const).map((t) => {
+			const { total, sumScore } = toneStats[t];
+			const accuracy = total > 0 ? Math.round(sumScore / total) : null;
+			return [
+				`tone${t}`,
+				{
+					name: TONE_NAMES[t],
+					accuracy,
+					count: total,
+					isWeak: accuracy !== null && accuracy < 75
+				}
+			];
+		})
+	) as DiagnosticAnalytics['toneAccuracy'];
+
+	// Weak-point extraction for the remedial engine
+	const weakPhonemes = phonemeBreakdown.filter((p) => p.avgGop < 75).slice(0, 3).map((p) => p.phoneme);
+	const weakTones = ([1, 2, 3, 4] as const)
+		.filter((t) => toneStats[t].total > 0 && toneStats[t].sumScore / toneStats[t].total < 75)
+		.map((t) => t);
+
+	return {
+		hasData: totalAttempts > 0,
+		totalAttempts,
+		overallAccuracy: totalAttempts > 0 ? Number((totalGop / totalAttempts).toFixed(1)) : null,
+		avgPer: totalAttempts > 0 ? Number((totalPer / totalAttempts).toFixed(2)) : null,
+		avgToneScore: totalAttempts > 0 ? Number((totalTone / totalAttempts).toFixed(1)) : null,
+		toneAccuracy,
+		listeningImpact: {
+			withListeningAvgScore: withListeningAvg,
+			withoutListeningAvgScore: withoutListeningAvg,
+			scoreDelta,
+			sampleWith: listenedScores.length,
+			sampleWithout: notListenedScores.length
+		},
+		hesitationStats: { avgLatencyMs: avgHesitationMs, sampleCount: hesitationLatencies.length },
+		phonemeBreakdown,
+		frequentSubstitutions,
+		weakPhonemes,
+		weakTones
+	};
+}

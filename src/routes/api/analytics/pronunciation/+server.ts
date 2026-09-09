@@ -66,9 +66,23 @@ export const POST = async ({ locals, request }: RequestEvent) => {
 
 	const processedItems: LearnerPronunciationPayload[] = [];
 
+function normalizeWordId(rawId: string): string {
+	if (!rawId) return '';
+	let clean = rawId.trim();
+	try {
+		clean = decodeURIComponent(clean);
+	} catch {}
+	if (clean.includes('_')) {
+		const parts = clean.split('_');
+		const lastPart = parts[parts.length - 1];
+		if (lastPart) clean = lastPart;
+	}
+	return clean;
+}
+
 	for (const item of rawItems) {
-		const userId = String(item.user_id || (locals.user ? locals.user.id : ''));
-		const wordId = String(item.word_id || '');
+		const userId = String(item.user_id || (locals.user ? locals.user.id : 'usr_uuid_local'));
+		const wordId = normalizeWordId(String(item.word_id || ''));
 		const pinyin = String(item.pinyin || '');
 		const attemptNumber = Number(item.attempt_number || 1);
 		const audioDurationSec = Number(item.audio_duration_sec || 0);

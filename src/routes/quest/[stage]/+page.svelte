@@ -21,6 +21,7 @@
 		verifySentenceReading,
 		type SentenceVerificationResult
 	} from '$lib/speech';
+	import { sendPronunciationTelemetry } from '$lib/telemetry/client';
 
 	const stageId = $page.params.stage || '';
 	const stageData: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
@@ -260,6 +261,50 @@
 			}
 
 			const isTonePerfect = res.isAllMatch && res.overallScore >= 70;
+
+			// Ingest pronunciation telemetry into research LRS & Neon DB
+			sendPronunciationTelemetry({
+				eventType: 'pronunciation_evaluation',
+				timestamp: new Date().toISOString(),
+				mode: 'quest',
+				word: {
+					id: currentChallenge.word.hanzi,
+					hanzi: currentChallenge.word.hanzi,
+					pinyin: currentChallenge.word.pinyin,
+					meaning: currentChallenge.word.thai || '',
+					expectedTone: currentChallenge.word.tone || 1,
+					tonePattern: String(currentChallenge.word.tone || 1)
+				},
+				behavior: {
+					listenedToExample: currentChallenge.type === 'listen_speak',
+					listenCount: currentChallenge.type === 'listen_speak' ? 1 : 0,
+					listenTimestamps: []
+				},
+				assessment: {
+					isPassed: isWordCorrect,
+					overallScore: res.overallScore,
+					rawScore: res.overallScore,
+					isToneMatch: res.isAllMatch,
+					isWordMatch: isWordCorrect,
+					recognizedWord: finalHeard,
+					speechCandidates: candidatePool,
+					syllableResults: res.syllableResults.map((s, idx) => ({
+						syllableIndex: idx,
+						hanzi: s.hanzi,
+						pinyin: s.pinyin || '',
+						score: s.score,
+						isMatch: s.isMatch,
+						targetTone: s.targetTone,
+						detectedTone: s.detectedTone,
+						feedback: s.feedback || ''
+					})),
+					acoustics: {
+						avgF0: res.avgF0 ?? 0,
+						totalDurationMs: res.totalDurationMs ?? 1500
+					},
+					overallFeedback: res.overallFeedback
+				}
+			}).catch(() => {});
 
 			if (isWordCorrect) {
 				feedbackType = 'success';
