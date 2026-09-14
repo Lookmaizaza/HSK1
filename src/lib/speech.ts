@@ -229,8 +229,11 @@ export function quickSimilarity(target: string, said: string): number {
 // Homophone and near-sound phonetic groups for common Mandarin words (especially HSK 1-3 single syllables)
 export const PHONETIC_HOMOPHONE_MAP: Record<string, string[]> = {
 	'爱': ['爱', '艾', '哎', '唉', '矮', '碍', '隘', '捱', '按', '啊'],
-	'八': ['八', '吧', '巴', '爸', '把', '拔', '坝', '靶', '发', '伯', '拔'],
-	'爸': ['爸', '八', '吧', '巴', '把', '拔', '坝'],
+	'八': ['八', '吧', '巴', '爸', '把', '拔', '坝', '靶', '发', '伯', '8', 'ba'],
+	'吧': ['吧', '八', '巴', '爸', '把', '拔', '坝', '靶', '发', '伯', '8', 'ba'],
+	'巴': ['巴', '八', '吧', '爸', '把', '拔', '8', 'ba'],
+	'把': ['把', '八', '吧', '巴', '爸', '拔', '8', 'ba'],
+	'爸': ['爸', '八', '吧', '巴', '把', '拔', '坝', 'ba'],
 	'百': ['百', '摆', '败', '拜', '白', '柏'],
 	'白': ['白', '百', '摆', '败', '拜', '柏', '伯'],
 	'不': ['不', '布', '部', '步', '补', '捕', '簿', '木'],
@@ -334,6 +337,16 @@ export const PHONETIC_HOMOPHONE_MAP: Record<string, string[]> = {
 	'坐': ['坐', '做', '作', '座', '左', '昨']
 };
 
+export function areHomophones(charA: string, charB: string): boolean {
+	if (!charA || !charB) return false;
+	if (charA === charB) return true;
+	const listA = PHONETIC_HOMOPHONE_MAP[charA];
+	if (listA && listA.includes(charB)) return true;
+	const listB = PHONETIC_HOMOPHONE_MAP[charB];
+	if (listB && listB.includes(charA)) return true;
+	return false;
+}
+
 function stripToneMarks(pinyin: string): string {
 	return pinyin
 		.normalize('NFD')
@@ -394,15 +407,14 @@ export function matchChineseWord(
 		}
 	}
 
-	// 3. Target-Guided Homophone & Phonetic Sound Cluster Check (for 1-char and multi-char words)
+	// 4. Target-Guided Homophone & Phonetic Sound Cluster Check (for 1-char and multi-char words)
 	const targetChars = Array.from(cleanTarget);
 	for (const cand of cleanCandidates) {
 		const candChars = Array.from(cand);
 
-		// Single character homophone check
+		// Single character homophone check (bidirectional)
 		if (targetChars.length === 1 && candChars.length === 1) {
-			const homophones = PHONETIC_HOMOPHONE_MAP[targetChars[0]];
-			if (homophones && homophones.includes(candChars[0])) {
+			if (areHomophones(targetChars[0], candChars[0])) {
 				return { isMatch: true, bestMatch: cleanTarget, similarity: 100 };
 			}
 		}
@@ -411,11 +423,7 @@ export function matchChineseWord(
 		if (targetChars.length > 1 && candChars.length === targetChars.length) {
 			let allCharsMatch = true;
 			for (let idx = 0; idx < targetChars.length; idx++) {
-				const tChar = targetChars[idx];
-				const cChar = candChars[idx];
-				if (tChar === cChar) continue;
-				const homos = PHONETIC_HOMOPHONE_MAP[tChar];
-				if (!homos || !homos.includes(cChar)) {
+				if (!areHomophones(targetChars[idx], candChars[idx])) {
 					allCharsMatch = false;
 					break;
 				}
@@ -510,9 +518,7 @@ export function verifySentenceReading(
 
 	// Helper to check if two characters match directly or phonetically
 	const isCharMatch = (tChar: string, cChar: string): boolean => {
-		if (tChar === cChar) return true;
-		const homophones = PHONETIC_HOMOPHONE_MAP[tChar];
-		return !!(homophones && homophones.includes(cChar));
+		return areHomophones(tChar, cChar);
 	};
 
 	let bestMatchedIndices = new Set<number>();

@@ -432,9 +432,15 @@ export function analyzeToneContour(
 	// 6. Score Calculation against Target Tone
 	let score = 70;
 	let feedback = '';
-	const isMatch = targetTone ? detectedTone === targetTone : true;
+	let isMatch = targetTone ? detectedTone === targetTone : true;
 
-	if (targetTone) {
+	if (targetTone === 5) {
+		// Neutral Tone (5) is unstressed/short; any clear short vocalization matches
+		isMatch = true;
+		detectedTone = 5;
+		score = 85;
+		feedback = 'ออกเสียงสั้นและเบาได้ถูกต้องตามเสียงเบา (Neutral Tone)';
+	} else if (targetTone) {
 		const targetProfile = TONE_PROFILES[targetTone];
 		const targetCurve = targetProfile.curve;
 		let totalDiff = 0;

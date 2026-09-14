@@ -172,14 +172,14 @@
 
 		tracker.onPitchUpdate = (point, all) => {
 			// Require real human voice characteristics: pitch in vocal range, clarity, and volume
-			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.35 && point.volume > 0.018) {
+			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.30 && point.volume > 0.010) {
 				hasVoicedSpeech = true;
 			}
-			if (hasVoicedSpeech && all.length >= 15) {
-				const recent = all.slice(-10);
-				const isSilent = recent.every((p) => p.volume < 0.015 || p.f0 <= 0 || p.clarity < 0.3);
+			if (hasVoicedSpeech && all.length >= 12) {
+				const recent = all.slice(-8);
+				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 500);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 450);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;
@@ -205,7 +205,7 @@
 		// Allow Web Speech API to finalize and deliver transcript if speech was voiced
 		if (hasVoicedSpeech && speechCandidates.length === 0) {
 			await new Promise<void>((resolve) => {
-				const timer = setTimeout(resolve, 500);
+				const timer = setTimeout(resolve, 800);
 				if (currentRec) {
 					currentRec.onend = () => {
 						clearTimeout(timer);
@@ -228,10 +228,11 @@
 
 			// 1. Voice Activity Check: Count actual voiced frames within human vocal frequency
 			const voicedFrames = recorded.filter(
-				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.35 && p.volume > 0.018
+				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.30 && p.volume > 0.010
 			);
 			const maxVolume = Math.max(...recorded.map((p) => p.volume || 0), 0);
-			const isRealHumanVoice = hasVoicedSpeech && voicedFrames.length >= 7 && maxVolume >= 0.028;
+			// Human voice detected: Has vocal frequency frames and peak volume distinct from room silence
+			const isRealHumanVoice = (hasVoicedSpeech || voicedFrames.length >= 4) && (voicedFrames.length >= 4 && maxVolume >= 0.015);
 
 			// If no speech was recognized AND no significant voiced speech frames detected:
 			if (candidatePool.length === 0 && !isRealHumanVoice) {
@@ -295,19 +296,33 @@
 			let isWordCorrect = matchRes.isMatch;
 			let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
 
-			// Single-syllable acoustic fallback (when ASR server drops or delays single short syllable, but user spoke loudly and clearly with accurate tone):
-			if (!isWordCorrect && candidatePool.length === 0 && isRealHumanVoice && res.isAllMatch && res.overallScore >= 68) {
-				isWordCorrect = true;
-				finalHeard = targetHanzi;
+			// Single-syllable acoustic fallback (when ASR drops or delays short single syllable, but user spoke with real human voice):
+			const isSingleSyllable = (targetHanzi || '').length <= 1 || syllables.length <= 1;
+			if (!isWordCorrect && candidatePool.length === 0 && isRealHumanVoice && isSingleSyllable) {
+				// Tone 5 (neutral tone like 吧, 吗, 呢) has no fixed pitch; any voiced syllable is correct.
+				// For tones 1-4, accept if pitch contour matches or overall score is reasonable (>= 48)
+				if (currentChallenge.word.tone === 5 || res.isAllMatch || res.overallScore >= 48) {
+					isWordCorrect = true;
+					finalHeard = targetHanzi;
+				}
 			}
 
-			// Guard: If still no word recognized and not validated:
+			// Guard: If no word recognized and not validated:
 			if (candidatePool.length === 0 && !isWordCorrect) {
 				feedbackType = 'error';
-				feedbackMessage = 'ยังไม่พบเสียงคำศัพท์ กรุณาออกเสียงให้ชัดเจน';
-				setTimeout(() => {
-					feedbackType = 'none';
-				}, 1800);
+				if (isRealHumanVoice && res.syllableResults?.[0]) {
+					const detectedTone = res.syllableResults[0].detectedTone;
+					const targetTone = currentChallenge.word.tone;
+					feedbackMessage = `วรรณยุกต์ยังไม่ตรง (พบเสียง ${detectedTone} แต่คำนี้เสียง ${targetTone === 5 ? 'เบา' : targetTone}) ลองใหม่`;
+				} else {
+					feedbackMessage = 'ยังไม่พบเสียงคำศัพท์ กรุณาออกเสียงให้ชัดเจน';
+				}
+				progress.loseHeart();
+				if (!checkGameOver()) {
+					setTimeout(() => {
+						feedbackType = 'none';
+					}, 2200);
+				}
 				return;
 			}
 
