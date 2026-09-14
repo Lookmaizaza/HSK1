@@ -438,14 +438,8 @@
 			].filter((c) => Boolean(c && c.trim()));
 
 			const matchRes = matchChineseWord(selectedPreset.hanzi, candidatePool);
-			let isWordCorrect = matchRes.isMatch;
-			let finalHeard = matchRes.isMatch ? selectedPreset.hanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
-
-			// Target-Proximity Rule: If user spoke clearly on this target word screen and tone score >= 60%
-			if (!isWordCorrect && candidatePool.length === 0 && res.contour.length >= 4 && res.overallScore >= 60) {
-				isWordCorrect = true;
-				finalHeard = selectedPreset.hanzi;
-			}
+			const isWordCorrect = matchRes.isMatch;
+			const finalHeard = matchRes.isMatch ? selectedPreset.hanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
 
 			res.recognizedWord = finalHeard ? finalHeard.trim() : undefined;
 			res.isWordMatch = isWordCorrect;
@@ -469,17 +463,12 @@
 					res.overallFeedback = `เก่งมาก! ออกเสียงคำศัพท์ "${selectedPreset.hanzi}" ได้ถูกต้อง (ระบบให้ผ่านเกณฑ์คำศัพท์) — สามารถปรับระดับวรรณยุกต์ตามเส้นกราฟแนะนำ เพื่อให้สำเนียงสมบูรณ์แบบยิ่งขึ้น`;
 				}
 			} else {
-				// Single-syllable acoustic fallback: If tone pitch is accurate
-				if (isTonePerfect && res.overallScore >= 75) {
-					isPassed = true;
-					finalScore = res.overallScore;
-					res.overallFeedback = `ดีมาก! ระดับเสียงวรรณยุกต์ตรงตามมาตรฐาน (${TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`}) ชัดเจน`;
+				isPassed = false;
+				finalScore = res.overallScore;
+				if (candidatePool.length === 0) {
+					res.overallFeedback = `ยังไม่พบเสียงคำศัพท์ภาษาจีน กรุณาออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ให้ชัดเจนและลองใหม่อีกครั้ง`;
 				} else {
-					isPassed = false;
-					finalScore = res.overallScore;
-					if (finalHeard) {
-						res.overallFeedback = `ยังไม่ตรงเป้าหมาย (ระบบได้ยินเป็น: "${finalHeard}") — แนะนำให้ออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ใหม่อีกครั้ง`;
-					}
+					res.overallFeedback = `ยังไม่ตรงเป้าหมาย (ระบบได้ยินเป็น: "${finalHeard || '-'}") — แนะนำให้ออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ใหม่อีกครั้ง`;
 				}
 			}
 

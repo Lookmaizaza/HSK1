@@ -171,14 +171,15 @@
 		}
 
 		tracker.onPitchUpdate = (point, all) => {
-			if (point.f0 > 0 && point.clarity > 0.35 && point.volume > 0.012) {
+			// Require real human voice characteristics: pitch in vocal range, high clarity, and solid volume
+			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.4 && point.volume > 0.02) {
 				hasVoicedSpeech = true;
 			}
 			if (hasVoicedSpeech && all.length >= 15) {
 				const recent = all.slice(-10);
-				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
+				const isSilent = recent.every((p) => p.volume < 0.015 || p.f0 <= 0 || p.clarity < 0.3);
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 400);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 450);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;
@@ -211,8 +212,32 @@
 				...speechCandidates
 			].filter((c) => Boolean(c && c.trim()));
 
-			// 1. Sentence reading challenge: verify every single word in the sentence
+			// 1. Voice Activity Check: Count actual voiced frames within human vocal frequency
+			const voicedFrames = recorded.filter(
+				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.4 && p.volume > 0.02
+			);
+
+			// If no speech was recognized AND no significant voiced speech frames detected:
+			if (candidatePool.length === 0 && voicedFrames.length < 8) {
+				feedbackType = 'error';
+				feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
+				setTimeout(() => {
+					feedbackType = 'none';
+				}, 1800);
+				return;
+			}
+
+			// 2. Sentence reading challenge: verify every single word in the sentence
 			if (currentChallenge.type === 'sentence_build') {
+				if (candidatePool.length === 0) {
+					feedbackType = 'error';
+					feedbackMessage = 'ไม่พบเสียงพูด กรุณาอ่านประโยคให้ชัดเจน';
+					setTimeout(() => {
+						feedbackType = 'none';
+					}, 1800);
+					return;
+				}
+
 				const targetSentence = currentChallenge.sentenceHanzi || '';
 				const sentenceRes = verifySentenceReading(targetSentence, candidatePool);
 				sentenceCheckResult = sentenceRes;
@@ -234,7 +259,17 @@
 				return;
 			}
 
-			// 2. Single word vocabulary challenge
+			// 3. Single word vocabulary challenge (speak or listen_speak)
+			// Guard: If speech recognition did NOT detect any word (silence or noise), do NOT pass!
+			if (candidatePool.length === 0) {
+				feedbackType = 'error';
+				feedbackMessage = 'ยังไม่พบเสียงคำศัพท์ กรุณาออกเสียงให้ชัดเจน';
+				setTimeout(() => {
+					feedbackType = 'none';
+				}, 1800);
+				return;
+			}
+
 			let syllables = currentChallenge.word.syllables || [{
 				hanzi: currentChallenge.word.hanzi,
 				pinyin: currentChallenge.word.pinyin,
@@ -250,35 +285,25 @@
 			
 			const targetHanzi = currentChallenge.word.hanzi;
 			const matchRes = matchChineseWord(targetHanzi || '', candidatePool);
-			let isWordCorrect = matchRes.isMatch;
-			let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
+			const isWordCorrect = matchRes.isMatch;
+			const finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
 
-			// Target-Proximity Rule: If user spoke clearly on this target word screen and tone score >= 60%
-			if (!isWordCorrect && candidatePool.length === 0 && res.contour.length >= 4 && res.overallScore >= 60) {
-				isWordCorrect = true;
-				finalHeard = targetHanzi;
-			}
-
-			const isTonePerfect = res.isAllMatch && res.overallScore >= 70;
-
+			// User MUST have pronounced the target word correctly to pass
 			if (isWordCorrect) {
+				const isToneGood = res.overallScore >= 60;
 				feedbackType = 'success';
-				feedbackMessage = isTonePerfect ? 'ยอดเยี่ยม! เสียงและวรรณยุกต์เป๊ะมาก' : 'ดีมาก! ออกเสียงถูก (ปรับวรรณยุกต์อีกนิดจะเพอร์เฟกต์)';
+				feedbackMessage = isToneGood 
+					? 'ยอดเยี่ยม! เสียงและวรรณยุกต์เป๊ะมาก' 
+					: 'ดีมาก! ออกเสียงถูก (ปรับวรรณยุกต์อีกนิดจะเพอร์เฟกต์)';
 				setTimeout(nextChallenge, 1500);
 			} else {
-				if (isTonePerfect && res.overallScore >= 75) {
-					feedbackType = 'success';
-					feedbackMessage = 'ดีมาก! วรรณยุกต์ตรงเป๊ะ';
-					setTimeout(nextChallenge, 1500);
-				} else {
-					feedbackType = 'error';
-					feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
-					progress.loseHeart();
-					if (!checkGameOver()) {
-						setTimeout(() => {
-							feedbackType = 'none';
-						}, 2000);
-					}
+				feedbackType = 'error';
+				feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
+				progress.loseHeart();
+				if (!checkGameOver()) {
+					setTimeout(() => {
+						feedbackType = 'none';
+					}, 2000);
 				}
 			}
 		} else {
