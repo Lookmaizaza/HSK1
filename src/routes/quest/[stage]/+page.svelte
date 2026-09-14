@@ -172,14 +172,15 @@
 		}
 
 		tracker.onPitchUpdate = (point, all) => {
-			if (point.f0 > 0 && point.clarity > 0.35 && point.volume > 0.012) {
+			// Require real human voice characteristics: pitch in vocal range, clarity, and volume
+			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.30 && point.volume > 0.010) {
 				hasVoicedSpeech = true;
 			}
-			if (hasVoicedSpeech && all.length >= 15) {
-				const recent = all.slice(-10);
+			if (hasVoicedSpeech && all.length >= 12) {
+				const recent = all.slice(-8);
 				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 400);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 450);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;
@@ -195,12 +196,26 @@
 		if (silenceTimeout) clearTimeout(silenceTimeout);
 		if (!tracker || !isRecording) return;
 
-		if (speechRecognizer) {
+		const currentRec = speechRecognizer;
+		if (currentRec) {
 			try {
-				speechRecognizer.stop();
+				currentRec.stop();
 			} catch {}
-			speechRecognizer = null;
 		}
+
+		// Allow Web Speech API to finalize and deliver transcript if speech was voiced
+		if (hasVoicedSpeech && speechCandidates.length === 0) {
+			await new Promise<void>((resolve) => {
+				const timer = setTimeout(resolve, 800);
+				if (currentRec) {
+					currentRec.onend = () => {
+						clearTimeout(timer);
+						setTimeout(resolve, 60);
+					};
+				}
+			});
+		}
+		speechRecognizer = null;
 
 		const recorded = tracker.stop();
 		isRecording = false;
@@ -212,8 +227,35 @@
 				...speechCandidates
 			].filter((c) => Boolean(c && c.trim()));
 
-			// 1. Sentence reading challenge: verify every single word in the sentence
+			// 1. Voice Activity Check: Count actual voiced frames within human vocal frequency
+			const voicedFrames = recorded.filter(
+				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.30 && p.volume > 0.010
+			);
+			const maxVolume = Math.max(...recorded.map((p) => p.volume || 0), 0);
+			// Human voice detected: Has vocal frequency frames and peak volume distinct from room silence
+			const isRealHumanVoice = (hasVoicedSpeech || voicedFrames.length >= 4) && (voicedFrames.length >= 4 && maxVolume >= 0.015);
+
+			// If no speech was recognized AND no significant voiced speech frames detected:
+			if (candidatePool.length === 0 && !isRealHumanVoice) {
+				feedbackType = 'error';
+				feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
+				setTimeout(() => {
+					feedbackType = 'none';
+				}, 1800);
+				return;
+			}
+
+			// 2. Sentence reading challenge: verify every single word in the sentence
 			if (currentChallenge.type === 'sentence_build') {
+				if (candidatePool.length === 0) {
+					feedbackType = 'error';
+					feedbackMessage = 'ไม่พบเสียงพูด กรุณาอ่านประโยคให้ชัดเจน';
+					setTimeout(() => {
+						feedbackType = 'none';
+					}, 1800);
+					return;
+				}
+
 				const targetSentence = currentChallenge.sentenceHanzi || '';
 				const sentenceRes = verifySentenceReading(targetSentence, candidatePool);
 				sentenceCheckResult = sentenceRes;
@@ -235,7 +277,7 @@
 				return;
 			}
 
-			// 2. Single word vocabulary challenge
+			// 3. Single word vocabulary challenge (speak or listen_speak)
 			let syllables = currentChallenge.word.syllables || [{
 				hanzi: currentChallenge.word.hanzi,
 				pinyin: currentChallenge.word.pinyin,
@@ -250,17 +292,40 @@
 			);
 			
 			const targetHanzi = currentChallenge.word.hanzi;
-			const matchRes = matchChineseWord(targetHanzi || '', candidatePool);
+			const targetPinyin = currentChallenge.word.pinyin;
+			const matchRes = matchChineseWord(targetHanzi || '', candidatePool, targetPinyin);
 			let isWordCorrect = matchRes.isMatch;
 			let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
 
-			// Target-Proximity Rule: If user spoke clearly on this target word screen and tone score >= 60%
-			if (!isWordCorrect && candidatePool.length === 0 && res.contour.length >= 4 && res.overallScore >= 60) {
-				isWordCorrect = true;
-				finalHeard = targetHanzi;
+			// Single-syllable acoustic fallback (when ASR drops or delays short single syllable, but user spoke with real human voice):
+			const isSingleSyllable = (targetHanzi || '').length <= 1 || syllables.length <= 1;
+			if (!isWordCorrect && candidatePool.length === 0 && isRealHumanVoice && isSingleSyllable) {
+				// Tone 5 (neutral tone like 吧, 吗, 呢) has no fixed pitch; any voiced syllable is correct.
+				// For tones 1-4, accept if pitch contour matches or overall score is reasonable (>= 48)
+				if (currentChallenge.word.tone === 5 || res.isAllMatch || res.overallScore >= 48) {
+					isWordCorrect = true;
+					finalHeard = targetHanzi;
+				}
 			}
 
-			const isTonePerfect = res.isAllMatch && res.overallScore >= 70;
+			// Guard: If no word recognized and not validated:
+			if (candidatePool.length === 0 && !isWordCorrect) {
+				feedbackType = 'error';
+				if (isRealHumanVoice && res.syllableResults?.[0]) {
+					const detectedTone = res.syllableResults[0].detectedTone;
+					const targetTone = currentChallenge.word.tone;
+					feedbackMessage = `วรรณยุกต์ยังไม่ตรง (พบเสียง ${detectedTone} แต่คำนี้เสียง ${targetTone === 5 ? 'เบา' : targetTone}) ลองใหม่`;
+				} else {
+					feedbackMessage = 'ยังไม่พบเสียงคำศัพท์ กรุณาออกเสียงให้ชัดเจน';
+				}
+				progress.loseHeart();
+				if (!checkGameOver()) {
+					setTimeout(() => {
+						feedbackType = 'none';
+					}, 2200);
+				}
+				return;
+			}
 
 			// Ingest pronunciation telemetry into research LRS & Neon DB
 			sendPronunciationTelemetry({
@@ -307,23 +372,20 @@
 			}).catch(() => {});
 
 			if (isWordCorrect) {
+				const isToneGood = res.overallScore >= 55;
 				feedbackType = 'success';
-				feedbackMessage = isTonePerfect ? 'ยอดเยี่ยม! เสียงและวรรณยุกต์เป๊ะมาก' : 'ดีมาก! ออกเสียงถูก (ปรับวรรณยุกต์อีกนิดจะเพอร์เฟกต์)';
+				feedbackMessage = isToneGood 
+					? 'ยอดเยี่ยม! เสียงและวรรณยุกต์เป๊ะมาก' 
+					: 'ดีมาก! ออกเสียงถูก (ปรับวรรณยุกต์อีกนิดจะเพอร์เฟกต์)';
 				setTimeout(nextChallenge, 1500);
 			} else {
-				if (isTonePerfect && res.overallScore >= 75) {
-					feedbackType = 'success';
-					feedbackMessage = 'ดีมาก! วรรณยุกต์ตรงเป๊ะ';
-					setTimeout(nextChallenge, 1500);
-				} else {
-					feedbackType = 'error';
-					feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
-					progress.loseHeart();
-					if (!checkGameOver()) {
-						setTimeout(() => {
-							feedbackType = 'none';
-						}, 2000);
-					}
+				feedbackType = 'error';
+				feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
+				progress.loseHeart();
+				if (!checkGameOver()) {
+					setTimeout(() => {
+						feedbackType = 'none';
+					}, 2000);
 				}
 			}
 		} else {
@@ -376,7 +438,7 @@
 			<div class="size-32 rounded-full bg-yellow-100 flex items-center justify-center mb-6 shadow-2xl">
 				<Sparkles class="size-16 text-yellow-500" />
 			</div>
-			<h1 class="text-3xl font-extrabold text-foreground mb-2">ผ่านด่านสำเร็จ!</h1>
+			<h1 class="text-3xl font-extrabold text-foreground mb-2">สำเร็จบทเรียน!</h1>
 			<p class="text-muted-foreground mb-8">คุณได้รับ +25 XP และทบทวนคำศัพท์เรียบร้อยแล้ว</p>
 			<a href="/" class="w-full rounded-2xl bg-primary py-4 text-center font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90">
 				กลับไปหน้าแผนที่
@@ -401,7 +463,7 @@
 			<div class="flex justify-between w-full mt-8 gap-4">
 				<button onclick={prevFlashcard} disabled={flashcardIndex === 0} class="flex-1 py-4 rounded-xl border font-bold disabled:opacity-50">ย้อนกลับ</button>
 				<button onclick={nextFlashcard} class="flex-1 py-4 rounded-xl bg-primary text-white font-bold">
-					{flashcardIndex === stageData.words.length - 1 ? 'จบด่านรับรางวัล' : 'ถัดไป'}
+					{flashcardIndex === stageData.words.length - 1 ? 'จบบทเรียนรับรางวัล' : 'ถัดไป'}
 				</button>
 			</div>
 			<div class="mt-4 text-sm text-muted-foreground">{flashcardIndex + 1} / {stageData.words.length}</div>

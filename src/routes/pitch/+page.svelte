@@ -38,7 +38,7 @@
 		Mic,
 		Square,
 		Volume2,
-		Sparkles,
+		AudioLines,
 		RotateCcw,
 		Activity,
 		HelpCircle,
@@ -52,7 +52,6 @@
 		BarChart3,
 		RotateCw,
 		Cpu,
-		Bot,
 		Layers,
 		ChevronLeft,
 		ChevronRight,
@@ -248,7 +247,8 @@
 		listenCount++;
 		listenTimestamps = [...listenTimestamps, Date.now()];
 		if (selectedPreset?.hanzi) {
-			speak(selectedPreset.hanzi);
+			// BUG-01 side-effect: speak() is now async — fire-and-forget is intentional here
+			speak(selectedPreset.hanzi).catch(() => {});
 		}
 	}
 
@@ -372,6 +372,24 @@
 		}
 	}
 
+	// BUG-02 FIX: speechRecognizer.stop() is asynchronous — it sends a stop signal to
+	// the browser but onend fires 100-500ms later. Without awaiting, speechCandidates
+	// would be empty when matchChineseWord() runs, causing false negatives.
+	// This helper wraps the stop sequence in a Promise that resolves only after onend.
+	function waitForRecognizerEnd(): Promise<void> {
+		if (!speechRecognizer) return Promise.resolve();
+		return new Promise<void>((resolve) => {
+			const r = speechRecognizer;
+			if (!r) { resolve(); return; }
+			// Override handlers to capture the final onend
+			r.onend = () => resolve();
+			r.onerror = () => resolve(); // error also means recognition ended
+			// Safety: if onend never fires (browser bug), resolve after 600ms
+			setTimeout(resolve, 600);
+			try { r.stop(); } catch { resolve(); }
+		});
+	}
+
 	async function stopRecording() {
 		if (silenceTimeout) {
 			clearTimeout(silenceTimeout);
@@ -382,11 +400,10 @@
 			maxDurationTimeout = null;
 		}
 
-		// Stop Speech Recognition
+		// BUG-02 FIX: await the recognizer's onend before proceeding so that
+		// speechCandidates is fully populated when matchChineseWord() runs.
 		if (speechRecognizer) {
-			try {
-				speechRecognizer.stop();
-			} catch {}
+			await waitForRecognizerEnd();
 			speechRecognizer = null;
 		}
 
@@ -420,14 +437,17 @@
 				...speechCandidates
 			].filter((c) => Boolean(c && c.trim()));
 
-			const matchRes = matchChineseWord(selectedPreset.hanzi, candidatePool);
+			const matchRes = matchChineseWord(selectedPreset.hanzi, candidatePool, selectedPreset.pinyin);
 			let isWordCorrect = matchRes.isMatch;
 			let finalHeard = matchRes.isMatch ? selectedPreset.hanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
 
-			// Target-Proximity Rule: If user spoke clearly on this target word screen and tone score >= 60%
-			if (!isWordCorrect && candidatePool.length === 0 && res.contour.length >= 4 && res.overallScore >= 60) {
-				isWordCorrect = true;
-				finalHeard = selectedPreset.hanzi;
+			// Single-syllable acoustic fallback (when ASR server drops or delays short single syllable, but vocal cord activity was recorded):
+			const isSingleSyllable = (selectedPreset.hanzi || '').length <= 1 || syllablesToAnalyze.length <= 1;
+			if (!isWordCorrect && candidatePool.length === 0 && isSingleSyllable && hasVoicedSpeech) {
+				if (selectedPreset.tone === 5 || res.isAllMatch || res.overallScore >= 50) {
+					isWordCorrect = true;
+					finalHeard = selectedPreset.hanzi;
+				}
 			}
 
 			res.recognizedWord = finalHeard ? finalHeard.trim() : undefined;
@@ -452,17 +472,18 @@
 					res.overallFeedback = `เก่งมาก! ออกเสียงคำศัพท์ "${selectedPreset.hanzi}" ได้ถูกต้อง (ระบบให้ผ่านเกณฑ์คำศัพท์) — สามารถปรับระดับวรรณยุกต์ตามเส้นกราฟแนะนำ เพื่อให้สำเนียงสมบูรณ์แบบยิ่งขึ้น`;
 				}
 			} else {
-				// Single-syllable acoustic fallback: If tone pitch is accurate
-				if (isTonePerfect && res.overallScore >= 75) {
-					isPassed = true;
-					finalScore = res.overallScore;
-					res.overallFeedback = `ดีมาก! ระดับเสียงวรรณยุกต์ตรงตามมาตรฐาน (${TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`}) ชัดเจน`;
-				} else {
-					isPassed = false;
-					finalScore = res.overallScore;
-					if (finalHeard) {
-						res.overallFeedback = `ยังไม่ตรงเป้าหมาย (ระบบได้ยินเป็น: "${finalHeard}") — แนะนำให้ออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ใหม่อีกครั้ง`;
+				isPassed = false;
+				finalScore = res.overallScore;
+				if (candidatePool.length === 0) {
+					if (hasVoicedSpeech && res.syllableResults?.[0]) {
+						const detectedTone = res.syllableResults[0].detectedTone;
+						const targetTone = selectedPreset.tone;
+						res.overallFeedback = `วรรณยุกต์ยังไม่ตรง (ตรวจพบเสียง ${detectedTone} แต่คำนี้เสียง ${targetTone === 5 ? 'เบา' : targetTone}) ลองใหม่อีกครั้ง`;
+					} else {
+						res.overallFeedback = `ยังไม่พบเสียงคำศัพท์ภาษาจีน กรุณาออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ให้ชัดเจนและลองใหม่อีกครั้ง`;
 					}
+				} else {
+					res.overallFeedback = `ยังไม่ตรงเป้าหมาย (ระบบได้ยินเป็น: "${finalHeard || '-'}") — แนะนำให้ออกเสียงคำว่า "${selectedPreset.hanzi}" (${selectedPreset.pinyin}) ใหม่อีกครั้ง`;
 				}
 			}
 
@@ -1231,20 +1252,12 @@
 				</div>
 			{/if}
 
-			<!-- AI Coach Feedback in Thai -->
+			<!-- Coach Feedback in Thai -->
 			<div class="mt-4 rounded-2xl bg-background/80 p-4 shadow-sm">
-				<div class="flex flex-wrap items-center justify-between gap-2">
-					<div class="flex items-center gap-2 text-xs font-bold text-primary">
-						<Sparkles class="size-4" /> คำแนะนำภาพรวมจากระบบ AI Coach
-					</div>
-					{#if analysisResult.syllableResults.some((s) => s.isAIModel)}
-						<div class="flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-							<Bot class="size-3 text-emerald-600 dark:text-emerald-400" />
-							<span>1D-CNN + Bi-LSTM Neural Network</span>
-						</div>
-					{/if}
+				<div class="flex items-center gap-2 text-xs font-bold text-primary mb-1.5">
+					<AudioLines class="size-4" /> คำแนะนำการออกเสียง
 				</div>
-				<p class="mt-1.5 text-sm leading-relaxed text-foreground">
+				<p class="text-sm leading-relaxed text-foreground">
 					{analysisResult.overallFeedback}
 				</p>
 			</div>
