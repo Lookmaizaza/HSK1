@@ -38,7 +38,7 @@
 		Mic,
 		Square,
 		Volume2,
-		Sparkles,
+		AudioLines,
 		RotateCcw,
 		Activity,
 		HelpCircle,
@@ -52,7 +52,6 @@
 		BarChart3,
 		RotateCw,
 		Cpu,
-		Bot,
 		Layers,
 		ChevronLeft,
 		ChevronRight,
@@ -1241,20 +1240,12 @@
 				</div>
 			{/if}
 
-			<!-- AI Coach Feedback in Thai -->
+			<!-- Coach Feedback in Thai -->
 			<div class="mt-4 rounded-2xl bg-background/80 p-4 shadow-sm">
-				<div class="flex flex-wrap items-center justify-between gap-2">
-					<div class="flex items-center gap-2 text-xs font-bold text-primary">
-						<Sparkles class="size-4" /> คำแนะนำภาพรวมจากระบบ AI Coach
-					</div>
-					{#if analysisResult.syllableResults.some((s) => s.isAIModel)}
-						<div class="flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-							<Bot class="size-3 text-emerald-600 dark:text-emerald-400" />
-							<span>1D-CNN + Bi-LSTM Neural Network</span>
-						</div>
-					{/if}
+				<div class="flex items-center gap-2 text-xs font-bold text-primary mb-1.5">
+					<AudioLines class="size-4" /> คำแนะนำการออกเสียง
 				</div>
-				<p class="mt-1.5 text-sm leading-relaxed text-foreground">
+				<p class="text-sm leading-relaxed text-foreground">
 					{analysisResult.overallFeedback}
 				</p>
 			</div>
