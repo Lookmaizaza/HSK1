@@ -128,8 +128,30 @@ function sanitizeForTTS(text: string): string {
 let lastSpoken = '';
 let lastSpokenAt = 0;
 
+// BUG-01 FIX: getVoices() is synchronous but browser loads voices asynchronously.
+// On Android Chrome / iOS Safari, getVoices() returns [] on first call.
+// This helper checks immediately (fast path for Desktop Chrome) then falls back
+// to listening for the voiceschanged event before resolving.
+async function getZhVoice(): Promise<SpeechSynthesisVoice | undefined> {
+	const tryFind = () =>
+		window.speechSynthesis.getVoices().find((v) => v.lang?.toLowerCase().startsWith('zh'));
+
+	// Fast path: voices already loaded (Desktop Chrome, subsequent calls)
+	const immediate = tryFind();
+	if (immediate) return immediate;
+
+	// Slow path: wait for the browser to finish loading voices (Android/Safari)
+	return new Promise<SpeechSynthesisVoice | undefined>((resolve) => {
+		window.speechSynthesis.addEventListener('voiceschanged', () => resolve(tryFind()), {
+			once: true // auto-removes itself after firing once
+		});
+		// Safety timeout: if voiceschanged never fires (some browsers), give up after 3s
+		setTimeout(() => resolve(undefined), 3000);
+	});
+}
+
 // Text-to-speech: speak Mandarin sentences using browser voices.
-export function speak(text: string, rate = 0.9): void {
+export async function speak(text: string, rate = 0.9): Promise<void> {
 	if (typeof window === 'undefined' || !window.speechSynthesis) return;
 	const clean = sanitizeForTTS(text);
 	if (!clean) return;
@@ -143,8 +165,8 @@ export function speak(text: string, rate = 0.9): void {
 	const utter = new SpeechSynthesisUtterance(clean);
 	utter.lang = 'zh-CN';
 	utter.rate = rate;
-	const voices = window.speechSynthesis.getVoices();
-	const zh = voices.find((v) => v.lang?.toLowerCase().startsWith('zh'));
+	// BUG-01 FIX: await voice loading instead of calling getVoices() synchronously
+	const zh = await getZhVoice();
 	if (zh) utter.voice = zh;
 	window.speechSynthesis.speak(utter);
 }
@@ -154,17 +176,40 @@ export function normalizeChinese(s: string): string {
 	return s.replace(/[\s\p{P}\p{S}]/gu, '');
 }
 
-// Cheap pre-LLM similarity so we can show instant feedback.
+// BUG-04 FIX: Build character bigrams (pairs of adjacent chars) from a string.
+// Bigrams preserve order, so "白天" and "天白" produce different bigram sets.
+// Unigram sets would give both 100% similarity — bigrams fix that.
+function getBigrams(s: string): Set<string> {
+	const bigrams = new Set<string>();
+	for (let i = 0; i < s.length - 1; i++) {
+		bigrams.add(s[i] + s[i + 1]);
+	}
+	return bigrams;
+}
+
+// Similarity score 0–100 between two Chinese strings.
+// Uses bigram Jaccard for multi-char words (order-aware) and exact match for single chars.
 export function quickSimilarity(target: string, said: string): number {
 	const a = normalizeChinese(target);
 	const b = normalizeChinese(said);
 	if (!a || !b) return 0;
-	const setA = new Set(a);
-	const setB = new Set(b);
+
+	// Single-character: bigrams cannot be formed (need ≥ 2 chars).
+	// Fall back to exact char match — homophones are handled upstream by PHONETIC_HOMOPHONE_MAP.
+	if (a.length === 1 || b.length === 1) {
+		return a === b ? 100 : 0;
+	}
+
+	// Multi-character: bigram Jaccard similarity (order-aware)
+	const biA = getBigrams(a);
+	const biB = getBigrams(b);
 	let hit = 0;
-	for (const ch of setB) if (setA.has(ch)) hit++;
-	return Math.round((hit / setA.size) * 100);
+	for (const bg of biB) if (biA.has(bg)) hit++;
+	// Jaccard: intersection / union
+	const union = biA.size + biB.size - hit;
+	return union === 0 ? 0 : Math.round((hit / union) * 100);
 }
+
 
 // Homophone and near-sound phonetic groups for common Mandarin words (especially HSK 1-3 single syllables)
 export const PHONETIC_HOMOPHONE_MAP: Record<string, string[]> = {

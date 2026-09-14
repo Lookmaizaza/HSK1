@@ -25,13 +25,170 @@ export type QuestStage = {
 	challenges: Challenge[];
 };
 
-const WORDS_PER_STAGE = 5;
+const WORDS_PER_STAGE = 8;
+
+// ธีมด่านตามหมวดคำศัพท์ — ใช้คำแรกในกลุ่มตรวจหมวดที่ตรงที่สุด
+function deriveThemeTitle(chunk: TonePreset[], stageIndex: number, hskLevel: number): string {
+	const words = chunk.map((p) => p.thai).join(' ');
+	const hanziAll = chunk.map((p) => p.hanzi).join('');
+
+	// ตรวจหมวดจากคำแปลภาษาไทย
+	if (/ครอบครัว|พ่อ|แม่|ลูก|พี่|น้อง|สามี|ภรรยา/.test(words)) return `ด่าน ${stageIndex} · ครอบครัว`;
+	if (/อาหาร|กิน|ดื่ม|ข้าว|ผัก|ผล|เนื้อ|ชา|น้ำ/.test(words)) return `ด่าน ${stageIndex} · อาหาร & เครื่องดื่ม`;
+	if (/เรียน|โรงเรียน|นักเรียน|ครู|อาจารย์|หนังสือ|เขียน|อ่าน|ภาษา/.test(words)) return `ด่าน ${stageIndex} · การเรียน`;
+	if (/ซื้อ|ขาย|เงิน|ราคา|ตลาด|ร้าน|แพง|ถูก/.test(words)) return `ด่าน ${stageIndex} · การซื้อขาย`;
+	if (/ไป|มา|รถ|เครื่องบิน|รถไฟ|สถานี|สนามบิน|แท็กซี่/.test(words)) return `ด่าน ${stageIndex} · การเดินทาง`;
+	if (/วัน|เดือน|ปี|เช้า|เที่ยง|เย็น|คืน|โมง|นาที/.test(words)) return `ด่าน ${stageIndex} · เวลา & วันที่`;
+	if (/ร่างกาย|หัว|ตา|มือ|เท้า|ป่วย|หมอ|โรงพยาบาล|ยา/.test(words)) return `ด่าน ${stageIndex} · สุขภาพ`;
+	if (/งาน|ทำงาน|บริษัท|ออฟฟิศ|เงินเดือน/.test(words)) return `ด่าน ${stageIndex} · การทำงาน`;
+	if (/อากาศ|ฝน|หิมะ|ร้อน|หนาว|ลม|ฟ้า/.test(words)) return `ด่าน ${stageIndex} · สภาพอากาศ`;
+	if (/สัตว์|หมา|แมว|นก|ปลา/.test(words)) return `ด่าน ${stageIndex} · สัตว์`;
+	if (/บ้าน|ห้อง|โต๊ะ|เก้าอี้|เตียง|ประตู/.test(words)) return `ด่าน ${stageIndex} · บ้าน & สิ่งของ`;
+	if (/สี|แดง|น้ำเงิน|เขียว|ขาว|ดำ/.test(words)) return `ด่าน ${stageIndex} · สีสัน`;
+	if (/หนึ่ง|สอง|สาม|สี่|ห้า|หก|เจ็ด|แปด|เก้า|สิบ|ตัวเลข/.test(words)) return `ด่าน ${stageIndex} · ตัวเลข`;
+	if (/รัก|ชอบ|อยาก|ต้องการ|หวัง|ความรู้สึก/.test(words)) return `ด่าน ${stageIndex} · ความรู้สึก`;
+
+	// HSK level fallback with ordinal
+	const levelLabel = hskLevel === 1 ? 'พื้นฐาน' : hskLevel === 2 ? 'กลาง' : 'ขั้นสูง';
+	return `ด่าน ${stageIndex} · HSK ${hskLevel} ${levelLabel}`;
+}
+
+/**
+ * Generates a difficulty-laddered challenge sequence for a stage:
+ *
+ * Difficulty progression per stage (8 words → 8–10 challenges):
+ *  1. [EASY]   listen_speak  — ฟังแล้วพูดตาม (word 0)  warmup
+ *  2. [EASY]   translate     — เลือกความหมาย (word 1)
+ *  3. [EASY]   translate     — เลือกความหมาย (word 2)
+ *  4. [MED]    speak         — พูดคำเดี่ยว (word 3)
+ *  5. [MED]    speak         — พูดคำเดี่ยว (word 4)
+ *  6. [MED]    translate     — เลือกความหมาย (word 5)  เพิ่มตัวเลือกลวง
+ *  7. [HARD]   speak         — พูดคำเดี่ยว (word 6)
+ *  8. [HARD]   speak         — พูดคำเดี่ยว (word 7)
+ *  9. [HARD]   sentence_build — อ่านประโยค (word 0)
+ * 10. [HARD]   sentence_build — อ่านประโยค (word 4)  ถ้ามีคำใน NATURAL_SENTENCES
+ */
+function chunkPresets(presets: TonePreset[], hskLevel: number): QuestStage[] {
+	const stages: QuestStage[] = [];
+	let stageIndex = 1;
+
+	const allThaiMeanings = presets.map((p) => p.thai);
+
+	for (let i = 0; i < presets.length; i += WORDS_PER_STAGE) {
+		const chunk = presets.slice(i, i + WORDS_PER_STAGE);
+		const challenges: Challenge[] = [];
+
+		// ── EASY tier ──────────────────────────────────────────────────
+		// 1. Listen & Speak warmup (word 0)
+		if (chunk[0]) {
+			challenges.push({
+				id: `c-${stageIndex}-0-listen`,
+				type: 'listen_speak',
+				word: chunk[0]
+			});
+		}
+
+		// 2-3. Translate multiple-choice (3 choices) — words 1, 2
+		[1, 2].forEach((idx) => {
+			const word = chunk[idx];
+			if (!word) return;
+			const wrongPool = allThaiMeanings.filter((t) => t !== word.thai);
+			const choices = shuffleArray([word.thai, ...shuffleArray(wrongPool).slice(0, 2)]);
+			challenges.push({
+				id: `c-${stageIndex}-${idx}-translate`,
+				type: 'translate',
+				word,
+				choices,
+				correctChoiceIndex: choices.indexOf(word.thai)
+			});
+		});
+
+		// ── MEDIUM tier ────────────────────────────────────────────────
+		// 4-5. Speak recall — words 3, 4
+		[3, 4].forEach((idx) => {
+			const word = chunk[idx];
+			if (!word) return;
+			challenges.push({
+				id: `c-${stageIndex}-${idx}-speak`,
+				type: 'speak',
+				word
+			});
+		});
+
+		// 6. Harder translate (4 choices) — word 5
+		if (chunk[5]) {
+			const word = chunk[5];
+			const wrongPool = allThaiMeanings.filter((t) => t !== word.thai);
+			const choices = shuffleArray([word.thai, ...shuffleArray(wrongPool).slice(0, 3)]);
+			challenges.push({
+				id: `c-${stageIndex}-5-translate-hard`,
+				type: 'translate',
+				word,
+				choices,
+				correctChoiceIndex: choices.indexOf(word.thai)
+			});
+		}
+
+		// ── HARD tier ──────────────────────────────────────────────────
+		// 7-8. Speak recall (harder words at end of chunk) — words 6, 7
+		[6, 7].forEach((idx) => {
+			const word = chunk[idx];
+			if (!word) return;
+			challenges.push({
+				id: `c-${stageIndex}-${idx}-speak`,
+				type: 'speak',
+				word
+			});
+		});
+
+		// 9. Sentence build — word 0 (ประโยคหลักของด่าน)
+		const sentenceWord = chunk[0];
+		if (sentenceWord) {
+			const sentence = generateSentence(sentenceWord);
+			challenges.push({
+				id: `c-${stageIndex}-sentence-1`,
+				type: 'sentence_build',
+				word: sentenceWord,
+				sentenceHanzi: sentence.hanzi,
+				sentencePinyin: sentence.pinyin,
+				sentenceThai: sentence.thai
+			});
+		}
+
+		// 10. Bonus sentence build — word 4 (ถ้ามีและอยู่ใน NATURAL_SENTENCES)
+		const bonusWord = chunk[4];
+		if (bonusWord && NATURAL_SENTENCES[bonusWord.hanzi]) {
+			const sentence = generateSentence(bonusWord);
+			challenges.push({
+				id: `c-${stageIndex}-sentence-2`,
+				type: 'sentence_build',
+				word: bonusWord,
+				sentenceHanzi: sentence.hanzi,
+				sentencePinyin: sentence.pinyin,
+				sentenceThai: sentence.thai
+			});
+		}
+
+		stages.push({
+			id: `hsk${hskLevel}-stage-${stageIndex}`,
+			hskLevel,
+			stageIndex,
+			title: deriveThemeTitle(chunk, stageIndex, hskLevel),
+			words: chunk,
+			challenges
+		});
+		stageIndex++;
+	}
+
+	return stages;
+}
 
 /**
  * Curated dictionary of authentic, natural Mandarin sentences for HSK words.
  * Short, idiomatic, grammatically correct (3-6 characters), perfect for voice practice.
  */
 const NATURAL_SENTENCES: Record<string, { hanzi: string; pinyin: string; thai: string }> = {
+
 	'爱': { hanzi: '我爱你', pinyin: 'wǒ ài nǐ', thai: 'ฉันรักคุณ' },
 	'八': { hanzi: '现在八点', pinyin: 'xiàn zài bā diǎn', thai: 'ตอนนี้แปดโมง' },
 	'爸爸': { hanzi: '他是我爸爸', pinyin: 'tā shì wǒ bà ba', thai: 'เขาคือพ่อของฉัน' },
@@ -348,92 +505,8 @@ function shuffleArray<T>(array: T[]): T[] {
 	return newArr;
 }
 
-function chunkPresets(presets: TonePreset[], hskLevel: number): QuestStage[] {
-	const stages: QuestStage[] = [];
-	let stageIndex = 1;
 
-	const allThaiMeanings = presets.map(p => p.thai);
 
-	for (let i = 0; i < presets.length; i += WORDS_PER_STAGE) {
-		const chunk = presets.slice(i, i + WORDS_PER_STAGE);
-		const challenges: Challenge[] = [];
-
-		// For each 5-word stage, generate a concise, balanced sequence of 5-6 questions:
-		// 1. Listen & Speak (warmup with word 0)
-		if (chunk[0]) {
-			challenges.push({
-				id: `c-${stageIndex}-0-listen`,
-				type: 'listen_speak',
-				word: chunk[0]
-			});
-		}
-
-		// 2 & 3. Translate Multiple Choice (test recognition on words 1 & 2)
-		[1, 2].forEach((idx) => {
-			const word = chunk[idx];
-			if (!word) return;
-			const wrongPool = allThaiMeanings.filter(t => t !== word.thai);
-			const shuffledWrong = shuffleArray(wrongPool).slice(0, 3);
-			const choices = shuffleArray([word.thai, ...shuffledWrong]);
-
-			challenges.push({
-				id: `c-${stageIndex}-${idx}-translate`,
-				type: 'translate',
-				word,
-				choices,
-				correctChoiceIndex: choices.indexOf(word.thai)
-			});
-		});
-
-		// 4 & 5. Speak recall (practice pronouncing words 3 & 4)
-		[3, 4].forEach((idx) => {
-			const word = chunk[idx];
-			if (!word) return;
-			challenges.push({
-				id: `c-${stageIndex}-${idx}-speak`,
-				type: 'speak',
-				word
-			});
-		});
-
-		// 6. Sentence Build (read authentic natural sentence using one of the stage words)
-		const sentenceWord = chunk[0] || chunk[1];
-		if (sentenceWord) {
-			const sentence = generateSentence(sentenceWord);
-			challenges.push({
-				id: `c-${stageIndex}-sentence`,
-				type: 'sentence_build',
-				word: sentenceWord,
-				sentenceHanzi: sentence.hanzi,
-				sentencePinyin: sentence.pinyin,
-				sentenceThai: sentence.thai
-			});
-		}
-
-		// If a stage has fewer than 5 words (tail of list), make sure we have at least speak challenges
-		if (challenges.length < 3 && chunk.length > 0) {
-			chunk.forEach((w, wIdx) => {
-				challenges.push({
-					id: `c-${stageIndex}-${wIdx}-fallback`,
-					type: 'speak',
-					word: w
-				});
-			});
-		}
-
-		stages.push({
-			id: `hsk${hskLevel}-stage-${stageIndex}`,
-			hskLevel,
-			stageIndex,
-			title: `ด่านที่ ${stageIndex}`,
-			words: chunk,
-			challenges
-		});
-		stageIndex++;
-	}
-
-	return stages;
-}
 
 export const QUEST_STAGES_HSK1: QuestStage[] = chunkPresets(HSK1_VOCAB_PRESETS, 1);
 export const QUEST_STAGES_HSK2: QuestStage[] = chunkPresets(HSK2_VOCAB_PRESETS, 2);

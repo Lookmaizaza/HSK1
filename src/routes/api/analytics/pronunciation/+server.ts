@@ -12,16 +12,15 @@ import {
 
 // GET /api/analytics/pronunciation
 // Query params:
-// - userId: user ID or UUID (defaults to logged-in user)
 // - mode: 'history' (list of evaluations) | 'stats' (aggregated phoneme error stats)
 // - limit: number of records (default: 50)
 export const GET = async ({ locals, url }: RequestEvent) => {
-	const paramUserId = url.searchParams.get('userId')?.trim();
-	const targetUserId = paramUserId || (locals.user ? String(locals.user.id) : null);
-
-	if (!targetUserId) {
-		throw error(400, 'Missing userId parameter or not authenticated.');
+	// BUG-07 FIX: always use the authenticated session user — never trust a userId from the
+	// query string, as that would let any logged-in user read another user's data.
+	if (!locals.user) {
+		throw error(401, 'Authentication required.');
 	}
+	const targetUserId = String(locals.user.id);
 
 	const mode = url.searchParams.get('mode') || 'history';
 	const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 200);
@@ -54,6 +53,12 @@ export const POST = async ({ locals, request }: RequestEvent) => {
 		throw error(400, 'Invalid JSON body');
 	}
 
+	// BUG-07 FIX: never trust user_id from the request body — a logged-in user could
+	// inject another user's ID to write data into their record (data poisoning).
+	// Always derive the userId from the server-side session instead.
+	const sessionUserId = locals.user ? String(locals.user.id) : null;
+	const userId = sessionUserId ?? 'anonymous';
+
 	const rawItems = Array.isArray(body)
 		? body
 		: Array.isArray(body.items)
@@ -67,7 +72,7 @@ export const POST = async ({ locals, request }: RequestEvent) => {
 	const processedItems: LearnerPronunciationPayload[] = [];
 
 	for (const item of rawItems) {
-		const userId = String(item.user_id || (locals.user ? locals.user.id : ''));
+		// BUG-07 FIX: use session userId (already set above), ignore item.user_id from client
 		const wordId = String(item.word_id || '');
 		const pinyin = String(item.pinyin || '');
 		const attemptNumber = Number(item.attempt_number || 1);

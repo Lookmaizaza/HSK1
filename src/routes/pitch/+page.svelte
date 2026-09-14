@@ -248,7 +248,8 @@
 		listenCount++;
 		listenTimestamps = [...listenTimestamps, Date.now()];
 		if (selectedPreset?.hanzi) {
-			speak(selectedPreset.hanzi);
+			// BUG-01 side-effect: speak() is now async — fire-and-forget is intentional here
+			speak(selectedPreset.hanzi).catch(() => {});
 		}
 	}
 
@@ -372,6 +373,24 @@
 		}
 	}
 
+	// BUG-02 FIX: speechRecognizer.stop() is asynchronous — it sends a stop signal to
+	// the browser but onend fires 100-500ms later. Without awaiting, speechCandidates
+	// would be empty when matchChineseWord() runs, causing false negatives.
+	// This helper wraps the stop sequence in a Promise that resolves only after onend.
+	function waitForRecognizerEnd(): Promise<void> {
+		if (!speechRecognizer) return Promise.resolve();
+		return new Promise<void>((resolve) => {
+			const r = speechRecognizer;
+			if (!r) { resolve(); return; }
+			// Override handlers to capture the final onend
+			r.onend = () => resolve();
+			r.onerror = () => resolve(); // error also means recognition ended
+			// Safety: if onend never fires (browser bug), resolve after 600ms
+			setTimeout(resolve, 600);
+			try { r.stop(); } catch { resolve(); }
+		});
+	}
+
 	async function stopRecording() {
 		if (silenceTimeout) {
 			clearTimeout(silenceTimeout);
@@ -382,11 +401,10 @@
 			maxDurationTimeout = null;
 		}
 
-		// Stop Speech Recognition
+		// BUG-02 FIX: await the recognizer's onend before proceeding so that
+		// speechCandidates is fully populated when matchChineseWord() runs.
 		if (speechRecognizer) {
-			try {
-				speechRecognizer.stop();
-			} catch {}
+			await waitForRecognizerEnd();
 			speechRecognizer = null;
 		}
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { progress } from '$lib/progress.svelte';
 	import AppHeader from '$lib/components/AppHeader.svelte';
-	import { Star, Gamepad2, Heart, Zap, BookOpen } from '@lucide/svelte';
+	import { Star, Gamepad2, Heart, Zap, BookOpen, Flame, TrendingUp, MessageCircle, Lock } from '@lucide/svelte';
 	import { ALL_QUEST_STAGES } from '$lib/data/questLevels';
 
 	let selectedLevel = $state<number>(1);
@@ -22,20 +22,26 @@
 			<span>{progress.xp} XP</span>
 		</div>
 		<div class="flex items-center gap-1.5 font-bold text-orange-500">
-			<span class="text-lg">🔥</span>
+			<Flame class="size-5 fill-orange-400 text-orange-500" />
 			<span>{progress.streak}</span>
 		</div>
 	</div>
 
 	<!-- Extra Modes Banner -->
-	<div class="mb-8 flex gap-3">
-		<a href="/pitch" class="flex-1 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-600 p-4 text-white shadow-lg transition hover:scale-[1.02]">
-			<div class="text-2xl mb-1">📈</div>
-			<div class="text-sm font-bold">วิเคราะห์การออกเสียง</div>
+	<div class="mb-8 grid grid-cols-2 gap-3">
+		<a href="/pitch" class="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-600 p-4 text-white shadow-lg transition hover:scale-[1.02] hover:shadow-emerald-500/30 hover:shadow-xl">
+			<div class="mb-2 flex size-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+				<TrendingUp class="size-5" />
+			</div>
+			<div class="text-sm font-bold leading-tight">วิเคราะห์การออกเสียง</div>
+			<div class="mt-0.5 text-[11px] font-medium text-white/70">Pitch & Tone Detection</div>
 		</a>
-		<a href="/talk" class="flex-1 rounded-2xl bg-gradient-to-br from-violet-500 to-pink-500 p-4 text-white shadow-lg transition hover:scale-[1.02]">
-			<div class="text-2xl mb-1">💬</div>
-			<div class="text-sm font-bold">สถานการณ์จำลอง</div>
+		<a href="/talk" class="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 to-pink-500 p-4 text-white shadow-lg transition hover:scale-[1.02] hover:shadow-violet-500/30 hover:shadow-xl">
+			<div class="mb-2 flex size-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+				<MessageCircle class="size-5" />
+			</div>
+			<div class="text-sm font-bold leading-tight">สถานการณ์จำลอง</div>
+			<div class="mt-0.5 text-[11px] font-medium text-white/70">AI Conversation Practice</div>
 		</a>
 	</div>
 
@@ -87,7 +93,7 @@
 						{:else if isUnlocked}
 							<Gamepad2 class="size-8" />
 						{:else}
-							<span class="text-xl font-bold">{i + 1}</span>
+							<Lock class="size-7" />
 						{/if}
 					</div>
 					
@@ -100,3 +106,4 @@
 		{/each}
 	</div>
 </main>
+
