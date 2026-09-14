@@ -21,36 +21,127 @@ export type QuestStage = {
 	hskLevel: number;
 	stageIndex: number;
 	title: string;
+	category: string;
+	description: string;
 	words: TonePreset[];
 	challenges: Challenge[];
 };
 
 const WORDS_PER_STAGE = 8;
 
-// ธีมด่านตามหมวดคำศัพท์ — ใช้คำแรกในกลุ่มตรวจหมวดที่ตรงที่สุด
-function deriveThemeTitle(chunk: TonePreset[], stageIndex: number, hskLevel: number): string {
+// ข้อมูลธีมและหมวดหมู่ของบทเรียน — สกัดจากคำศัพท์ในกลุ่ม (ไม่ใช้คำว่าด่าน)
+function deriveThemeInfo(
+	chunk: TonePreset[],
+	stageIndex: number,
+	hskLevel: number
+): { title: string; category: string; description: string } {
 	const words = chunk.map((p) => p.thai).join(' ');
-	const hanziAll = chunk.map((p) => p.hanzi).join('');
 
-	// ตรวจหมวดจากคำแปลภาษาไทย
-	if (/ครอบครัว|พ่อ|แม่|ลูก|พี่|น้อง|สามี|ภรรยา/.test(words)) return `ด่าน ${stageIndex} · ครอบครัว`;
-	if (/อาหาร|กิน|ดื่ม|ข้าว|ผัก|ผล|เนื้อ|ชา|น้ำ/.test(words)) return `ด่าน ${stageIndex} · อาหาร & เครื่องดื่ม`;
-	if (/เรียน|โรงเรียน|นักเรียน|ครู|อาจารย์|หนังสือ|เขียน|อ่าน|ภาษา/.test(words)) return `ด่าน ${stageIndex} · การเรียน`;
-	if (/ซื้อ|ขาย|เงิน|ราคา|ตลาด|ร้าน|แพง|ถูก/.test(words)) return `ด่าน ${stageIndex} · การซื้อขาย`;
-	if (/ไป|มา|รถ|เครื่องบิน|รถไฟ|สถานี|สนามบิน|แท็กซี่/.test(words)) return `ด่าน ${stageIndex} · การเดินทาง`;
-	if (/วัน|เดือน|ปี|เช้า|เที่ยง|เย็น|คืน|โมง|นาที/.test(words)) return `ด่าน ${stageIndex} · เวลา & วันที่`;
-	if (/ร่างกาย|หัว|ตา|มือ|เท้า|ป่วย|หมอ|โรงพยาบาล|ยา/.test(words)) return `ด่าน ${stageIndex} · สุขภาพ`;
-	if (/งาน|ทำงาน|บริษัท|ออฟฟิศ|เงินเดือน/.test(words)) return `ด่าน ${stageIndex} · การทำงาน`;
-	if (/อากาศ|ฝน|หิมะ|ร้อน|หนาว|ลม|ฟ้า/.test(words)) return `ด่าน ${stageIndex} · สภาพอากาศ`;
-	if (/สัตว์|หมา|แมว|นก|ปลา/.test(words)) return `ด่าน ${stageIndex} · สัตว์`;
-	if (/บ้าน|ห้อง|โต๊ะ|เก้าอี้|เตียง|ประตู/.test(words)) return `ด่าน ${stageIndex} · บ้าน & สิ่งของ`;
-	if (/สี|แดง|น้ำเงิน|เขียว|ขาว|ดำ/.test(words)) return `ด่าน ${stageIndex} · สีสัน`;
-	if (/หนึ่ง|สอง|สาม|สี่|ห้า|หก|เจ็ด|แปด|เก้า|สิบ|ตัวเลข/.test(words)) return `ด่าน ${stageIndex} · ตัวเลข`;
-	if (/รัก|ชอบ|อยาก|ต้องการ|หวัง|ความรู้สึก/.test(words)) return `ด่าน ${stageIndex} · ความรู้สึก`;
+	if (/ครอบครัว|พ่อ|แม่|ลูก|พี่|น้อง|สามี|ภรรยา/.test(words)) {
+		return {
+			title: 'ครอบครัว',
+			category: 'บุคคลและครอบครัว',
+			description: 'คำศัพท์เกี่ยวกับสมาชิกในครอบครัว ความสัมพันธ์ และบุคคลใกล้ชิด'
+		};
+	}
+	if (/อาหาร|กิน|ดื่ม|ข้าว|ผัก|ผล|เนื้อ|ชา|น้ำ/.test(words)) {
+		return {
+			title: 'อาหาร & เครื่องดื่ม',
+			category: 'อาหารและเครื่องดื่ม',
+			description: 'คำศัพท์เกี่ยวกับอาหาร เครื่องดื่ม วัตถุดิบ และการรับประทาน'
+		};
+	}
+	if (/เรียน|โรงเรียน|นักเรียน|ครู|อาจารย์|หนังสือ|เขียน|อ่าน|ภาษา/.test(words)) {
+		return {
+			title: 'การเรียน',
+			category: 'การศึกษาและภาษา',
+			description: 'คำศัพท์เกี่ยวกับการเรียน ภาษาจีน โรงเรียน และอุปกรณ์การเรียน'
+		};
+	}
+	if (/ซื้อ|ขาย|เงิน|ราคา|ตลาด|ร้าน|แพง|ถูก/.test(words)) {
+		return {
+			title: 'การซื้อขาย',
+			category: 'การซื้อขายและการเงิน',
+			description: 'คำศัพท์เกี่ยวกับการช้อปปิ้ง ราคาสินค้า การจ่ายเงิน และการซื้อของ'
+		};
+	}
+	if (/ไป|มา|รถ|เครื่องบิน|รถไฟ|สถานี|สนามบิน|แท็กซี่/.test(words)) {
+		return {
+			title: 'การเดินทาง',
+			category: 'การเดินทางและสถานที่',
+			description: 'คำศัพท์เกี่ยวกับยานพาหนะ การเดินทาง ทิศทาง และสถานที่สำคัญ'
+		};
+	}
+	if (/วัน|เดือน|ปี|เช้า|เที่ยง|เย็น|คืน|โมง|นาที/.test(words)) {
+		return {
+			title: 'เวลา & วันที่',
+			category: 'เวลาและปฏิทิน',
+			description: 'คำศัพท์เกี่ยวกับการบอกเวลา วัน เดือน ปี และช่วงเวลาในแต่ละวัน'
+		};
+	}
+	if (/ร่างกาย|หัว|ตา|มือ|เท้า|ป่วย|หมอ|โรงพยาบาล|ยา/.test(words)) {
+		return {
+			title: 'สุขภาพ & ร่างกาย',
+			category: 'สุขภาพและร่างกาย',
+			description: 'คำศัพท์เกี่ยวกับร่างกาย สุขภาพ การเจ็บป่วย และการดูแลตัวเอง'
+		};
+	}
+	if (/งาน|ทำงาน|บริษัท|ออฟฟิศ|เงินเดือน/.test(words)) {
+		return {
+			title: 'การทำงาน',
+			category: 'อาชีพและการทำงาน',
+			description: 'คำศัพท์เกี่ยวกับอาชีพ สถานที่ทำงาน และการติดต่อประสานงาน'
+		};
+	}
+	if (/อากาศ|ฝน|หิมะ|ร้อน|หนาว|ลม|ฟ้า/.test(words)) {
+		return {
+			title: 'สภาพอากาศ',
+			category: 'ธรรมชาติและสภาพอากาศ',
+			description: 'คำศัพท์เกี่ยวกับสภาพดินฟ้าอากาศ ฤดูกาล และธรรมชาติรอบตัว'
+		};
+	}
+	if (/สัตว์|หมา|แมว|นก|ปลา/.test(words)) {
+		return {
+			title: 'สัตว์',
+			category: 'สัตว์และสิ่งมีชีวิต',
+			description: 'คำศัพท์เกี่ยวกับสัตว์เลี้ยง สัตว์ทั่วไป และธรรมชาติ'
+		};
+	}
+	if (/บ้าน|ห้อง|โต๊ะ|เก้าอี้|เตียง|ประตู/.test(words)) {
+		return {
+			title: 'บ้าน & สิ่งของ',
+			category: 'ที่อยู่อาศัยและสิ่งของ',
+			description: 'คำศัพท์เกี่ยวกับสิ่งของเครื่องใช้ในบ้าน ห้องต่างๆ และของใช้ประจำวัน'
+		};
+	}
+	if (/สี|แดง|น้ำเงิน|เขียว|ขาว|ดำ/.test(words)) {
+		return {
+			title: 'สีสัน',
+			category: 'สีสันและลักษณะ',
+			description: 'คำศัพท์เกี่ยวกับแม่สี สีสันต่างๆ และการบอกลักษณะ'
+		};
+	}
+	if (/หนึ่ง|สอง|สาม|สี่|ห้า|หก|เจ็ด|แปด|เก้า|สิบ|ตัวเลข/.test(words)) {
+		return {
+			title: 'ตัวเลข & การนับ',
+			category: 'ตัวเลขและจำนวน',
+			description: 'คำศัพท์เกี่ยวกับตัวเลข จำนวน การนับ และลำดับที่'
+		};
+	}
+	if (/รัก|ชอบ|อยาก|ต้องการ|หวัง|ความรู้สึก/.test(words)) {
+		return {
+			title: 'ความรู้สึก & ความคิด',
+			category: 'อารมณ์และความรู้สึก',
+			description: 'คำศัพท์เกี่ยวกับความรู้สึก อารมณ์ และความต้องการในชีวิตประจำวัน'
+		};
+	}
 
-	// HSK level fallback with ordinal
-	const levelLabel = hskLevel === 1 ? 'พื้นฐาน' : hskLevel === 2 ? 'กลาง' : 'ขั้นสูง';
-	return `ด่าน ${stageIndex} · HSK ${hskLevel} ${levelLabel}`;
+	const levelLabel = hskLevel === 1 ? 'พื้นฐาน' : hskLevel === 2 ? 'ระดับกลาง' : 'ระดับก้าวหน้า';
+	return {
+		title: `HSK ${hskLevel} ชุดที่ ${stageIndex}`,
+		category: `คำศัพท์ HSK ${hskLevel}`,
+		description: `คำศัพท์ ${levelLabel} สำหรับฝึกทักษะการฟัง พูด และแปลความหมาย`
+	};
 }
 
 /**
@@ -169,11 +260,14 @@ function chunkPresets(presets: TonePreset[], hskLevel: number): QuestStage[] {
 			});
 		}
 
+		const theme = deriveThemeInfo(chunk, stageIndex, hskLevel);
 		stages.push({
 			id: `hsk${hskLevel}-stage-${stageIndex}`,
 			hskLevel,
 			stageIndex,
-			title: deriveThemeTitle(chunk, stageIndex, hskLevel),
+			title: theme.title,
+			category: theme.category,
+			description: theme.description,
 			words: chunk,
 			challenges
 		});

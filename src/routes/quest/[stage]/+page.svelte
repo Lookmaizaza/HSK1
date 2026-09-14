@@ -331,7 +331,7 @@
 			<div class="size-32 rounded-full bg-yellow-100 flex items-center justify-center mb-6 shadow-2xl">
 				<Sparkles class="size-16 text-yellow-500" />
 			</div>
-			<h1 class="text-3xl font-extrabold text-foreground mb-2">ผ่านด่านสำเร็จ!</h1>
+			<h1 class="text-3xl font-extrabold text-foreground mb-2">สำเร็จบทเรียน!</h1>
 			<p class="text-muted-foreground mb-8">คุณได้รับ +25 XP และทบทวนคำศัพท์เรียบร้อยแล้ว</p>
 			<a href="/" class="w-full rounded-2xl bg-primary py-4 text-center font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90">
 				กลับไปหน้าแผนที่
@@ -356,7 +356,7 @@
 			<div class="flex justify-between w-full mt-8 gap-4">
 				<button onclick={prevFlashcard} disabled={flashcardIndex === 0} class="flex-1 py-4 rounded-xl border font-bold disabled:opacity-50">ย้อนกลับ</button>
 				<button onclick={nextFlashcard} class="flex-1 py-4 rounded-xl bg-primary text-white font-bold">
-					{flashcardIndex === stageData.words.length - 1 ? 'จบด่านรับรางวัล' : 'ถัดไป'}
+					{flashcardIndex === stageData.words.length - 1 ? 'จบบทเรียนรับรางวัล' : 'ถัดไป'}
 				</button>
 			</div>
 			<div class="mt-4 text-sm text-muted-foreground">{flashcardIndex + 1} / {stageData.words.length}</div>
