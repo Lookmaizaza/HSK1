@@ -171,9 +171,24 @@ export async function speak(text: string, rate = 0.9): Promise<void> {
 	window.speechSynthesis.speak(utter);
 }
 
-// Strip punctuation and whitespace for char-level comparison.
+const DIGIT_TO_HANZI: Record<string, string> = {
+	'0': '零',
+	'1': '一',
+	'2': '二',
+	'3': '三',
+	'4': '四',
+	'5': '五',
+	'6': '六',
+	'7': '七',
+	'8': '八',
+	'9': '九',
+	'10': '十'
+};
+
+// Strip punctuation and whitespace for char-level comparison, normalizing digits to Hanzi
 export function normalizeChinese(s: string): string {
-	return s.replace(/[\s\p{P}\p{S}]/gu, '');
+	const stripped = s.replace(/[\s\p{P}\p{S}]/gu, '');
+	return DIGIT_TO_HANZI[stripped] || stripped;
 }
 
 // BUG-04 FIX: Build character bigrams (pairs of adjacent chars) from a string.
@@ -319,6 +334,14 @@ export const PHONETIC_HOMOPHONE_MAP: Record<string, string[]> = {
 	'坐': ['坐', '做', '作', '座', '左', '昨']
 };
 
+function stripToneMarks(pinyin: string): string {
+	return pinyin
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^a-zA-Z]/g, '')
+		.toLowerCase();
+}
+
 /**
  * Target-Guided Chinese Word Matcher.
  * Leverages target context, homophone sound groups, and multi-alternative hypotheses
@@ -326,7 +349,8 @@ export const PHONETIC_HOMOPHONE_MAP: Record<string, string[]> = {
  */
 export function matchChineseWord(
 	targetHanzi: string,
-	candidates: string[]
+	candidates: string[],
+	targetPinyin?: string
 ): {
 	isMatch: boolean;
 	bestMatch: string;
@@ -354,6 +378,19 @@ export function matchChineseWord(
 	for (const cand of cleanCandidates) {
 		if (cand.includes(cleanTarget) || cleanTarget.includes(cand)) {
 			return { isMatch: true, bestMatch: cleanTarget, similarity: 100 };
+		}
+	}
+
+	// 3. Pinyin Romanization Match (useful when ASR returns romanized word or pinyin)
+	if (targetPinyin) {
+		const normTargetPinyin = stripToneMarks(targetPinyin);
+		if (normTargetPinyin) {
+			for (const rawCand of candidates) {
+				const normCand = stripToneMarks(rawCand);
+				if (normCand && (normCand === normTargetPinyin || normCand.includes(normTargetPinyin))) {
+					return { isMatch: true, bestMatch: cleanTarget, similarity: 100 };
+				}
+			}
 		}
 	}
 

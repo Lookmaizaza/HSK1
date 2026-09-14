@@ -171,15 +171,15 @@
 		}
 
 		tracker.onPitchUpdate = (point, all) => {
-			// Require real human voice characteristics: pitch in vocal range, high clarity, and solid volume
-			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.4 && point.volume > 0.02) {
+			// Require real human voice characteristics: pitch in vocal range, clarity, and volume
+			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.35 && point.volume > 0.018) {
 				hasVoicedSpeech = true;
 			}
 			if (hasVoicedSpeech && all.length >= 15) {
 				const recent = all.slice(-10);
 				const isSilent = recent.every((p) => p.volume < 0.015 || p.f0 <= 0 || p.clarity < 0.3);
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 450);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 500);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;
@@ -195,12 +195,26 @@
 		if (silenceTimeout) clearTimeout(silenceTimeout);
 		if (!tracker || !isRecording) return;
 
-		if (speechRecognizer) {
+		const currentRec = speechRecognizer;
+		if (currentRec) {
 			try {
-				speechRecognizer.stop();
+				currentRec.stop();
 			} catch {}
-			speechRecognizer = null;
 		}
+
+		// Allow Web Speech API to finalize and deliver transcript if speech was voiced
+		if (hasVoicedSpeech && speechCandidates.length === 0) {
+			await new Promise<void>((resolve) => {
+				const timer = setTimeout(resolve, 500);
+				if (currentRec) {
+					currentRec.onend = () => {
+						clearTimeout(timer);
+						setTimeout(resolve, 60);
+					};
+				}
+			});
+		}
+		speechRecognizer = null;
 
 		const recorded = tracker.stop();
 		isRecording = false;
@@ -214,11 +228,13 @@
 
 			// 1. Voice Activity Check: Count actual voiced frames within human vocal frequency
 			const voicedFrames = recorded.filter(
-				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.4 && p.volume > 0.02
+				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.35 && p.volume > 0.018
 			);
+			const maxVolume = Math.max(...recorded.map((p) => p.volume || 0), 0);
+			const isRealHumanVoice = hasVoicedSpeech && voicedFrames.length >= 7 && maxVolume >= 0.028;
 
 			// If no speech was recognized AND no significant voiced speech frames detected:
-			if (candidatePool.length === 0 && voicedFrames.length < 8) {
+			if (candidatePool.length === 0 && !isRealHumanVoice) {
 				feedbackType = 'error';
 				feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
 				setTimeout(() => {
@@ -260,16 +276,6 @@
 			}
 
 			// 3. Single word vocabulary challenge (speak or listen_speak)
-			// Guard: If speech recognition did NOT detect any word (silence or noise), do NOT pass!
-			if (candidatePool.length === 0) {
-				feedbackType = 'error';
-				feedbackMessage = 'ยังไม่พบเสียงคำศัพท์ กรุณาออกเสียงให้ชัดเจน';
-				setTimeout(() => {
-					feedbackType = 'none';
-				}, 1800);
-				return;
-			}
-
 			let syllables = currentChallenge.word.syllables || [{
 				hanzi: currentChallenge.word.hanzi,
 				pinyin: currentChallenge.word.pinyin,
@@ -284,13 +290,30 @@
 			);
 			
 			const targetHanzi = currentChallenge.word.hanzi;
-			const matchRes = matchChineseWord(targetHanzi || '', candidatePool);
-			const isWordCorrect = matchRes.isMatch;
-			const finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
+			const targetPinyin = currentChallenge.word.pinyin;
+			const matchRes = matchChineseWord(targetHanzi || '', candidatePool, targetPinyin);
+			let isWordCorrect = matchRes.isMatch;
+			let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
+
+			// Single-syllable acoustic fallback (when ASR server drops or delays single short syllable, but user spoke loudly and clearly with accurate tone):
+			if (!isWordCorrect && candidatePool.length === 0 && isRealHumanVoice && res.isAllMatch && res.overallScore >= 68) {
+				isWordCorrect = true;
+				finalHeard = targetHanzi;
+			}
+
+			// Guard: If still no word recognized and not validated:
+			if (candidatePool.length === 0 && !isWordCorrect) {
+				feedbackType = 'error';
+				feedbackMessage = 'ยังไม่พบเสียงคำศัพท์ กรุณาออกเสียงให้ชัดเจน';
+				setTimeout(() => {
+					feedbackType = 'none';
+				}, 1800);
+				return;
+			}
 
 			// User MUST have pronounced the target word correctly to pass
 			if (isWordCorrect) {
-				const isToneGood = res.overallScore >= 60;
+				const isToneGood = res.overallScore >= 55;
 				feedbackType = 'success';
 				feedbackMessage = isToneGood 
 					? 'ยอดเยี่ยม! เสียงและวรรณยุกต์เป๊ะมาก' 
