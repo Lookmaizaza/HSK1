@@ -512,12 +512,20 @@
 				[selectedPreset.id]: updatedStat
 			});
 
+			const hskLevelNum = selectedPreset.id.startsWith('hsk2')
+				? 2
+				: selectedPreset.id.startsWith('hsk3')
+					? 3
+					: 1;
+
 			// 1. Send comprehensive JSON telemetry payload to /api/v1/telemetry/score-ingest for xAPI translation
 			const telemetryPayload = {
 				eventType: 'pronunciation_evaluation',
 				timestamp: new Date().toISOString(),
+				hsk_level: hskLevelNum,
+				mode: 'free_pitch',
 				word: {
-					id: selectedPreset.id,
+					id: selectedPreset.hanzi,
 					hanzi: selectedPreset.hanzi,
 					pinyin: selectedPreset.pinyin,
 					meaning: selectedPreset.thai || selectedPreset.english,

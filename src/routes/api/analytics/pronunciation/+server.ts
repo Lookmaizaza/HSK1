@@ -71,16 +71,31 @@ export const POST = async ({ locals, request }: RequestEvent) => {
 
 	const processedItems: LearnerPronunciationPayload[] = [];
 
-	for (const item of rawItems) {
-		// BUG-07 FIX: use session userId (already set above), ignore item.user_id from client
-		const wordId = String(item.word_id || '');
-		const pinyin = String(item.pinyin || '');
-		const attemptNumber = Number(item.attempt_number || 1);
-		const audioDurationSec = Number(item.audio_duration_sec || 0);
+function normalizeWordId(rawId: string): string {
+	if (!rawId) return '';
+	let clean = rawId.trim();
+	try {
+		clean = decodeURIComponent(clean);
+	} catch {}
+	if (clean.includes('_')) {
+		const parts = clean.split('_');
+		const lastPart = parts[parts.length - 1];
+		if (lastPart) clean = lastPart;
+	}
+	return clean;
+}
 
-		if (!wordId || !pinyin) {
-			continue;
-		}
+	for (const item of rawItems) {
+    const userId = String(locals.user?.user_id || 'usr_uuid_local');
+    const wordId = String(item.word_id || '');
+
+    const pinyin = String(item.pinyin || '');
+    const attemptNumber = Number(item.attempt_number || 1);
+    const audioDurationSec = Number(item.audio_duration_sec || 0);
+
+    if (!wordId || !pinyin) {
+        continue;
+    }
 
 		const phonemeDetails: PhonemeDetail[] = Array.isArray(item.scores?.phoneme_details)
 			? item.scores.phoneme_details.map((p: any) => ({
