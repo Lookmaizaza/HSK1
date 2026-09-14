@@ -9,41 +9,47 @@
 		Flame, 
 		TrendingUp, 
 		MessageCircle, 
-		Lock, 
-		X, 
-		ArrowRight, 
-		Layers, 
-		Volume2 
+		Lock,
+		Users,
+		Utensils,
+		GraduationCap,
+		ShoppingBag,
+		Compass,
+		Clock,
+		HeartPulse,
+		Briefcase,
+		CloudSun,
+		PawPrint,
+		House,
+		Palette,
+		Calculator,
+		Smile
 	} from '@lucide/svelte';
 	import { ALL_QUEST_STAGES, type QuestStage } from '$lib/data/questLevels';
-	import { speak } from '$lib/speech';
 
 	let selectedLevel = $state<number>(1);
 	const filteredStages = $derived(ALL_QUEST_STAGES.filter((s) => s.hskLevel === selectedLevel));
 
-	// Popover stage state (appears ONLY when a stage is tapped)
-	let activeStage = $state<QuestStage | null>(null);
-
-	function toggleStage(stage: QuestStage) {
-		if (activeStage?.id === stage.id) {
-			activeStage = null;
-		} else {
-			activeStage = stage;
-		}
-	}
-
-	function closePopover() {
-		activeStage = null;
-	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' && activeStage) {
-			closePopover();
-		}
+	// จับคู่รูปไอคอนตามหมวดหมู่เนื้อหาของแต่ละด่าน
+	function getStageIcon(stage: QuestStage) {
+		const t = stage.title;
+		if (t.includes('ครอบครัว')) return Users;
+		if (t.includes('อาหาร')) return Utensils;
+		if (t.includes('การเรียน')) return GraduationCap;
+		if (t.includes('ซื้อขาย')) return ShoppingBag;
+		if (t.includes('เดินทาง')) return Compass;
+		if (t.includes('เวลา')) return Clock;
+		if (t.includes('สุขภาพ')) return HeartPulse;
+		if (t.includes('ทำงาน')) return Briefcase;
+		if (t.includes('อากาศ')) return CloudSun;
+		if (t.includes('สัตว์')) return PawPrint;
+		if (t.includes('บ้าน')) return House;
+		if (t.includes('สีสัน')) return Palette;
+		if (t.includes('ตัวเลข')) return Calculator;
+		if (t.includes('ความรู้สึก')) return Smile;
+		return BookOpen;
 	}
 </script>
-
-<svelte:window onkeydown={handleKeydown} />
 
 <AppHeader />
 
@@ -92,10 +98,7 @@
 		{#each [1, 2, 3] as lvl (lvl)}
 			<button
 				type="button"
-				onclick={() => {
-					selectedLevel = lvl;
-					closePopover();
-				}}
+				onclick={() => selectedLevel = lvl}
 				class="flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-extrabold transition-all {selectedLevel === lvl ? 'bg-emerald-600 text-white shadow-md scale-105' : 'bg-muted/40 border text-muted-foreground hover:bg-muted'}"
 			>
 				<BookOpen class="size-4" />
@@ -113,134 +116,49 @@
 			{@const isUnlocked = i === 0 || (progress.completed[filteredStages[i - 1].id] ?? 0) > 0}
 			{@const stars = progress.completed[stage.id] ?? 0}
 			{@const offset = Math.sin(i * 1.2) * 50}
-			{@const isCurrentActive = activeStage?.id === stage.id}
+			{@const StageIcon = getStageIcon(stage)}
 			
-			<div class="relative my-5 flex w-full justify-center">
-				<div 
-					class="relative flex flex-col items-center"
+			<div class="relative my-4 flex w-full justify-center">
+				<a
+					href={isUnlocked ? `/quest/${stage.id}` : '#'}
+					class="group relative flex flex-col items-center transition-transform hover:scale-105 active:scale-95 {isUnlocked ? '' : 'opacity-60 cursor-not-allowed'}"
 					style="transform: translateX({offset}px)"
+					aria-label="ด่าน {stage.stageIndex} · {stage.title}"
 				>
-					<!-- Stage Circle Button -->
-					<button
-						type="button"
-						onclick={() => toggleStage(stage)}
-						class="group relative flex items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 focus:outline-none {isUnlocked ? '' : 'opacity-65'}"
-						aria-label="{stage.title}"
+					<!-- Stage Circle Button with Icon -->
+					<div 
+						class="relative grid size-16 place-items-center rounded-full shadow-lg transition-all
+						{stars === 3 
+							? 'bg-yellow-400 text-yellow-950 ring-4 ring-yellow-400/30' 
+							: stars > 0 
+								? 'bg-emerald-500 text-white ring-4 ring-emerald-500/30' 
+								: isUnlocked 
+									? 'bg-emerald-500 text-white ring-4 ring-emerald-500/30 shadow-emerald-500/30' 
+									: 'bg-muted text-muted-foreground/50 border border-muted-foreground/20'}"
 					>
-						<div 
-							class="relative grid size-16 place-items-center rounded-full shadow-lg transition-all
-							{stars === 3 
-								? 'bg-yellow-400 text-yellow-950 ring-4 ring-yellow-400/30' 
-								: stars > 0 
-									? 'bg-emerald-500 text-white ring-4 ring-emerald-500/30' 
-									: isUnlocked 
-										? 'bg-emerald-500 text-white ring-4 ring-emerald-500/30 shadow-emerald-500/30' 
-										: 'bg-muted text-muted-foreground/60 border border-muted-foreground/25'}"
-						>
-							{#if !isUnlocked}
-								<!-- Locked Icon, perfectly centered -->
-								<Lock class="size-6 shrink-0" />
-							{:else}
-								<!-- Stage Number, perfectly centered mathematically and optically -->
-								<span class="flex size-full items-center justify-center text-center text-2xl font-black tabular-nums select-none leading-none pt-[1px]">
-									{stage.stageIndex}
-								</span>
-								{#if stars > 0}
-									<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-background px-1.5 py-0.5 shadow-xs border text-amber-500">
-										{#each Array(stars) as _}
-											<Star class="size-2.5 fill-current" />
-										{/each}
-									</div>
-								{/if}
-							{/if}
-						</div>
-					</button>
-
-					<!-- Popover Speech Bubble (shown ONLY when tapped) -->
-					{#if isCurrentActive}
-						<!-- Click-outside backdrop -->
-						<div 
-							class="fixed inset-0 z-40 bg-black/25 backdrop-blur-[1px] animate-in fade-in duration-150"
-							onclick={closePopover}
-							role="presentation"
-						></div>
-
-						<!-- Floating Speech Bubble -->
-						<div 
-							class="absolute {i === 0 ? 'top-[calc(100%+14px)]' : 'bottom-[calc(100%+14px)]'} left-1/2 -translate-x-1/2 z-50 w-72 max-w-[calc(100vw-36px)] rounded-3xl bg-card border p-4 shadow-2xl text-card-foreground animate-in zoom-in-95 fade-in duration-150"
-							onclick={(e) => e.stopPropagation()}
-							role="dialog"
-						>
-							<!-- Pointer Arrow -->
-							<div 
-								class="absolute {i === 0 ? '-top-2 border-t border-l' : '-bottom-2 border-b border-r'} left-1/2 -ml-2 size-4 rotate-45 bg-card"
-							></div>
-
-							<!-- Category & Close Button -->
-							<div class="flex items-start justify-between gap-2 mb-1">
-								<div class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-									<Layers class="size-3.5" />
-									<span>{stage.category}</span>
-								</div>
-								<button 
-									type="button" 
-									onclick={closePopover}
-									class="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition"
-									aria-label="ปิด"
-								>
-									<X class="size-3.5" />
-								</button>
-							</div>
-
-							<!-- Title -->
-							<h4 class="text-base font-black text-foreground leading-tight mb-1">
-								{stage.title}
-							</h4>
-
-							<!-- Short Content Description -->
-							<p class="text-xs text-muted-foreground leading-relaxed mb-3">
-								{stage.description}
-							</p>
-
-							<!-- Vocabulary Samples -->
-							<div class="mb-3">
-								<div class="text-[11px] font-bold text-muted-foreground mb-1">
-									ตัวอย่างคำศัพท์ ({stage.words.length} คำ):
-								</div>
-								<div class="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-									{#each stage.words.slice(0, 4) as w}
-										<button 
-											type="button" 
-											onclick={() => speak(w.hanzi)}
-											class="inline-flex items-center gap-1 rounded-lg bg-muted/80 px-2 py-0.5 text-[11px] font-semibold text-foreground hover:bg-muted transition"
-											title="คลิกเพื่อฟังเสียง"
-										>
-											<span class="font-bold">{w.hanzi}</span>
-											<span class="text-muted-foreground text-[10px]">({w.thai})</span>
-											<Volume2 class="size-2.5 text-muted-foreground opacity-70" />
-										</button>
+						{#if !isUnlocked}
+							<!-- Locked Icon -->
+							<Lock class="size-7 shrink-0" />
+						{:else}
+							<!-- Category/Theme Icon -->
+							<StageIcon class="size-7 shrink-0" />
+							{#if stars > 0}
+								<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-background px-1.5 py-0.5 shadow-xs border text-amber-500">
+									{#each Array(stars) as _}
+										<Star class="size-2.5 fill-current" />
 									{/each}
 								</div>
-							</div>
-
-							<!-- Action Button -->
-							{#if isUnlocked}
-								<a
-									href="/quest/{stage.id}"
-									class="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2.5 text-xs font-extrabold text-white shadow-md transition hover:bg-emerald-600 active:scale-[0.98]"
-								>
-									<span>{stars > 0 ? 'ทบทวนบทเรียน' : 'เริ่มเรียนเลย'}</span>
-									<ArrowRight class="size-3.5" />
-								</a>
-							{:else}
-								<div class="flex w-full items-center justify-center gap-1.5 rounded-xl bg-muted py-2 text-xs font-bold text-muted-foreground border cursor-not-allowed">
-									<Lock class="size-3.5" />
-									<span>ต้องผ่านบทเรียนก่อนหน้าเพื่อปลดล็อก</span>
-								</div>
 							{/if}
+						{/if}
+					</div>
+
+					<!-- Label Underneath: "ด่าน" และ "ประเภท" -->
+					<div class="mt-2 rounded-xl bg-card px-3 py-1 text-center shadow-xs border group-hover:border-emerald-500/50 transition">
+						<div class="text-xs font-extrabold leading-tight text-foreground whitespace-nowrap">
+							<span class="text-emerald-600 dark:text-emerald-400 font-bold">ด่าน {stage.stageIndex}</span> · {stage.title}
 						</div>
-					{/if}
-				</div>
+					</div>
+				</a>
 			</div>
 		{/each}
 	</div>
