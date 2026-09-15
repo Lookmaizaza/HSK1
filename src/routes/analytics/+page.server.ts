@@ -7,13 +7,10 @@ import {
 	getPronunciationEvaluations
 } from '$lib/server/db';
 import { generateRemedialVocab, type RemedialCard } from '$lib/analytics/remedialEngine';
-<<<<<<< Updated upstream
-=======
 import {
 	generateMistakeArticulationGuides,
 	type DynamicArticulationGuide
 } from '$lib/analytics/articulationGuides';
->>>>>>> Stashed changes
 import { HSK1_VOCAB_PRESETS, HSK2_VOCAB_PRESETS, HSK3_VOCAB_PRESETS } from '$lib/vocabLoader';
 import type { TonePreset } from '$lib/pitch';
 import type { PageServerLoad } from './$types';
@@ -69,10 +66,7 @@ export type HskLevelSummary = {
 	unpracticedCount: number;
 	avgAccuracy: number | null;
 	remedialCards: (RemedialCard & { hskLevel: 1 | 2 | 3 })[];
-<<<<<<< Updated upstream
-=======
 	articulationGuides: DynamicArticulationGuide[];
->>>>>>> Stashed changes
 	words: VocabItemMastery[];
 };
 
@@ -197,11 +191,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			hskLevel: level
 		}));
 
-<<<<<<< Updated upstream
-=======
 		const articulationGuides = generateMistakeArticulationGuides(words, 3);
 
->>>>>>> Stashed changes
 		return {
 			level,
 			name,
@@ -217,10 +208,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			unpracticedCount,
 			avgAccuracy,
 			remedialCards: remedial,
-<<<<<<< Updated upstream
-=======
 			articulationGuides,
->>>>>>> Stashed changes
 			words
 		};
 	}
@@ -273,13 +261,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	});
 
-<<<<<<< Updated upstream
-=======
 	// Overall articulation guides based on all mistake words across all levels
 	const allWords = [...hsk1Summary.words, ...hsk2Summary.words, ...hsk3Summary.words];
 	const overallArticulationGuides = generateMistakeArticulationGuides(allWords, 4);
 
->>>>>>> Stashed changes
 	return {
 		user: locals.user || null,
 		diagnostic: diagnosticData,
@@ -292,10 +277,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			coveragePercent: overallCoveragePercent
 		},
 		overallRemedialCards,
-<<<<<<< Updated upstream
-=======
 		overallArticulationGuides,
->>>>>>> Stashed changes
 		topMistakes,
 		recentMistakes,
 		mistakeStats,

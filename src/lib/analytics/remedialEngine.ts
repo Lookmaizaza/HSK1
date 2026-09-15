@@ -1,4 +1,4 @@
-// Adaptive Remedial Engine (LQ6/LQ7)
+// Adaptive Remedial Engine (Targeted Phoneme & Tone Remediation)
 // Matches the learner's weak phonemes / tones (from getDiagnosticAnalytics)
 // against the HSK vocabulary to generate personalized practice cards.
 

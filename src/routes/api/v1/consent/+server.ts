@@ -1,6 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { recordUserConsent } from '$lib/server/db';
+import { recordUserConsent, getUserConsent } from '$lib/server/db';
+
+export const GET: RequestHandler = async ({ url, locals }) => {
+	const userId = url.searchParams.get('userId') || (locals.user ? String(locals.user.id) : 'usr_uuid_local');
+	const consentType = url.searchParams.get('consentType') || 'pdpa_research_telemetry';
+	const granted = await getUserConsent(userId, consentType);
+	return json({ userId, consentType, granted });
+};
 
 export const POST: RequestHandler = async ({ request, getClientAddress, locals }) => {
 	try {

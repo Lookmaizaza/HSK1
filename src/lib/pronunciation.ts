@@ -1,3 +1,7 @@
+// Pronunciation Assessment & Phoneme-level Error Analysis types and utilities.
+// Standardized for Computer-Assisted Pronunciation Training (CAPT), GOP (Goodness of Pronunciation),
+// and PER (Phoneme Error Rate) analytics.
+
 import { segmentPinyinWord } from './vocabLoader';
 
 export type PhonemeType = 'initial' | 'final' | 'final_tone';
@@ -148,7 +152,7 @@ export function extractTargetPhonemes(pinyin: string): Array<{ phoneme: string; 
 
 	for (const syl of syllables) {
 		const { initial, finalTone } = splitPinyinSyllable(syl);
-		if (initial && (PINYIN_INITIALS as readonly string[]).includes(initial)) {
+		if (initial) {
 			result.push({ phoneme: initial, type: 'initial' });
 		}
 		if (finalTone) {

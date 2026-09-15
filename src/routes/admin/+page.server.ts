@@ -4,7 +4,8 @@ import {
 	listAllCompletions,
 	findUserByUsername,
 	verifyPassword,
-	createSession
+	createSession,
+	getResearchExportStats
 } from '$lib/server/db';
 import { TRACKS, units } from '$lib/data/lessons';
 import type { Actions, PageServerLoad } from './$types';
@@ -18,9 +19,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw error(403, `Account "${locals.user.username}" is not an admin.`);
 	}
 
-	const [users, completions] = await Promise.all([
+	const [users, completions, researchStats] = await Promise.all([
 		listAllUsersWithProgress(),
-		listAllCompletions()
+		listAllCompletions(),
+		getResearchExportStats()
 	]);
 
 	const trackTotals = Object.fromEntries(
@@ -77,6 +79,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		needsLogin: false as const,
 		stats,
+		researchStats,
 		users: usersWithDetail,
 		tracks: TRACKS.map((t) => ({
 			id: t.id,

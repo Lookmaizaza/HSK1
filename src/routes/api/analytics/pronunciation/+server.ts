@@ -1,6 +1,7 @@
 import { json, error, type RequestEvent } from '@sveltejs/kit';
 import {
 	recordPronunciationEvaluation,
+	recordPhonemeEvaluations,
 	getPronunciationEvaluations,
 	getPronunciationPhonemeErrorStats
 } from '$lib/server/db';
@@ -12,15 +13,16 @@ import {
 
 // GET /api/analytics/pronunciation
 // Query params:
+// - userId: user ID or UUID (defaults to logged-in user)
 // - mode: 'history' (list of evaluations) | 'stats' (aggregated phoneme error stats)
 // - limit: number of records (default: 50)
 export const GET = async ({ locals, url }: RequestEvent) => {
-	// BUG-07 FIX: always use the authenticated session user — never trust a userId from the
-	// query string, as that would let any logged-in user read another user's data.
-	if (!locals.user) {
-		throw error(401, 'Authentication required.');
+	const paramUserId = url.searchParams.get('userId')?.trim();
+	const targetUserId = paramUserId || (locals.user ? String(locals.user.id) : null);
+
+	if (!targetUserId) {
+		throw error(400, 'Missing userId parameter or not authenticated.');
 	}
-	const targetUserId = String(locals.user.id);
 
 	const mode = url.searchParams.get('mode') || 'history';
 	const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 200);
@@ -43,34 +45,6 @@ export const GET = async ({ locals, url }: RequestEvent) => {
 	});
 };
 
-// POST /api/analytics/pronunciation
-// Body: LearnerPronunciationPayload or { items: LearnerPronunciationPayload[] }
-export const POST = async ({ locals, request }: RequestEvent) => {
-	let body: any;
-	try {
-		body = await request.json();
-	} catch {
-		throw error(400, 'Invalid JSON body');
-	}
-
-	// BUG-07 FIX: never trust user_id from the request body — a logged-in user could
-	// inject another user's ID to write data into their record (data poisoning).
-	// Always derive the userId from the server-side session instead.
-	const sessionUserId = locals.user ? String(locals.user.id) : null;
-	const userId = sessionUserId ?? 'anonymous';
-
-	const rawItems = Array.isArray(body)
-		? body
-		: Array.isArray(body.items)
-			? body.items
-			: [body];
-
-	if (rawItems.length === 0) {
-		throw error(400, 'No evaluation items provided.');
-	}
-
-	const processedItems: LearnerPronunciationPayload[] = [];
-
 function normalizeWordId(rawId: string): string {
 	if (!rawId) return '';
 	let clean = rawId.trim();
@@ -85,17 +59,38 @@ function normalizeWordId(rawId: string): string {
 	return clean;
 }
 
+// POST /api/analytics/pronunciation
+// Body: LearnerPronunciationPayload or { items: LearnerPronunciationPayload[] }
+export const POST = async ({ locals, request }: RequestEvent) => {
+	let body: any;
+	try {
+		body = await request.json();
+	} catch {
+		throw error(400, 'Invalid JSON body');
+	}
+
+	const rawItems = Array.isArray(body)
+		? body
+		: Array.isArray(body.items)
+			? body.items
+			: [body];
+
+	if (rawItems.length === 0) {
+		throw error(400, 'No evaluation items provided.');
+	}
+
+	const processedItems: LearnerPronunciationPayload[] = [];
+
 	for (const item of rawItems) {
-    const userId = String(locals.user?.user_id || 'usr_uuid_local');
-    const wordId = String(item.word_id || '');
+		const userId = String(item.user_id || (locals.user ? locals.user.id : 'usr_uuid_local'));
+		const wordId = normalizeWordId(String(item.word_id || ''));
+		const pinyin = String(item.pinyin || '');
+		const attemptNumber = Number(item.attempt_number || 1);
+		const audioDurationSec = Number(item.audio_duration_sec || 0);
 
-    const pinyin = String(item.pinyin || '');
-    const attemptNumber = Number(item.attempt_number || 1);
-    const audioDurationSec = Number(item.audio_duration_sec || 0);
-
-    if (!wordId || !pinyin) {
-        continue;
-    }
+		if (!wordId || !pinyin) {
+			continue;
+		}
 
 		const phonemeDetails: PhonemeDetail[] = Array.isArray(item.scores?.phoneme_details)
 			? item.scores.phoneme_details.map((p: any) => ({
@@ -135,6 +130,24 @@ function normalizeWordId(rawId: string): string {
 		};
 
 		await recordPronunciationEvaluation(validPayload);
+
+		// Also record detailed phoneme breakdown into phoneme_evaluations table
+		if (phonemeDetails.length > 0) {
+			await recordPhonemeEvaluations(
+				phonemeDetails.map((pd) => ({
+					userId,
+					wordId,
+					pinyin,
+					phoneme: pd.phoneme,
+					phonemeType: pd.type,
+					gop: pd.gop,
+					status: pd.status,
+					target: pd.target,
+					recognized: pd.recognized
+				}))
+			);
+		}
+
 		processedItems.push(validPayload);
 	}
 

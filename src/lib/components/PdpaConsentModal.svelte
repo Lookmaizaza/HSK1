@@ -182,7 +182,7 @@
 						class="mt-0.5 rounded border-input size-4 text-primary focus:ring-primary accent-primary"
 					/>
 					<span class="leading-tight text-foreground font-medium">
-						ยินยอมให้นำข้อมูลสถิติเชิงตัวเลข (คะแนน GOP, ความลังเล LQ6) ไปใช้วิจัยและพัฒนาแบบไม่ระบุตัวตน
+						ยินยอมให้นำข้อมูลสถิติเชิงตัวเลข (คะแนนความแม่นยำ GOP, วรรณยุกต์, หน่วยเสียง) ไปใช้วิจัยและพัฒนาแบบไม่ระบุตัวตน
 					</span>
 				</label>
 			</div>
