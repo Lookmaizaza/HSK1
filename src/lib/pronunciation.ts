@@ -2,6 +2,8 @@
 // Standardized for Computer-Assisted Pronunciation Training (CAPT), GOP (Goodness of Pronunciation),
 // and PER (Phoneme Error Rate) analytics.
 
+import { segmentPinyinWord } from './vocabLoader';
+
 export type PhonemeType = 'initial' | 'final' | 'final_tone';
 
 export type PhonemeStatus = 'correct' | 'substitution' | 'omission' | 'insertion';
@@ -134,10 +136,18 @@ export function splitPinyinSyllable(rawSyllable: string): {
 }
 
 /**
- * Parses a full pinyin string (e.g. "zhī shi" or "nǐ hǎo") into target phoneme segments.
+ * Parses a full pinyin string (e.g. "zhī shi" or "dàxué" or "nǐ hǎo") into target phoneme segments.
+ * Correctly segments connected multi-syllable pinyin words so initial consonants are extracted cleanly.
  */
 export function extractTargetPhonemes(pinyin: string): Array<{ phoneme: string; type: PhonemeType }> {
-	const syllables = pinyin.trim().split(/\s+/).filter(Boolean);
+	if (!pinyin) return [];
+	const rawBlocks = pinyin.trim().split(/\s+/).filter(Boolean);
+	const syllables: string[] = [];
+	for (const block of rawBlocks) {
+		const segs = segmentPinyinWord(block);
+		syllables.push(...segs);
+	}
+
 	const result: Array<{ phoneme: string; type: PhonemeType }> = [];
 
 	for (const syl of syllables) {

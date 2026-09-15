@@ -3,7 +3,12 @@ import {
 	convertTelemetryToXApi,
 	type PronunciationAssessmentTelemetry
 } from '$lib/xapi';
-import { recordPronunciationEvaluation } from '$lib/server/db';
+import {
+	recordPronunciationEvaluation,
+	recordPhonemeEvaluations,
+	recordLearningEvent
+} from '$lib/server/db';
+import { extractTargetPhonemes } from '$lib/pronunciation';
 
 // GET /api/v1/telemetry/score-ingest (Health / Schema Check)
 export const GET = async () => {
@@ -76,9 +81,17 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 		learnerName: username
 	});
 
-	// If authenticated user or userId provided, optionally persist record
+	// If authenticated user or userId provided, persist records across telemetry tables
 	if (userId) {
 		try {
+			const phonemeDetails = telemetry.assessment.syllableResults.map((s) => ({
+				phoneme: s.hanzi,
+				score: s.score,
+				isMatch: s.isMatch,
+				targetTone: s.targetTone,
+				detectedTone: s.detectedTone
+			}));
+
 			await recordPronunciationEvaluation({
 				user_id: String(userId),
 				word_id: telemetry.word.hanzi,
@@ -89,17 +102,49 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 					gop_overall: telemetry.assessment.overallScore,
 					per_overall: telemetry.assessment.isPassed ? 0 : 25,
 					tone_score: telemetry.assessment.rawScore,
-					phoneme_details: telemetry.assessment.syllableResults.map((s) => ({
-						phoneme: s.hanzi,
-						score: s.score,
-						isMatch: s.isMatch,
-						targetTone: s.targetTone,
-						detectedTone: s.detectedTone
-					}))
+					phoneme_details: phonemeDetails
 				}
 			});
-		} catch {
-			// Non-blocking storage fallback
+
+			// 1. Record detailed phoneme breakdown into phoneme_evaluations table
+			const targetPhonemes = extractTargetPhonemes(telemetry.word.pinyin || '');
+			if (targetPhonemes.length > 0) {
+				const phonemeRecords = targetPhonemes.map((pt) => ({
+					userId: String(userId),
+					wordId: telemetry.word.hanzi,
+					pinyin: telemetry.word.pinyin,
+					phoneme: pt.phoneme,
+					phonemeType: pt.type,
+					gop: telemetry.assessment.overallScore,
+					status: telemetry.assessment.isPassed ? 'correct' : 'substitution',
+					target: pt.phoneme,
+					recognized: telemetry.assessment.isPassed ? pt.phoneme : (telemetry.assessment.recognizedWord || '?')
+				}));
+				await recordPhonemeEvaluations(phonemeRecords);
+			}
+
+			// 2. Persist IEEE 9274.1.1 xAPI Statements into learning_events table
+			if (xapiStatements.assessmentStatement) {
+				await recordLearningEvent({
+					userId: String(userId),
+					eventType: 'pronounced',
+					wordId: telemetry.word.hanzi,
+					statementId: xapiStatements.assessmentStatement.id,
+					xapiStatement: xapiStatements.assessmentStatement
+				});
+			}
+
+			if (telemetry.behavior.listenedToExample && xapiStatements.listeningStatement) {
+				await recordLearningEvent({
+					userId: String(userId),
+					eventType: 'listened_to_example',
+					wordId: telemetry.word.hanzi,
+					statementId: xapiStatements.listeningStatement.id,
+					xapiStatement: xapiStatements.listeningStatement
+				});
+			}
+		} catch (dbErr) {
+			console.warn('⚠️ [ScoreIngest] DB recording fallback:', dbErr);
 		}
 	}
 
