@@ -29,4 +29,5 @@ vite.config.ts.timestamp-*
 .env*
 __pycache__/
 *.pyc
-newhsk/
+
+*.npz
