@@ -326,6 +326,56 @@
 				return;
 			}
 
+			// Dispatch research telemetry to /api/v1/telemetry/score-ingest
+			const finalScore = isWordCorrect ? Math.max(res.overallScore, 75) : Math.min(res.overallScore, 50);
+			const telemetryPayload = {
+				eventType: 'pronunciation_evaluation',
+				timestamp: new Date().toISOString(),
+				word: {
+					id: currentChallenge.word.hanzi,
+					hanzi: currentChallenge.word.hanzi,
+					pinyin: currentChallenge.word.pinyin,
+					meaning: currentChallenge.word.thai || currentChallenge.word.english || '',
+					expectedTone: currentChallenge.word.tone
+				},
+				behavior: {
+					listenedToExample: currentChallenge.type === 'listen_speak' || showHint,
+					listenCount: currentChallenge.type === 'listen_speak' ? 1 : 0,
+					listenTimestamps: []
+				},
+				assessment: {
+					isPassed: isWordCorrect,
+					overallScore: finalScore,
+					rawScore: res.overallScore,
+					isToneMatch: res.overallScore >= 55,
+					isWordMatch: isWordCorrect,
+					recognizedWord: finalHeard || undefined,
+					speechCandidates: [...candidatePool],
+					syllableResults: (res.syllableResults || []).map((s) => ({
+						syllableIndex: s.syllableIndex,
+						hanzi: s.hanzi,
+						pinyin: s.pinyin,
+						targetTone: s.targetTone,
+						detectedTone: s.detectedTone,
+						isMatch: s.isMatch,
+						score: s.score,
+						feedback: s.feedback,
+						isAIModel: s.isAIModel
+					})),
+					acoustics: {
+						avgF0: res.avgF0 || 0,
+						totalDurationMs: res.totalDurationMs || 0
+					},
+					overallFeedback: isWordCorrect ? 'ออกเสียงถูกต้อง' : `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}")`
+				}
+			};
+
+			fetch('/api/v1/telemetry/score-ingest', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(telemetryPayload)
+			}).catch(() => {});
+
 			// User MUST have pronounced the target word correctly to pass
 			if (isWordCorrect) {
 				const isToneGood = res.overallScore >= 55;
@@ -335,6 +385,20 @@
 					: 'ดีมาก! ออกเสียงถูก (ปรับวรรณยุกต์อีกนิดจะเพอร์เฟกต์)';
 				setTimeout(nextChallenge, 1500);
 			} else {
+				fetch('/api/mistakes', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						hanzi: currentChallenge.word.hanzi,
+						pinyin: currentChallenge.word.pinyin,
+						meaning: currentChallenge.word.thai || currentChallenge.word.english || '',
+						expectedTone: currentChallenge.word.tone,
+						heardText: finalHeard || '',
+						score: finalScore,
+						feedback: `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}")`
+					})
+				}).catch(() => {});
+
 				feedbackType = 'error';
 				feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
 				progress.loseHeart();

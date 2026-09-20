@@ -23,9 +23,16 @@
 		House,
 		Palette,
 		Calculator,
-		Smile
+		Smile,
+		Sparkles,
+		Volume2,
+		Mic,
+		ArrowRight
 	} from '@lucide/svelte';
 	import { ALL_QUEST_STAGES, type QuestStage } from '$lib/data/questLevels';
+	import { speak } from '$lib/speech';
+
+	let { data } = $props();
 
 	let selectedLevel = $state<number>(1);
 	const filteredStages = $derived(ALL_QUEST_STAGES.filter((s) => s.hskLevel === selectedLevel));
@@ -87,6 +94,72 @@
 			<div class="mt-0.5 text-[11px] font-medium text-white/70">AI Conversation Practice</div>
 		</a>
 	</div>
+
+	<!-- Adaptive Remedial Recommendations Section -->
+	{#if data.remedialCards && data.remedialCards.length > 0}
+		<section class="mb-8 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 via-card to-background p-5 shadow-sm">
+			<div class="flex items-center justify-between mb-3.5">
+				<div class="flex items-center gap-2.5">
+					<div class="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+						<Sparkles class="size-4" />
+					</div>
+					<div>
+						<h2 class="text-sm font-extrabold text-foreground">คำแนะนำซ่อมเสริมเฉพาะคุณ (Adaptive Practice)</h2>
+						<p class="text-[11px] text-muted-foreground">ระบบวิเคราะห์จุดที่คุณยังออกเสียงคลาดเคลื่อน และคัดเลือกคำศัพท์เพื่อฝึกซ้ำ</p>
+					</div>
+				</div>
+				<a href="/analytics" class="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5 shrink-0">
+					ดูสถิติ <ArrowRight class="size-3" />
+				</a>
+			</div>
+
+			<!-- Recommended Words List with Options in order: 1. Listen, 2. Practice -->
+			<div class="space-y-2.5">
+				{#each data.remedialCards as card, idx (card.presetId || card.hanzi)}
+					<div class="flex items-center justify-between rounded-2xl border bg-card/90 p-3.5 transition hover:border-primary/40 hover:shadow-xs gap-3">
+						<div class="flex items-center gap-3 min-w-0">
+							<span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
+								{idx + 1}
+							</span>
+							<div class="min-w-0">
+								<div class="flex items-baseline gap-2">
+									<span class="text-xl font-black text-foreground">{card.hanzi}</span>
+									<span class="text-xs font-mono font-bold text-sky-600 dark:text-sky-400">{card.pinyin}</span>
+									<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+										{card.tag}
+									</span>
+								</div>
+								<div class="text-xs text-muted-foreground mt-0.5 truncate">
+									{card.thai} • <span class="text-foreground/75 font-medium">{card.reason}</span>
+								</div>
+							</div>
+						</div>
+
+						<!-- Recommendation Actions in order: 1. Listen, 2. Practice -->
+						<div class="flex items-center gap-1.5 shrink-0">
+							<button
+								type="button"
+								onclick={() => speak(card.hanzi)}
+								class="flex size-8 items-center justify-center rounded-xl border border-input bg-card hover:bg-accent text-foreground transition active:scale-95 cursor-pointer"
+								title="1. ฟังเสียงต้นแบบ"
+							>
+								<Volume2 class="size-3.5 text-primary" />
+							</button>
+
+							<a
+								href="/pitch?word={encodeURIComponent(card.hanzi)}"
+								class="flex items-center gap-1 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-2.5 py-1.5 text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer"
+								title="2. ฝึกออกเสียงคำนี้"
+							>
+								<Mic class="size-3" />
+								<span>ฝึก</span>
+							</a>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/if}
 
 	<div class="text-center mb-6">
 		<h1 class="text-3xl font-extrabold tracking-tight">HSK Quest</h1>

@@ -1,6 +1,22 @@
 <script lang="ts">
 	import AppHeader from '$lib/components/AppHeader.svelte';
-	import { Users, Zap, Trophy, Flame, ChevronDown, ChevronRight, Star, CheckCircle2, Circle, Shield, LogIn } from '@lucide/svelte';
+	import {
+		Users,
+		Zap,
+		Trophy,
+		Flame,
+		ChevronDown,
+		ChevronRight,
+		Star,
+		CheckCircle2,
+		Circle,
+		Shield,
+		LogIn,
+		Download,
+		FileSpreadsheet,
+		FileCode,
+		Info
+	} from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -137,6 +153,81 @@
 			<div class="text-xs text-muted-foreground">top streak {data.stats.topStreak}🔥</div>
 		</div>
 	</div>
+
+	<!-- Research & Telemetry Export Section -->
+	<section class="mb-8 rounded-3xl border bg-card p-5 sm:p-6 shadow-sm">
+		<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+			<div>
+				<div class="flex items-center gap-2.5">
+					<div class="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+						<Download class="size-5" />
+					</div>
+					<div>
+						<h2 class="text-lg font-extrabold text-foreground">ดาวน์โหลดข้อมูลการวิจัย (Research Dataset & Telemetry)</h2>
+						<p class="text-xs text-muted-foreground">
+							ส่งออกชุดข้อมูลสำหรับงานวิจัย CAPT ตามมาตรฐาน PDPA (ปกปิดตัวตนอัตโนมัติ) เพื่อนำไปวิเคราะห์ใน SPSS, Excel, Python หรือ R
+						</p>
+					</div>
+				</div>
+			</div>
+
+			<!-- Live counts badges -->
+			{#if data.researchStats}
+				<div class="flex flex-wrap items-center gap-2 text-xs">
+					<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+						<span class="size-1.5 rounded-full bg-emerald-500"></span>
+						{data.researchStats.totalEvaluations} ผลประเมิน
+					</span>
+					<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1 font-semibold text-blue-700 dark:text-blue-300 border border-blue-500/20">
+						<span class="size-1.5 rounded-full bg-blue-500"></span>
+						{data.researchStats.totalEvents} xAPI Events
+					</span>
+					<span class="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-3 py-1 font-semibold text-purple-700 dark:text-purple-300 border border-purple-500/20">
+						<span class="size-1.5 rounded-full bg-purple-500"></span>
+						{data.researchStats.totalParticipants} ผู้เข้าร่วม (PDPA)
+					</span>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Action Buttons -->
+		<div class="mt-5 flex flex-wrap gap-3 pt-4 border-t border-border/60">
+			<a
+				id="btn-export-csv"
+				href="/api/admin/export?format=csv"
+				download
+				class="inline-flex items-center gap-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-bold shadow-md shadow-emerald-600/20 transition active:scale-95 cursor-pointer"
+			>
+				<FileSpreadsheet class="size-4" />
+				<span>ดาวน์โหลด CSV Dataset (Excel / SPSS / R)</span>
+			</a>
+
+			<a
+				id="btn-export-json"
+				href="/api/admin/export?format=xapi"
+				download
+				class="inline-flex items-center gap-2.5 rounded-xl border border-input bg-card hover:bg-accent hover:text-accent-foreground text-foreground px-4 py-2.5 text-sm font-bold shadow-xs transition active:scale-95 cursor-pointer"
+			>
+				<FileCode class="size-4 text-blue-500" />
+				<span>ดาวน์โหลด xAPI Statements (JSON)</span>
+			</a>
+		</div>
+
+		<!-- Field Dictionary Note -->
+		<div class="mt-4 rounded-xl bg-muted/40 p-3.5 text-xs text-muted-foreground border border-border/40">
+			<div class="flex items-center gap-1.5 font-semibold text-foreground mb-1.5">
+				<Info class="size-3.5 text-emerald-600" /> โครงสร้างตัวแปรในไฟล์ CSV:
+			</div>
+			<p class="leading-relaxed">
+				<span class="font-mono text-foreground font-semibold">gop_overall</span> (คะแนนความชัดเจน Goodness of Pronunciation), 
+				<span class="font-mono text-foreground font-semibold">per_overall</span> (อัตราความผิดพลาดหน่วยเสียง Phoneme Error Rate), 
+				<span class="font-mono text-foreground font-semibold">tone_score</span> (คะแนนความแม่นยำของระดับเส้นเสียง Tone Contour), 
+				<span class="font-mono text-foreground font-semibold">listened_to_example</span> (LQ5 พฤติกรรมการฟังตัวอย่างเสียงก่อนพูด), 
+				<span class="font-mono text-foreground font-semibold">attempt_number</span> (ครั้งที่พยายามออกเสียง), 
+				และ <span class="font-mono text-foreground font-semibold">anonymized_user_id</span> (รหัสผู้เข้าร่วมที่ปกปิดตัวตนตามมาตรฐาน PDPA)
+			</p>
+		</div>
+	</section>
 
 	<!-- Users table -->
 	<section>
