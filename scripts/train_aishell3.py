@@ -315,14 +315,18 @@ def get_or_create_cache(data_dir: str, cache_dir: str, train_target: int = 8000,
     Loads train & test datasets from .npz cache or extracts from raw AISHELL-3 files.
     """
     train_cache = os.path.join(cache_dir, "aishell3_train_cache.npz")
+    val_cache = os.path.join(cache_dir, "aishell3_val_cache.npz")
     test_cache = os.path.join(cache_dir, "aishell3_test_cache.npz")
 
-    if not reextract and os.path.exists(train_cache) and os.path.exists(test_cache):
+    # Prefer validation split if available to preserve Blind Test integrity
+    target_eval_cache = val_cache if os.path.exists(val_cache) else test_cache
+
+    if not reextract and os.path.exists(train_cache) and os.path.exists(target_eval_cache):
         print(f"📦 Loading pre-extracted train cache: {train_cache}")
         train_data = np.load(train_cache)
-        print(f"📦 Loading pre-extracted test cache: {test_cache}")
-        test_data = np.load(test_cache)
-        return (train_data["features"], train_data["labels"]), (test_data["features"], test_data["labels"])
+        print(f"📦 Loading pre-extracted evaluation cache: {target_eval_cache}")
+        eval_data = np.load(target_eval_cache)
+        return (train_data["features"], train_data["labels"]), (eval_data["features"], eval_data["labels"])
 
     # Extract Train Set
     train_dir = os.path.join(data_dir, "train")

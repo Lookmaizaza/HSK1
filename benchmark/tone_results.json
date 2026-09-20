@@ -1,84 +1,84 @@
 {
   "model_path": "static/models/mandarin_tone_cnn.onnx",
   "model_size_kb": 1197.04,
-  "test_samples": 8000,
-  "overall_accuracy": 81.4,
-  "macro_precision": 81.4,
-  "macro_recall": 81.4,
-  "macro_f1": 81.35,
+  "test_samples": 4000,
+  "overall_accuracy": 81.53,
+  "macro_precision": 81.52,
+  "macro_recall": 81.53,
+  "macro_f1": 81.48,
   "per_tone": {
     "Tone_1": {
       "name": "Tone 1 (阴平 55)",
-      "support": 2000,
-      "tp": 1634,
-      "fp": 336,
-      "fn": 366,
-      "precision": 82.94,
-      "recall": 81.7,
-      "f1": 82.32
+      "support": 1000,
+      "tp": 813,
+      "fp": 168,
+      "fn": 187,
+      "precision": 82.87,
+      "recall": 81.3,
+      "f1": 82.08
     },
     "Tone_2": {
       "name": "Tone 2 (阳平 35)",
-      "support": 2000,
-      "tp": 1775,
-      "fp": 372,
-      "fn": 225,
-      "precision": 82.67,
-      "recall": 88.75,
-      "f1": 85.6
+      "support": 1000,
+      "tp": 890,
+      "fp": 186,
+      "fn": 110,
+      "precision": 82.71,
+      "recall": 89.0,
+      "f1": 85.74
     },
     "Tone_3": {
       "name": "Tone 3 (上声 214)",
-      "support": 2000,
-      "tp": 1563,
-      "fp": 327,
-      "fn": 437,
-      "precision": 82.7,
-      "recall": 78.15,
-      "f1": 80.36
+      "support": 1000,
+      "tp": 786,
+      "fp": 163,
+      "fn": 214,
+      "precision": 82.82,
+      "recall": 78.6,
+      "f1": 80.66
     },
     "Tone_4": {
       "name": "Tone 4 (去声 51)",
-      "support": 2000,
-      "tp": 1540,
-      "fp": 453,
-      "fn": 460,
-      "precision": 77.27,
-      "recall": 77.0,
-      "f1": 77.13
+      "support": 1000,
+      "tp": 772,
+      "fp": 222,
+      "fn": 228,
+      "precision": 77.67,
+      "recall": 77.2,
+      "f1": 77.43
     }
   },
   "confusion_matrix": [
     [
-      1634,
-      188,
-      8,
-      170
+      813,
+      92,
+      3,
+      92
     ],
     [
-      181,
-      1775,
-      21,
-      23
+      90,
+      890,
+      12,
+      8
     ],
     [
-      20,
-      157,
-      1563,
-      260
+      7,
+      85,
+      786,
+      122
     ],
     [
-      135,
-      27,
-      298,
-      1540
+      71,
+      9,
+      148,
+      772
     ]
   ],
   "latency_ms": {
-    "mean": 0.317,
-    "p50": 0.313,
-    "p95": 0.405,
-    "p99": 0.556,
-    "throughput_syllables_per_sec": 3109.3
+    "mean": 0.303,
+    "p50": 0.309,
+    "p95": 0.358,
+    "p99": 0.439,
+    "throughput_syllables_per_sec": 3258.4
   }
 }

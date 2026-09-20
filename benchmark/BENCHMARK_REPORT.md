@@ -1,6 +1,6 @@
 # 🏆 Comprehensive System Benchmark Report
 **Project:** HSK Mandarin Tone & Spoken Language Learning Platform  
-**Evaluation Date:** 2026-09-20 17:27:18  
+**Evaluation Date:** 2026-09-20 17:36:43  
 **Branch:** `model-aishell3-v3`  
 
 ---
@@ -25,30 +25,30 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 ### Performance Metrics:
 | Metric | Value | Target Threshold | Status |
 | :--- | :---: | :---: | :---: |
-| **Overall Test Accuracy** | **81.40%** | ≥ 75.00% | ✅ **PASSED** |
-| **Macro Precision** | **81.40%** | ≥ 75.00% | ✅ **PASSED** |
-| **Macro Recall** | **81.40%** | ≥ 75.00% | ✅ **PASSED** |
-| **Macro F1-Score** | **81.35%** | ≥ 75.00% | ✅ **PASSED** |
-| **Average Inference Latency** | **0.32 ms** | ≤ 20.00 ms | ⚡ **ULTRA FAST** |
-| **P95 Latency** | **0.41 ms** | ≤ 30.00 ms | ⚡ **ULTRA FAST** |
-| **Throughput** | **3109.3 syl/sec** | ≥ 100 syl/sec | 🚀 **REALTIME READY** |
+| **Overall Test Accuracy** | **81.53%** | ≥ 75.00% | ✅ **PASSED** |
+| **Macro Precision** | **81.52%** | ≥ 75.00% | ✅ **PASSED** |
+| **Macro Recall** | **81.53%** | ≥ 75.00% | ✅ **PASSED** |
+| **Macro F1-Score** | **81.48%** | ≥ 75.00% | ✅ **PASSED** |
+| **Average Inference Latency** | **0.30 ms** | ≤ 20.00 ms | ⚡ **ULTRA FAST** |
+| **P95 Latency** | **0.36 ms** | ≤ 30.00 ms | ⚡ **ULTRA FAST** |
+| **Throughput** | **3258.4 syl/sec** | ≥ 100 syl/sec | 🚀 **REALTIME READY** |
 
 ### Per-Tone Classification Report:
 | Tone Category | Test Samples | Precision | Recall | F1-Score |
 | :--- | :---: | :---: | :---: | :---: |
-| Tone 1 (阴平 55) | 2000 | 82.94% | 81.70% | 82.32% |
-| Tone 2 (阳平 35) | 2000 | 82.67% | 88.75% | 85.60% |
-| Tone 3 (上声 214) | 2000 | 82.70% | 78.15% | 80.36% |
-| Tone 4 (去声 51) | 2000 | 77.27% | 77.00% | 77.13% |
+| Tone 1 (阴平 55) | 1000 | 82.87% | 81.30% | 82.08% |
+| Tone 2 (阳平 35) | 1000 | 82.71% | 89.00% | 85.74% |
+| Tone 3 (上声 214) | 1000 | 82.82% | 78.60% | 80.66% |
+| Tone 4 (去声 51) | 1000 | 77.67% | 77.20% | 77.43% |
 
 
 ### Confusion Matrix:
 | Actual \ Predicted | Tone 1 | Tone 2 | Tone 3 | Tone 4 |
 | :--- | :---: | :---: | :---: | :---: |
-| **Tone 1 (阴平)** | **1634** | 188 | 8 | 170 |
-| **Tone 2 (阳平)** | 181 | **1775** | 21 | 23 |
-| **Tone 3 (上声)** | 20 | 157 | **1563** | 260 |
-| **Tone 4 (去声)** | 135 | 27 | 298 | **1540** |
+| **Tone 1 (阴平)** | **813** | 92 | 3 | 92 |
+| **Tone 2 (阳平)** | 90 | **890** | 12 | 8 |
+| **Tone 3 (上声)** | 7 | 85 | **786** | 122 |
+| **Tone 4 (去声)** | 71 | 9 | 148 | **772** |
 
 
 ---

@@ -15,12 +15,19 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def run_tone_benchmark(
     model_path="static/models/mandarin_tone_cnn.onnx",
-    test_cache_path="scripts/aishell3_test_cache.npz",
+    test_cache_path=None,
     output_json="benchmark/tone_results.json"
 ):
     print("=" * 70)
-    print("🧠 [1/2] BENCHMARKING MANDARIN TONE CNN (AISHELL-3)")
+    print("🧠 [1/2] BENCHMARKING MANDARIN TONE CNN (STRICT BLIND TEST)")
     print("=" * 70)
+
+    if test_cache_path is None:
+        blind_candidate = "benchmark/aishell3_blind_test_cache.npz"
+        if os.path.exists(blind_candidate):
+            test_cache_path = blind_candidate
+        else:
+            test_cache_path = "scripts/aishell3_test_cache.npz"
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model not found at: {model_path}")
@@ -45,8 +52,10 @@ def run_tone_benchmark(
     y_test = test_data["labels"].astype(np.int64)      # (N,)
     num_samples = len(y_test)
 
+    is_blind = "blind" in os.path.basename(test_cache_path).lower()
+    test_type_desc = "Strict Blind Test (Holdout Unseen)" if is_blind else "Test Set"
     print(f"📦 Model: {model_path} ({total_size_kb:.1f} KB)")
-    print(f"📊 Test Samples: {num_samples} utterances (AISHELL-3 Native Mandarin)")
+    print(f"📊 Test Samples: {num_samples} utterances ({test_type_desc} - AISHELL-3 Native Mandarin)")
     print(f"⚙️ Input: {input_name} {ort_session.get_inputs()[0].shape}")
     print(f"⚙️ Output: {output_name} {ort_session.get_outputs()[0].shape}")
 
