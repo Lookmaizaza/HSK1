@@ -32,6 +32,14 @@
 	
 	let tracker: RealtimePitchTracker | null = null;
 	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
+	let audioDelayTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearAudioTimer() {
+		if (audioDelayTimer) {
+			clearTimeout(audioDelayTimer);
+			audioDelayTimer = null;
+		}
+	}
 	
 	let hasVoicedSpeech = false;
 	let feedbackMessage = $state('');
@@ -51,11 +59,12 @@
 		if (!stageData) {
 			goto('/');
 		} else {
-			playAudioIfListenSpeak();
+			playAudioIfListenSpeak(stageData.challenges[0]);
 		}
 	});
 
 	onDestroy(() => {
+		clearAudioTimer();
 		stopRecording();
 	});
 
@@ -67,6 +76,7 @@
 	}
 
 	function playAudio() {
+		clearAudioTimer();
 		if (currentChallenge) {
 			if (currentChallenge.type === 'sentence_build' && currentChallenge.sentenceHanzi) {
 				speak(currentChallenge.sentenceHanzi);
@@ -76,21 +86,26 @@
 		}
 	}
 
-	function playAudioIfListenSpeak() {
+	function playAudioIfListenSpeak(target?: Challenge) {
+		clearAudioTimer();
 		showHint = false; // Reset hint for new challenge
-		if (currentChallenge?.type === 'listen_speak') {
-			setTimeout(() => {
+		const challengeToPlay = target ?? currentChallenge;
+		if (challengeToPlay?.type === 'listen_speak') {
+			// รอประมาณ 1.5 วินาที (1-2 วิ) ก่อนเริ่มเล่นเสียง
+			audioDelayTimer = setTimeout(() => {
 				playAudio();
-			}, 500);
+				audioDelayTimer = null;
+			}, 1500);
 		}
 	}
 
 	function nextChallenge() {
+		clearAudioTimer();
 		if (stageData && currentIndex < stageData.challenges.length - 1) {
 			currentIndex++;
 			feedbackType = 'none';
 			sentenceCheckResult = null;
-			playAudioIfListenSpeak();
+			playAudioIfListenSpeak(stageData.challenges[currentIndex]);
 		} else {
 			phase = 'flashcard'; // Go to flashcards instead of victory
 		}
@@ -120,6 +135,7 @@
 	}
 
 	async function startRecording() {
+		clearAudioTimer();
 		feedbackType = 'none';
 		feedbackMessage = '';
 		sentenceCheckResult = null;
