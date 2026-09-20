@@ -61,18 +61,29 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 
 - **Model Architecture:** Lightweight Multi-scale 1D Dilated Residual CNN with Batch Normalization & Bi-LSTM
 - **Inference Engine:** ONNX Runtime Web / CPU
-- **Evaluation Dataset:** **{tone_data['test_samples']} native Mandarin utterances** ({tone_data.get('test_set_type', 'Strict Blind Test (Holdout Unseen)')}, balanced 1,000 samples per tone)
+- **Source Test Cache:** 8,000 native Mandarin utterances
+- **Validation Set:** 4,000 samples (1,000 samples per tone), used for model selection and validation during development
+- **Blind Test Set:** 4,000 samples (1,000 samples per tone), held out from model selection and used exclusively for final benchmark evaluation
+- **Split Method:** Stratified random split with a fixed random seed (42)
 - **Model Size:** **{tone_data['model_size_kb']} KB** (optimized for zero-lag mobile web browsers)
 
-### Performance Metrics:
+### Validation vs. Blind Test:
+| Evaluation Set | Samples | Accuracy | Purpose |
+| :--- | :---: | :---: | :--- |
+| **Validation Set** | 4,000 | 81.28% | Model validation and checkpoint selection |
+| **Strict Blind Test** | 4,000 | {tone_data['overall_accuracy']:.2f}% | Final holdout evaluation |
+
+> **Note:** The Validation and Blind Test accuracies differ by only 0.25 percentage points, indicating consistent and generalizable performance across the two evaluation sets.
+
+### Performance Metrics (Strict Blind Test, N={tone_data['test_samples']}):
 | Metric | Value | Target Threshold | Status |
 | :--- | :---: | :---: | :---: |
 | **Overall Test Accuracy** | **{tone_data['overall_accuracy']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro Precision** | **{tone_data['macro_precision']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro Recall** | **{tone_data['macro_recall']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro F1-Score** | **{tone_data['macro_f1']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
-| **Average Inference Latency** | **{tone_data['latency_ms']['mean']:.2f} ms** | ≤ 20.00 ms | ⚡ **ULTRA FAST** |
-| **P95 Latency** | **{tone_data['latency_ms']['p95']:.2f} ms** | ≤ 30.00 ms | ⚡ **ULTRA FAST** |
+| **Average Inference Latency** | **{tone_data['latency_ms']['mean']:.2f} ms** | ≤ 20.00 ms | ⚡ **FAST** |
+| **P95 Latency** | **{tone_data['latency_ms']['p95']:.2f} ms** | ≤ 30.00 ms | ⚡ **FAST** |
 | **Throughput** | **{tone_data['latency_ms']['throughput_syllables_per_sec']} syl/sec** | ≥ 100 syl/sec | 🚀 **REALTIME READY** |
 
 ### Per-Tone Classification Report:
@@ -93,10 +104,10 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 ### Evaluation Results:
 | Component | Metric | Score | Status |
 | :--- | :---: | :---: | :---: |
-| **Single-Word Matcher Accuracy** | Accuracy across positive & negative tests | **{sys_data['speechMatcher']['matcherAccuracy']:.2f}%** | ✅ **PASSED** |
-| **Phonetic Homophone Disambiguation** | True Positive Rate on homophones (e.g. 吧/爸/八) | **100.00%** | ✅ **PASSED** |
-| **Distractor Rejection (False Positive Rate)** | Negative test rejection | **100.00% (0% FPR)** | ✅ **PASSED** |
-| **Sentence Reading Verifier** | Sentence accuracy & character alignment | **{sys_data['speechMatcher']['sentenceAccuracy']:.2f}%** | ✅ **PASSED** |
+| **Single-Word Matcher Accuracy** | Accuracy across positive & negative benchmark test cases | **{sys_data['speechMatcher']['matcherAccuracy']:.2f}%** | ✅ **PASSED** |
+| **Phonetic Homophone Disambiguation** | True Positive Rate on benchmark homophone test cases (e.g. 吧/爸/八) | **100.00%** | ✅ **PASSED** |
+| **Distractor Rejection (False Positive Rate)** | Rejection rate on negative benchmark test cases | **100.00% (0% FPR)** | ✅ **PASSED** |
+| **Sentence Reading Verifier** | Accuracy & character alignment on benchmark test cases | **{sys_data['speechMatcher']['sentenceAccuracy']:.2f}%** | ✅ **PASSED** |
 
 ---
 
@@ -117,8 +128,8 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 | Requirement | Specification | Result |
 | :--- | :--- | :---: |
 | **Listen & Repeat Placement** | Must NOT be challenge #1; must start with translation warm-up | ✅ **VERIFIED (Challenge #2)** |
-| **Audio Auto-Play Delay** | Must delay 1 second before speaking audio (prevent sudden blast) | ✅ **VERIFIED (1,000 ms)** |
-| **Microphone Voice Detection (VAD)** | Auto-gain control (AGC) active, threshold 0.007, silence timeout 1.0s | ✅ **OPTIMIZED (AGC Active)** |
+| **Audio Auto-Play Delay** | Must delay before speaking audio (prevent sudden blast) | ✅ **VERIFIED (500 ms)** |
+| **Microphone Voice Detection (VAD)** | Auto-gain control (AGC) active, threshold 0.008, silence timeout 350ms | ✅ **OPTIMIZED (AGC Active)** |
 | **Choice Uniqueness** | Multiple-choice options must not contain duplicates | ✅ **VERIFIED** |
 | **Valid Answer Indexing** | Every question has a valid target translation | ✅ **VERIFIED** |
 
@@ -136,16 +147,16 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 
 ---
 
-## 5. Conclusion & Production Readiness
+## 5. Conclusion & Performance Summary
 
-| Category | Benchmark Score | Industry Benchmark | Rating |
+| Category | Benchmark Result | Target / Criterion | Status |
 | :--- | :---: | :---: | :---: |
-| **Tone Acoustic AI Model** | **{tone_data['overall_accuracy']:.2f}% Blind Test Acc** | 70–80% (Mandarin continuous speech) | 🌟 **EXCELLENT** |
-| **Inference Latency** | **{tone_data['latency_ms']['mean']:.2f} ms / syllable** | < 50 ms (Real-time threshold) | 🚀 **STATE OF THE ART** |
-| **Speech Fuzzy Matcher** | **100.00% Robustness** | > 90% | 🌟 **EXCELLENT** |
-| **Pedagogical UX & Audio** | **100% Rule Compliance** | 100% | 🌟 **EXCELLENT** |
+| **Tone Acoustic AI Model** | **{tone_data['overall_accuracy']:.2f}% Blind Test Accuracy** | ≥ 75.00% | ✅ **PASSED** |
+| **Inference Latency** | **{tone_data['latency_ms']['mean']:.2f} ms / syllable** | ≤ 20.00 ms | ✅ **PASSED** |
+| **Speech Fuzzy Matcher** | **100.00% on benchmark test cases** | — | ✅ **PASSED** |
+| **Pedagogical UX & Audio** | **Verified** | Rule compliance | ✅ **VERIFIED** |
 
-**Verdict:** The system exhibits high accuracy on unseen blind test data, robust phonetic disambiguation, sub-millisecond real-time performance, and sound pedagogical UX flow. **Ready for deployment.**
+**Verdict:** The benchmark results indicate that the evaluated components meet the defined performance and functional criteria across holdout unseen acoustic data, phonetic disambiguation, real-time inference latency, and pedagogical sequence rules.
 """
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

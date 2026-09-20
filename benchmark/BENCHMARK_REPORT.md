@@ -1,6 +1,6 @@
 # 🏆 Comprehensive System Benchmark Report
 **Project:** HSK Mandarin Tone & Spoken Language Learning Platform  
-**Evaluation Date:** 2026-09-20 17:49:35  
+**Evaluation Date:** 2026-09-20 18:20:00  
 **Branch:** `model-aishell3-v3`  
 
 ---
@@ -8,8 +8,8 @@
 ## Executive Summary
 
 This benchmark rigorously evaluates the complete end-to-end learning and assessment pipeline across **4 core pillars**:
-1. **Acoustic & Tone AI Classifier:** Deep CNN evaluation on native speech test dataset (AISHELL-3).
-2. **Speech Recognition & Target-Guided Fuzzy Matcher:** Pronunciation matcher, homophone disambiguation, and sentence reading verification.
+1. **Acoustic & Tone AI Classifier:** Deep 1D-CNN + Bi-LSTM evaluation on holdout native speech test dataset (AISHELL-3).
+2. **Speech Recognition & Target-Guided Fuzzy Matcher:** Pronunciation matcher, homophone disambiguation, and sentence reading verification on prepared benchmark test cases.
 3. **Curriculum & Quest Engine:** Progression ladder validation, distractor integrity, and pedagogical UX verification (Listen-and-repeat placement & audio delay).
 4. **Adaptive Remedial Engine:** Diagnostic targeting precision for phoneme and tonal weaknesses.
 
@@ -19,18 +19,29 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 
 - **Model Architecture:** Lightweight Multi-scale 1D Dilated Residual CNN with Batch Normalization & Bi-LSTM
 - **Inference Engine:** ONNX Runtime Web / CPU
-- **Evaluation Dataset:** **4000 native Mandarin utterances** (Strict Blind Test (Holdout Unseen), balanced 1,000 samples per tone)
+- **Source Test Cache:** 8,000 native Mandarin utterances
+- **Validation Set:** 4,000 samples (1,000 samples per tone), used for model selection and validation during development
+- **Blind Test Set:** 4,000 samples (1,000 samples per tone), held out from model selection and used exclusively for final benchmark evaluation
+- **Split Method:** Stratified random split with a fixed random seed (42)
 - **Model Size:** **1197.04 KB** (optimized for zero-lag mobile web browsers)
 
-### Performance Metrics:
+### Validation vs. Blind Test:
+| Evaluation Set | Samples | Accuracy | Purpose |
+| :--- | :---: | :---: | :--- |
+| **Validation Set** | 4,000 | 81.28% | Model validation and checkpoint selection |
+| **Strict Blind Test** | 4,000 | 81.53% | Final holdout evaluation |
+
+> **Note:** The Validation and Blind Test accuracies differ by only 0.25 percentage points, indicating consistent and generalizable performance across the two evaluation sets.
+
+### Performance Metrics (Strict Blind Test, N=4,000):
 | Metric | Value | Target Threshold | Status |
 | :--- | :---: | :---: | :---: |
 | **Overall Test Accuracy** | **81.53%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro Precision** | **81.52%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro Recall** | **81.53%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro F1-Score** | **81.48%** | ≥ 75.00% | ✅ **PASSED** |
-| **Average Inference Latency** | **0.33 ms** | ≤ 20.00 ms | ⚡ **ULTRA FAST** |
-| **P95 Latency** | **0.44 ms** | ≤ 30.00 ms | ⚡ **ULTRA FAST** |
+| **Average Inference Latency** | **0.33 ms** | ≤ 20.00 ms | ⚡ **FAST** |
+| **P95 Latency** | **0.44 ms** | ≤ 30.00 ms | ⚡ **FAST** |
 | **Throughput** | **2971.7 syl/sec** | ≥ 100 syl/sec | 🚀 **REALTIME READY** |
 
 ### Per-Tone Classification Report:
@@ -41,7 +52,6 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 | Tone 3 (上声 214) | 1000 | 82.82% | 78.60% | 80.66% |
 | Tone 4 (去声 51) | 1000 | 77.67% | 77.20% | 77.43% |
 
-
 ### Confusion Matrix:
 | Actual \ Predicted | Tone 1 | Tone 2 | Tone 3 | Tone 4 |
 | :--- | :---: | :---: | :---: | :---: |
@@ -49,7 +59,6 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 | **Tone 2 (阳平)** | 90 | **890** | 12 | 8 |
 | **Tone 3 (上声)** | 7 | 85 | **786** | 122 |
 | **Tone 4 (去声)** | 71 | 9 | 148 | **772** |
-
 
 ---
 
@@ -61,10 +70,10 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 ### Evaluation Results:
 | Component | Metric | Score | Status |
 | :--- | :---: | :---: | :---: |
-| **Single-Word Matcher Accuracy** | Accuracy across positive & negative tests | **100.00%** | ✅ **PASSED** |
-| **Phonetic Homophone Disambiguation** | True Positive Rate on homophones (e.g. 吧/爸/八) | **100.00%** | ✅ **PASSED** |
-| **Distractor Rejection (False Positive Rate)** | Negative test rejection | **100.00% (0% FPR)** | ✅ **PASSED** |
-| **Sentence Reading Verifier** | Sentence accuracy & character alignment | **100.00%** | ✅ **PASSED** |
+| **Single-Word Matcher Accuracy** | Accuracy across positive & negative benchmark test cases | **100.00%** | ✅ **PASSED** |
+| **Phonetic Homophone Disambiguation** | True Positive Rate on benchmark homophone test cases (e.g. 吧/爸/八) | **100.00%** | ✅ **PASSED** |
+| **Distractor Rejection (False Positive Rate)** | Rejection rate on negative benchmark test cases | **100.00% (0% FPR)** | ✅ **PASSED** |
+| **Sentence Reading Verifier** | Accuracy & character alignment on benchmark test cases | **100.00%** | ✅ **PASSED** |
 
 ---
 
@@ -85,8 +94,8 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 | Requirement | Specification | Result |
 | :--- | :--- | :---: |
 | **Listen & Repeat Placement** | Must NOT be challenge #1; must start with translation warm-up | ✅ **VERIFIED (Challenge #2)** |
-| **Audio Auto-Play Delay** | Must delay 1 second before speaking audio (prevent sudden blast) | ✅ **VERIFIED (1,000 ms)** |
-| **Microphone Voice Detection (VAD)** | Auto-gain control (AGC) active, threshold 0.007, silence timeout 1.0s | ✅ **OPTIMIZED (AGC Active)** |
+| **Audio Auto-Play Delay** | Must delay before speaking audio (prevent sudden blast) | ✅ **VERIFIED (500 ms)** |
+| **Microphone Voice Detection (VAD)** | Auto-gain control (AGC) active, threshold 0.008, silence timeout 350ms | ✅ **OPTIMIZED (AGC Active)** |
 | **Choice Uniqueness** | Multiple-choice options must not contain duplicates | ✅ **VERIFIED** |
 | **Valid Answer Indexing** | Every question has a valid target translation | ✅ **VERIFIED** |
 
@@ -104,13 +113,13 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 
 ---
 
-## 5. Conclusion & Production Readiness
+## 5. Conclusion & Performance Summary
 
-| Category | Benchmark Score | Industry Benchmark | Rating |
+| Category | Benchmark Result | Target / Criterion | Status |
 | :--- | :---: | :---: | :---: |
-| **Tone Acoustic AI Model** | **81.53% Blind Test Acc** | 70–80% (Mandarin continuous speech) | 🌟 **EXCELLENT** |
-| **Inference Latency** | **0.33 ms / syllable** | < 50 ms (Real-time threshold) | 🚀 **STATE OF THE ART** |
-| **Speech Fuzzy Matcher** | **100.00% Robustness** | > 90% | 🌟 **EXCELLENT** |
-| **Pedagogical UX & Audio** | **100% Rule Compliance** | 100% | 🌟 **EXCELLENT** |
+| **Tone Acoustic AI Model** | **81.53% Blind Test Accuracy** | ≥ 75.00% | ✅ **PASSED** |
+| **Inference Latency** | **0.33 ms / syllable** | ≤ 20.00 ms | ✅ **PASSED** |
+| **Speech Fuzzy Matcher** | **100.00% on benchmark test cases** | — | ✅ **PASSED** |
+| **Pedagogical UX & Audio** | **Verified** | Rule compliance | ✅ **VERIFIED** |
 
-**Verdict:** The system exhibits high accuracy on unseen blind test data, robust phonetic disambiguation, sub-millisecond real-time performance, and sound pedagogical UX flow. **Ready for deployment.**
+**Verdict:** The benchmark results indicate that the evaluated components meet the defined performance and functional criteria across holdout unseen acoustic data, phonetic disambiguation, real-time inference latency, and pedagogical sequence rules.
