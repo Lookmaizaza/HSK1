@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-09-20T10:27:18.515Z",
+  "speechMatcher": {
+    "matcherAccuracy": 100,
+    "sentenceAccuracy": 100,
+    "totalTests": 35,
+    "categories": {
+      "exact": {
+        "total": 5,
+        "passed": 5
+      },
+      "homophone": {
+        "total": 10,
+        "passed": 10
+      },
+      "digit": {
+        "total": 1,
+        "passed": 1
+      },
+      "pinyin": {
+        "total": 1,
+        "passed": 1
+      },
+      "substring": {
+        "total": 2,
+        "passed": 2
+      },
+      "multi_alt": {
+        "total": 1,
+        "passed": 1
+      },
+      "negative": {
+        "total": 10,
+        "passed": 10
+      }
+    }
+  },
+  "curriculum": {
+    "totalVocab": 1000,
+    "hsk1Count": 300,
+    "hsk2Count": 200,
+    "hsk3Count": 500,
+    "totalStages": 126,
+    "naturalSentencesCount": 179,
+    "listenSpeakNotFirst": true,
+    "audioDelayEnforced": true
+  },
+  "remedialEngine": {
+    "remedialAccuracy": 100,
+    "testedProfiles": 4
+  }
+}
