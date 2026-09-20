@@ -128,6 +128,7 @@ def run_tone_benchmark(
     results = {
         "model_path": model_path,
         "model_size_kb": round(total_size_kb, 2),
+        "test_set_type": test_type_desc,
         "test_samples": num_samples,
         "overall_accuracy": round(overall_accuracy, 2),
         "macro_precision": round(macro_precision, 2),

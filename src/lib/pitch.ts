@@ -787,11 +787,12 @@ export class RealtimePitchTracker {
 		if (typeof window === 'undefined') return false;
 
 		try {
-			if (this.audioContext && this.audioContext.state === 'suspended') {
-				await this.audioContext.resume();
-			} else if (!this.audioContext) {
+			if (!this.audioContext || this.audioContext.state === 'closed') {
 				const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
 				this.audioContext = new AudioContextCtor();
+			}
+			if (this.audioContext.state === 'suspended') {
+				await this.audioContext.resume();
 			}
 
 			this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -801,6 +802,10 @@ export class RealtimePitchTracker {
 					autoGainControl: true
 				}
 			});
+
+			if (this.audioContext.state === 'suspended') {
+				await this.audioContext.resume();
+			}
 
 			this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 			this.analyserNode = this.audioContext.createAnalyser();

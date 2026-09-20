@@ -1,6 +1,7 @@
 {
   "model_path": "static/models/mandarin_tone_cnn.onnx",
   "model_size_kb": 1197.04,
+  "test_set_type": "Strict Blind Test (Holdout Unseen)",
   "test_samples": 4000,
   "overall_accuracy": 81.53,
   "macro_precision": 81.52,
@@ -75,10 +76,10 @@
     ]
   ],
   "latency_ms": {
-    "mean": 0.345,
-    "p50": 0.321,
-    "p95": 0.49,
-    "p99": 0.735,
-    "throughput_syllables_per_sec": 2855.7
+    "mean": 0.332,
+    "p50": 0.316,
+    "p95": 0.439,
+    "p99": 0.756,
+    "throughput_syllables_per_sec": 2971.7
   }
 }
