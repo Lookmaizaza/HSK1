@@ -117,7 +117,7 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 | Requirement | Specification | Result |
 | :--- | :--- | :---: |
 | **Listen & Repeat Placement** | Must NOT be challenge #1; must start with translation warm-up | ✅ **VERIFIED (Challenge #2)** |
-| **Audio Auto-Play Delay** | Must delay 1–2 seconds before speaking audio (prevent sudden blast) | ✅ **VERIFIED (1,500 ms)** |
+| **Audio Auto-Play Delay** | Must delay 1 second before speaking audio (prevent sudden blast) | ✅ **VERIFIED (1,000 ms)** |
 | **Choice Uniqueness** | Multiple-choice options must not contain duplicates | ✅ **VERIFIED** |
 | **Valid Answer Indexing** | Every question has a valid target translation | ✅ **VERIFIED** |
 

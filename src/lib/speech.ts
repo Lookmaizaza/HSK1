@@ -157,11 +157,17 @@ export async function speak(text: string, rate = 0.9): Promise<void> {
 	if (!clean) return;
 
 	const now = Date.now();
-	if (clean === lastSpoken && now - lastSpokenAt < 1500) return;
+	if (clean === lastSpoken && now - lastSpokenAt < 300) return;
 	lastSpoken = clean;
 	lastSpokenAt = now;
 
-	window.speechSynthesis.cancel();
+	try {
+		window.speechSynthesis.cancel();
+		if (window.speechSynthesis.paused) {
+			window.speechSynthesis.resume();
+		}
+	} catch {}
+
 	const utter = new SpeechSynthesisUtterance(clean);
 	utter.lang = 'zh-CN';
 	utter.rate = rate;

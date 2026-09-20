@@ -91,11 +91,11 @@
 		showHint = false; // Reset hint for new challenge
 		const challengeToPlay = target ?? currentChallenge;
 		if (challengeToPlay?.type === 'listen_speak') {
-			// รอประมาณ 1.5 วินาที (1-2 วิ) ก่อนเริ่มเล่นเสียง
+			// รอ 1 วินาที (1000 ms) ก่อนเริ่มเล่นเสียง
 			audioDelayTimer = setTimeout(() => {
 				playAudio();
 				audioDelayTimer = null;
-			}, 1500);
+			}, 1000);
 		}
 	}
 
@@ -136,6 +136,11 @@
 
 	async function startRecording() {
 		clearAudioTimer();
+		if (typeof window !== 'undefined' && window.speechSynthesis) {
+			try {
+				window.speechSynthesis.cancel();
+			} catch {}
+		}
 		feedbackType = 'none';
 		feedbackMessage = '';
 		sentenceCheckResult = null;
@@ -188,14 +193,14 @@
 
 		tracker.onPitchUpdate = (point, all) => {
 			// Require real human voice characteristics: pitch in vocal range, clarity, and volume
-			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.30 && point.volume > 0.010) {
+			if (point.f0 >= 65 && point.f0 <= 550 && point.clarity > 0.18 && point.volume > 0.005) {
 				hasVoicedSpeech = true;
 			}
 			if (hasVoicedSpeech && all.length >= 12) {
 				const recent = all.slice(-8);
-				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
+				const isSilent = recent.every((p) => p.volume < 0.007 || p.f0 <= 0 || p.clarity < 0.20);
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 450);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 1000);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;
@@ -244,11 +249,11 @@
 
 			// 1. Voice Activity Check: Count actual voiced frames within human vocal frequency
 			const voicedFrames = recorded.filter(
-				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.30 && p.volume > 0.010
+				(p) => p.f0 >= 65 && p.f0 <= 550 && p.clarity > 0.18 && p.volume > 0.005
 			);
 			const maxVolume = Math.max(...recorded.map((p) => p.volume || 0), 0);
 			// Human voice detected: Has vocal frequency frames and peak volume distinct from room silence
-			const isRealHumanVoice = (hasVoicedSpeech || voicedFrames.length >= 4) && (voicedFrames.length >= 4 && maxVolume >= 0.015);
+			const isRealHumanVoice = (hasVoicedSpeech || voicedFrames.length >= 2) && (voicedFrames.length >= 2 && maxVolume >= 0.007);
 
 			// If no speech was recognized AND no significant voiced speech frames detected:
 			if (candidatePool.length === 0 && !isRealHumanVoice) {

@@ -797,8 +797,8 @@ export class RealtimePitchTracker {
 			this.mediaStream = await navigator.mediaDevices.getUserMedia({
 				audio: {
 					echoCancellation: true,
-					noiseSuppression: false,
-					autoGainControl: false
+					noiseSuppression: true,
+					autoGainControl: true
 				}
 			});
 

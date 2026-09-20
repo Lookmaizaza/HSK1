@@ -75,10 +75,10 @@
     ]
   ],
   "latency_ms": {
-    "mean": 0.303,
-    "p50": 0.309,
-    "p95": 0.358,
-    "p99": 0.439,
-    "throughput_syllables_per_sec": 3258.4
+    "mean": 0.345,
+    "p50": 0.321,
+    "p95": 0.49,
+    "p99": 0.735,
+    "throughput_syllables_per_sec": 2855.7
   }
 }

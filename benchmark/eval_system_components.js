@@ -336,8 +336,8 @@ function benchmarkCurriculum() {
 
 	// Check audio delay setting in +page.svelte
 	const questPageContent = fs.readFileSync(path.join(ROOT, 'src/routes/quest/[stage]/+page.svelte'), 'utf-8');
-	const hasAudioDelay = questPageContent.includes('setTimeout') && questPageContent.includes('1500');
-	console.log(`   - Audio playback delayed by 1-2s (1500ms): ${hasAudioDelay ? '✅ PASS (Configured to 1500ms)' : '❌ FAIL'}`);
+	const hasAudioDelay = questPageContent.includes('setTimeout') && (questPageContent.includes('1000') || questPageContent.includes('1500'));
+	console.log(`   - Audio playback delayed by 1s (1000ms): ${hasAudioDelay ? '✅ PASS (Configured to 1000ms)' : '❌ FAIL'}`);
 
 	return {
 		totalVocab,

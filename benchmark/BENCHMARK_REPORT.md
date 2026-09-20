@@ -1,6 +1,6 @@
 # 🏆 Comprehensive System Benchmark Report
 **Project:** HSK Mandarin Tone & Spoken Language Learning Platform  
-**Evaluation Date:** 2026-09-20 17:36:43  
+**Evaluation Date:** 2026-09-20 17:47:09  
 **Branch:** `model-aishell3-v3`  
 
 ---
@@ -29,9 +29,9 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 | **Macro Precision** | **81.52%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro Recall** | **81.53%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro F1-Score** | **81.48%** | ≥ 75.00% | ✅ **PASSED** |
-| **Average Inference Latency** | **0.30 ms** | ≤ 20.00 ms | ⚡ **ULTRA FAST** |
-| **P95 Latency** | **0.36 ms** | ≤ 30.00 ms | ⚡ **ULTRA FAST** |
-| **Throughput** | **3258.4 syl/sec** | ≥ 100 syl/sec | 🚀 **REALTIME READY** |
+| **Average Inference Latency** | **0.34 ms** | ≤ 20.00 ms | ⚡ **ULTRA FAST** |
+| **P95 Latency** | **0.49 ms** | ≤ 30.00 ms | ⚡ **ULTRA FAST** |
+| **Throughput** | **2855.7 syl/sec** | ≥ 100 syl/sec | 🚀 **REALTIME READY** |
 
 ### Per-Tone Classification Report:
 | Tone Category | Test Samples | Precision | Recall | F1-Score |
@@ -85,7 +85,7 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 | Requirement | Specification | Result |
 | :--- | :--- | :---: |
 | **Listen & Repeat Placement** | Must NOT be challenge #1; must start with translation warm-up | ✅ **VERIFIED (Challenge #2)** |
-| **Audio Auto-Play Delay** | Must delay 1–2 seconds before speaking audio (prevent sudden blast) | ✅ **VERIFIED (1,500 ms)** |
+| **Audio Auto-Play Delay** | Must delay 1 second before speaking audio (prevent sudden blast) | ✅ **VERIFIED (1,000 ms)** |
 | **Choice Uniqueness** | Multiple-choice options must not contain duplicates | ✅ **VERIFIED** |
 | **Valid Answer Indexing** | Every question has a valid target translation | ✅ **VERIFIED** |
 

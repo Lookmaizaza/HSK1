@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T17:36:43.807895",
+  "generated_at": "2026-09-20T17:47:09.574055",
   "tone_model": {
     "model_path": "static/models/mandarin_tone_cnn.onnx",
     "model_size_kb": 1197.04,
@@ -77,15 +77,15 @@
       ]
     ],
     "latency_ms": {
-      "mean": 0.303,
-      "p50": 0.309,
-      "p95": 0.358,
-      "p99": 0.439,
-      "throughput_syllables_per_sec": 3258.4
+      "mean": 0.345,
+      "p50": 0.321,
+      "p95": 0.49,
+      "p99": 0.735,
+      "throughput_syllables_per_sec": 2855.7
     }
   },
   "system_components": {
-    "timestamp": "2026-09-20T10:36:43.791Z",
+    "timestamp": "2026-09-20T10:47:09.563Z",
     "speechMatcher": {
       "matcherAccuracy": 100,
       "sentenceAccuracy": 100,
