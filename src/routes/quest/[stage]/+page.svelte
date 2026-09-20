@@ -9,7 +9,8 @@
 	import { 
 		RealtimePitchTracker, 
 		analyzeMultiSyllableToneContour, 
-		type PitchPoint 
+		type PitchPoint,
+		TONE_PROFILES
 	} from '$lib/pitch';
 	import { predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
 	import { Heart, Mic, CheckCircle2, AlertCircle, Sparkles, X, Volume2, ArrowRight } from '@lucide/svelte';
@@ -33,6 +34,7 @@
 	let tracker: RealtimePitchTracker | null = null;
 	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
 	let audioDelayTimer: ReturnType<typeof setTimeout> | null = null;
+	let maxRecordTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	function clearAudioTimer() {
 		if (audioDelayTimer) {
@@ -91,11 +93,11 @@
 		showHint = false; // Reset hint for new challenge
 		const challengeToPlay = target ?? currentChallenge;
 		if (challengeToPlay?.type === 'listen_speak') {
-			// รอประมาณ 1.5 วินาที (1-2 วิ) ก่อนเริ่มเล่นเสียง
+			// รอ 0.5 วินาที (500 ms) ก่อนเริ่มเล่นเสียง
 			audioDelayTimer = setTimeout(() => {
 				playAudio();
 				audioDelayTimer = null;
-			}, 1500);
+			}, 500);
 		}
 	}
 
@@ -104,6 +106,7 @@
 		if (stageData && currentIndex < stageData.challenges.length - 1) {
 			currentIndex++;
 			feedbackType = 'none';
+			feedbackMessage = '';
 			sentenceCheckResult = null;
 			playAudioIfListenSpeak(stageData.challenges[currentIndex]);
 		} else {
@@ -136,6 +139,11 @@
 
 	async function startRecording() {
 		clearAudioTimer();
+		if (typeof window !== 'undefined' && window.speechSynthesis) {
+			try {
+				window.speechSynthesis.cancel();
+			} catch {}
+		}
 		feedbackType = 'none';
 		feedbackMessage = '';
 		sentenceCheckResult = null;
@@ -187,15 +195,14 @@
 		}
 
 		tracker.onPitchUpdate = (point, all) => {
-			// Require real human voice characteristics: pitch in vocal range, clarity, and volume
-			if (point.f0 >= 70 && point.f0 <= 500 && point.clarity > 0.30 && point.volume > 0.010) {
+			if (point.f0 >= 65 && point.f0 <= 550 && point.clarity > 0.18 && point.volume > 0.005) {
 				hasVoicedSpeech = true;
 			}
-			if (hasVoicedSpeech && all.length >= 12) {
-				const recent = all.slice(-8);
-				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
+			if (hasVoicedSpeech && all.length >= 8) {
+				const recent = all.slice(-6);
+				const isSilent = recent.every((p) => p.volume < 0.008 || p.f0 <= 0 || p.clarity < 0.20);
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 450);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 350);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;
@@ -204,11 +211,24 @@
 		};
 
 		const ok = await tracker.start();
-		if (ok) isRecording = true;
+		if (ok) {
+			isRecording = true;
+			if (maxRecordTimeout) clearTimeout(maxRecordTimeout);
+			maxRecordTimeout = setTimeout(() => {
+				if (isRecording) stopRecording();
+			}, 3500);
+		}
 	}
 
 	async function stopRecording() {
-		if (silenceTimeout) clearTimeout(silenceTimeout);
+		if (silenceTimeout) {
+			clearTimeout(silenceTimeout);
+			silenceTimeout = null;
+		}
+		if (maxRecordTimeout) {
+			clearTimeout(maxRecordTimeout);
+			maxRecordTimeout = null;
+		}
 		if (!tracker || !isRecording) return;
 
 		const currentRec = speechRecognizer;
@@ -217,219 +237,205 @@
 				currentRec.stop();
 			} catch {}
 		}
-
-		// Allow Web Speech API to finalize and deliver transcript if speech was voiced
-		if (hasVoicedSpeech && speechCandidates.length === 0) {
-			await new Promise<void>((resolve) => {
-				const timer = setTimeout(resolve, 800);
-				if (currentRec) {
-					currentRec.onend = () => {
-						clearTimeout(timer);
-						setTimeout(resolve, 60);
-					};
-				}
-			});
-		}
 		speechRecognizer = null;
 
 		const recorded = tracker.stop();
 		isRecording = false;
 
-		if (recorded.length > 0 && currentChallenge) {
-			const candidatePool = [
-				recognizedWord,
-				speechTranscript,
-				...speechCandidates
-			].filter((c) => Boolean(c && c.trim()));
+		try {
+			if (recorded.length > 0 && currentChallenge) {
+				const candidatePool = [
+					recognizedWord,
+					speechTranscript,
+					...speechCandidates
+				].filter((c) => Boolean(c && c.trim()));
 
-			// 1. Voice Activity Check: Count actual voiced frames within human vocal frequency
-			const voicedFrames = recorded.filter(
-				(p) => p.f0 >= 70 && p.f0 <= 500 && p.clarity > 0.30 && p.volume > 0.010
-			);
-			const maxVolume = Math.max(...recorded.map((p) => p.volume || 0), 0);
-			// Human voice detected: Has vocal frequency frames and peak volume distinct from room silence
-			const isRealHumanVoice = (hasVoicedSpeech || voicedFrames.length >= 4) && (voicedFrames.length >= 4 && maxVolume >= 0.015);
+				// 1. Voice Activity Check
+				const voicedFrames = recorded.filter(
+					(p) => p.f0 >= 65 && p.f0 <= 550 && p.clarity > 0.18 && p.volume > 0.005
+				);
+				const maxVolume = Math.max(...recorded.map((p) => p.volume || 0), 0);
+				const isRealHumanVoice = (hasVoicedSpeech || voicedFrames.length >= 2) && (voicedFrames.length >= 2 || maxVolume >= 0.007);
 
-			// If no speech was recognized AND no significant voiced speech frames detected:
-			if (candidatePool.length === 0 && !isRealHumanVoice) {
-				feedbackType = 'error';
-				feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
-				setTimeout(() => {
-					feedbackType = 'none';
-				}, 1800);
-				return;
-			}
-
-			// 2. Sentence reading challenge: verify every single word in the sentence
-			if (currentChallenge.type === 'sentence_build') {
-				if (candidatePool.length === 0) {
+				if (candidatePool.length === 0 && !isRealHumanVoice && recorded.length < 5) {
 					feedbackType = 'error';
-					feedbackMessage = 'ไม่พบเสียงพูด กรุณาอ่านประโยคให้ชัดเจน';
+					feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
 					setTimeout(() => {
-						feedbackType = 'none';
-					}, 1800);
+						if (feedbackType === 'error') feedbackType = 'none';
+					}, 1500);
 					return;
 				}
 
-				const targetSentence = currentChallenge.sentenceHanzi || '';
-				const sentenceRes = verifySentenceReading(targetSentence, candidatePool);
-				sentenceCheckResult = sentenceRes;
-
-				if (sentenceRes.isAllCorrect) {
-					feedbackType = 'success';
-					feedbackMessage = sentenceRes.feedback;
-					setTimeout(nextChallenge, 1800);
-				} else {
-					feedbackType = 'error';
-					feedbackMessage = sentenceRes.feedback;
-					progress.loseHeart();
-					if (!checkGameOver()) {
+				// 2. Sentence reading challenge
+				if (currentChallenge.type === 'sentence_build') {
+					if (candidatePool.length === 0) {
+						feedbackType = 'error';
+						feedbackMessage = 'ไม่พบเสียงพูด กรุณาอ่านประโยคให้ชัดเจน';
 						setTimeout(() => {
-							feedbackType = 'none';
-						}, 2500);
+							if (feedbackType === 'error') feedbackType = 'none';
+						}, 1500);
+						return;
 					}
+
+					const targetSentence = currentChallenge.sentenceHanzi || '';
+					const sentenceRes = verifySentenceReading(targetSentence, candidatePool);
+					sentenceCheckResult = sentenceRes;
+
+					if (sentenceRes.isAllCorrect) {
+						feedbackType = 'success';
+						feedbackMessage = sentenceRes.feedback;
+						setTimeout(nextChallenge, 800);
+					} else {
+						feedbackType = 'error';
+						feedbackMessage = sentenceRes.feedback;
+						progress.loseHeart();
+						if (!checkGameOver()) {
+							setTimeout(() => {
+								if (feedbackType === 'error') feedbackType = 'none';
+							}, 2000);
+						}
+					}
+					return;
 				}
-				return;
-			}
 
-			// 3. Single word vocabulary challenge (speak or listen_speak)
-			let syllables = currentChallenge.word.syllables || [{
-				hanzi: currentChallenge.word.hanzi,
-				pinyin: currentChallenge.word.pinyin,
-				baseTone: currentChallenge.word.tone,
-				surfaceTone: currentChallenge.word.tone
-			}];
-
-			const res = await analyzeMultiSyllableToneContour(
-				recorded,
-				syllables,
-				predictToneNeuralNetwork
-			);
-			
-			const targetHanzi = currentChallenge.word.hanzi;
-			const targetPinyin = currentChallenge.word.pinyin;
-			const matchRes = matchChineseWord(targetHanzi || '', candidatePool, targetPinyin);
-			let isWordCorrect = matchRes.isMatch;
-			let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
-
-			// Single-syllable acoustic fallback (when ASR drops or delays short single syllable, but user spoke with real human voice):
-			const isSingleSyllable = (targetHanzi || '').length <= 1 || syllables.length <= 1;
-			if (!isWordCorrect && candidatePool.length === 0 && isRealHumanVoice && isSingleSyllable) {
-				// Tone 5 (neutral tone like 吧, 吗, 呢) has no fixed pitch; any voiced syllable is correct.
-				// For tones 1-4, accept if pitch contour matches or overall score is reasonable (>= 48)
-				if (currentChallenge.word.tone === 5 || res.isAllMatch || res.overallScore >= 48) {
-					isWordCorrect = true;
-					finalHeard = targetHanzi;
-				}
-			}
-
-			// Guard: If no word recognized and not validated:
-			if (candidatePool.length === 0 && !isWordCorrect) {
-				feedbackType = 'error';
-				if (isRealHumanVoice && res.syllableResults?.[0]) {
-					const detectedTone = res.syllableResults[0].detectedTone;
-					const targetTone = currentChallenge.word.tone;
-					feedbackMessage = `วรรณยุกต์ยังไม่ตรง (พบเสียง ${detectedTone} แต่คำนี้เสียง ${targetTone === 5 ? 'เบา' : targetTone}) ลองใหม่`;
-				} else {
-					feedbackMessage = 'ยังไม่พบเสียงคำศัพท์ กรุณาออกเสียงให้ชัดเจน';
-				}
-				progress.loseHeart();
-				if (!checkGameOver()) {
-					setTimeout(() => {
-						feedbackType = 'none';
-					}, 2200);
-				}
-				return;
-			}
-
-			// Dispatch research telemetry to /api/v1/telemetry/score-ingest
-			const finalScore = isWordCorrect ? Math.max(res.overallScore, 75) : Math.min(res.overallScore, 50);
-			const telemetryPayload = {
-				eventType: 'pronunciation_evaluation',
-				timestamp: new Date().toISOString(),
-				word: {
-					id: currentChallenge.word.hanzi,
+				// 3. Single word vocabulary challenge (listen_speak or speak)
+				let syllables = currentChallenge.word.syllables || [{
 					hanzi: currentChallenge.word.hanzi,
 					pinyin: currentChallenge.word.pinyin,
-					meaning: currentChallenge.word.thai || currentChallenge.word.english || '',
-					expectedTone: currentChallenge.word.tone
-				},
-				behavior: {
-					listenedToExample: currentChallenge.type === 'listen_speak' || showHint,
-					listenCount: currentChallenge.type === 'listen_speak' ? 1 : 0,
-					listenTimestamps: []
-				},
-				assessment: {
-					isPassed: isWordCorrect,
-					overallScore: finalScore,
-					rawScore: res.overallScore,
-					isToneMatch: res.overallScore >= 55,
-					isWordMatch: isWordCorrect,
-					recognizedWord: finalHeard || undefined,
-					speechCandidates: [...candidatePool],
-					syllableResults: (res.syllableResults || []).map((s) => ({
-						syllableIndex: s.syllableIndex,
-						hanzi: s.hanzi,
-						pinyin: s.pinyin,
-						targetTone: s.targetTone,
-						detectedTone: s.detectedTone,
-						isMatch: s.isMatch,
-						score: s.score,
-						feedback: s.feedback,
-						isAIModel: s.isAIModel
-					})),
-					acoustics: {
-						avgF0: res.avgF0 || 0,
-						totalDurationMs: res.totalDurationMs || 0
-					},
-					overallFeedback: isWordCorrect ? 'ออกเสียงถูกต้อง' : `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}")`
+					baseTone: currentChallenge.word.tone,
+					surfaceTone: currentChallenge.word.tone
+				}];
+
+				// Pitch analysis: check pitch contour syllable by syllable
+				const res = await analyzeMultiSyllableToneContour(
+					recorded,
+					syllables,
+					predictToneNeuralNetwork
+				);
+
+				// ASR analysis: check spoken words & candidates
+				const targetHanzi = currentChallenge.word.hanzi;
+				const targetPinyin = currentChallenge.word.pinyin;
+				const matchRes = matchChineseWord(targetHanzi || '', candidatePool, targetPinyin);
+				let isWordCorrect = matchRes.isMatch;
+				let finalHeard = matchRes.isMatch ? targetHanzi : (matchRes.bestMatch || recognizedWord || speechTranscript);
+
+				// Acoustic fallback for single syllable
+				const isSingleSyllable = (targetHanzi || '').length <= 1 || syllables.length <= 1;
+				if (!isWordCorrect && candidatePool.length === 0 && isRealHumanVoice && isSingleSyllable) {
+					if (currentChallenge.word.tone === 5 || res.isAllMatch || res.overallScore >= 45) {
+						isWordCorrect = true;
+						finalHeard = targetHanzi;
+					}
 				}
-			};
 
-			fetch('/api/v1/telemetry/score-ingest', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(telemetryPayload)
-			}).catch(() => {});
+				// Check whether syllables and tones match the target
+				const isAllTonesMatch = res.isAllMatch;
+				const isToneReasonable = res.isAllMatch || res.overallScore >= 55;
+				const isPassed = isWordCorrect && isToneReasonable;
+				const finalScore = isPassed ? Math.max(res.overallScore, 75) : Math.min(res.overallScore, 50);
 
-			// User MUST have pronounced the target word correctly to pass
-			if (isWordCorrect) {
-				const isToneGood = res.overallScore >= 55;
-				feedbackType = 'success';
-				feedbackMessage = isToneGood 
-					? 'ยอดเยี่ยม! เสียงและวรรณยุกต์เป๊ะมาก' 
-					: 'ดีมาก! ออกเสียงถูก (ปรับวรรณยุกต์อีกนิดจะเพอร์เฟกต์)';
-				setTimeout(nextChallenge, 1500);
-			} else {
-				fetch('/api/mistakes', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
+				// Research telemetry
+				const telemetryPayload = {
+					eventType: 'pronunciation_evaluation',
+					timestamp: new Date().toISOString(),
+					word: {
+						id: currentChallenge.word.hanzi,
 						hanzi: currentChallenge.word.hanzi,
 						pinyin: currentChallenge.word.pinyin,
 						meaning: currentChallenge.word.thai || currentChallenge.word.english || '',
-						expectedTone: currentChallenge.word.tone,
-						heardText: finalHeard || '',
-						score: finalScore,
-						feedback: `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}")`
-					})
+						expectedTone: currentChallenge.word.tone
+					},
+					behavior: {
+						listenedToExample: currentChallenge.type === 'listen_speak' || showHint,
+						listenCount: currentChallenge.type === 'listen_speak' ? 1 : 0,
+						listenTimestamps: []
+					},
+					assessment: {
+						isPassed,
+						overallScore: finalScore,
+						rawScore: res.overallScore,
+						isToneMatch: isToneReasonable,
+						isWordMatch: isWordCorrect,
+						recognizedWord: finalHeard || undefined,
+						speechCandidates: [...candidatePool],
+						syllableResults: (res.syllableResults || []).map((s) => ({
+							syllableIndex: s.syllableIndex,
+							hanzi: s.hanzi,
+							pinyin: s.pinyin,
+							targetTone: s.targetTone,
+							detectedTone: s.detectedTone,
+							isMatch: s.isMatch,
+							score: s.score,
+							feedback: s.feedback,
+							isAIModel: s.isAIModel
+						})),
+						acoustics: {
+							avgF0: res.avgF0 || 0,
+							totalDurationMs: res.totalDurationMs || 0
+						}
+					}
+				};
+
+				fetch('/api/v1/telemetry/score-ingest', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(telemetryPayload)
 				}).catch(() => {});
 
-				feedbackType = 'error';
-				feedbackMessage = `ยังไม่ตรง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
-				progress.loseHeart();
-				if (!checkGameOver()) {
-					setTimeout(() => {
-						feedbackType = 'none';
-					}, 2000);
+				if (isPassed) {
+					feedbackType = 'success';
+					feedbackMessage = isAllTonesMatch
+						? 'ยอดเยี่ยม! เสียงและวรรณยุกต์ถูกต้อง'
+						: `ดีมาก! ออกเสียงคำว่า "${targetHanzi}" ถูกต้อง`;
+					setTimeout(nextChallenge, 750);
+				} else {
+					feedbackType = 'error';
+					if (isWordCorrect && !isToneReasonable) {
+						if (syllables.length === 1) {
+							const detectedTone = res.syllableResults?.[0]?.detectedTone || 1;
+							const targetTone = syllables[0]?.surfaceTone || currentChallenge.word.tone;
+							feedbackMessage = `วรรณยุกต์ยังไม่ตรง (พบเสียง ${detectedTone} แต่คำนี้เสียง ${targetTone}) ลองใหม่`;
+						} else {
+							feedbackMessage = 'วรรณยุกต์ยังไม่ตรง ลองใหม่อีกครั้ง';
+						}
+					} else {
+						feedbackMessage = `ยังไม่ถูกต้อง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
+					}
+
+					fetch('/api/mistakes', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							hanzi: currentChallenge.word.hanzi,
+							pinyin: currentChallenge.word.pinyin,
+							meaning: currentChallenge.word.thai || currentChallenge.word.english || '',
+							expectedTone: currentChallenge.word.tone,
+							heardText: finalHeard || '',
+							score: finalScore,
+							feedback: feedbackMessage,
+							category: stageData?.category || 'quest'
+						})
+					}).catch(() => {});
+
+					progress.loseHeart();
+					if (!checkGameOver()) {
+						setTimeout(() => {
+							if (feedbackType === 'error') feedbackType = 'none';
+						}, 1800);
+					}
 				}
+			} else {
+				feedbackType = 'error';
+				feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
+				setTimeout(() => {
+					if (feedbackType === 'error') feedbackType = 'none';
+				}, 1500);
 			}
-		} else {
+		} catch (err) {
+			console.error('Error during pronunciation evaluation:', err);
 			feedbackType = 'error';
-			feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
-			setTimeout(() => {
-				feedbackType = 'none';
-			}, 1500);
+			feedbackMessage = 'เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง';
 		}
 	}
 
