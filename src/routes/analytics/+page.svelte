@@ -149,40 +149,94 @@
 <AppHeader showBack backHref="/" />
 
 <main class="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
-	<!-- 1. COMPACT HEADER WITH FAST ACTIONS -->
-	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b">
-		<div class="space-y-1">
-			<div class="flex items-center gap-2">
-				<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20 shadow-xs">
-					<Sparkles class="size-3.5" />
-					HSK 1 · 2 · 3
-				</span>
-				<span class="text-xs text-muted-foreground font-semibold">
-					{vocabOverview.totalWords.toLocaleString()} คำศัพท์
-				</span>
-			</div>
-			<h1 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-				แดชบอร์ดการออกเสียง
-			</h1>
-		</div>
+	<!-- 1. ANALYTICS HERO -->
+	<section class="relative isolate overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-sm sm:p-7">
+		<div class="pointer-events-none absolute inset-y-0 right-0 -z-10 w-1/3 bg-gradient-to-l from-amber-400/10 to-transparent"></div>
 
-		<div class="flex items-center gap-2">
-			<a
-				href="/"
-				class="inline-flex items-center gap-1.5 rounded-xl border bg-card hover:bg-muted text-foreground px-4 py-2.5 text-xs font-bold transition shadow-xs active:scale-95"
-			>
-				<Gamepad2 class="size-3.5" />
-				<span>ด่านเควสต์</span>
-			</a>
-			<a
-				href="/pitch"
-				class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-emerald-600/20 transition active:scale-95"
-			>
-				<Mic class="size-3.5" />
-				<span>ห้องฝึกพูดสด</span>
-			</a>
+		<div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)] lg:gap-10">
+			<div class="flex min-w-0 flex-col justify-between gap-8">
+				<div class="space-y-4">
+					<div class="flex flex-wrap items-center gap-2">
+						<span class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-primary">
+							<Sparkles class="size-3.5" />
+							Learning analytics
+						</span>
+						<span class="text-xs font-semibold text-muted-foreground">
+							HSK 1 · 2 · 3&nbsp; / &nbsp;{vocabOverview.totalWords.toLocaleString()} คำศัพท์
+						</span>
+					</div>
+					<div class="max-w-xl space-y-2">
+						<h1 class="text-3xl font-black leading-tight tracking-tight text-foreground sm:text-4xl">
+							แดชบอร์ดการออกเสียง
+						</h1>
+						<p class="max-w-lg text-sm leading-relaxed text-muted-foreground sm:text-base">
+							เห็นจังหวะการฝึก จุดแข็ง และเสียงที่ควรโฟกัสต่อได้ในภาพเดียว
+						</p>
+					</div>
+				</div>
+
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+					<div class="flex items-center gap-3">
+						<div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground text-background shadow-sm">
+							<Activity class="size-5" />
+						</div>
+						<div>
+							<div class="text-xs font-semibold text-muted-foreground">ระดับที่กำลังดู</div>
+							<div class="text-sm font-black text-foreground">{activeLevelTitle}</div>
+						</div>
+					</div>
+					<div class="flex flex-wrap items-center gap-2">
+						<span class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+							<Flame class="size-3.5" />
+							{totalPracticedWords} คำที่ฝึกแล้ว
+						</span>
+						<span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+							<TrendingUp class="size-3.5" />
+							{overallScore !== null ? `${overallScore}% accuracy` : 'กำลังเก็บข้อมูล'}
+						</span>
+					</div>
+				</div>
+			</div>
+
+			<div class="border-t border-primary/15 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+				<div class="flex items-start justify-between gap-4">
+					<div>
+						<div class="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Your snapshot</div>
+						<div class="mt-1 flex items-end gap-2">
+							<span class="font-mono text-4xl font-black tracking-tight text-foreground">{overallScore !== null ? `${overallScore}%` : '—'}</span>
+							<span class="pb-1 text-xs font-bold text-muted-foreground">overall accuracy</span>
+						</div>
+					</div>
+					<Award class="mt-1 size-6 text-amber-500" />
+				</div>
+
+				<div class="mt-6 space-y-2">
+					<div class="flex items-center justify-between text-xs font-semibold">
+						<span class="text-muted-foreground">Progress to unlock</span>
+						<span class="text-foreground">{unlockProgressPercent}%</span>
+					</div>
+					<div class="h-2 overflow-hidden rounded-full bg-muted">
+						<div class="h-full rounded-full bg-gradient-to-r from-primary to-amber-400 transition-all duration-700" style="width: {unlockProgressPercent}%"></div>
+					</div>
+					<div class="flex items-center justify-between text-[11px] text-muted-foreground">
+						<span>{totalPracticedWords} คำที่ฝึกแล้ว</span>
+						<span>เป้าหมาย {MIN_DIAGNOSTIC_WORDS} คำ</span>
+					</div>
+				</div>
+
+				<div class="mt-6 flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+					<a href="/" class="inline-flex items-center justify-center gap-1.5 rounded-xl border bg-card/80 px-3.5 py-2.5 text-xs font-bold text-foreground shadow-xs transition hover:bg-muted active:scale-95">
+						<Gamepad2 class="size-3.5" />
+						<span>ด่านเควสต์</span>
+					</a>
+					<a href="/pitch" class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-700 active:scale-95">
+						<Mic class="size-3.5" />
+						<span>เริ่มฝึกต่อ</span>
+					</a>
+				</div>
+			</div>
 		</div>
-	</div>
+	</section>
 
 	<!-- 2. HSK LEVEL SELECTOR TABS (HSK 1, HSK 2, HSK 3 & ทุกระดับ) -->
 	<section class="space-y-2">
