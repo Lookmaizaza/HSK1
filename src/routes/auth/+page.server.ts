@@ -49,19 +49,54 @@ async function mergeLocalProgress(userId: number, raw: string | null) {
 	} catch {
 		return;
 	}
-	if (parsed.completed) {
-		for (const [key, stars] of Object.entries(parsed.completed)) {
-			await completeLesson(userId, key, Number(stars) || 0);
+
+	// Security: Validate lesson completions format, clamp stars to 1-3, and limit to max 15 guest lessons
+	if (parsed.completed && typeof parsed.completed === 'object') {
+		const entries = Object.entries(parsed.completed).slice(0, 15);
+		for (const [key, stars] of entries) {
+			const clampedStars = Math.max(1, Math.min(3, Math.floor(Number(stars) || 0)));
+			if (typeof key === 'string' && /^[a-zA-Z0-9_\-\/]{2,60}$/.test(key)) {
+				await completeLesson(userId, key, clampedStars);
+			}
 		}
 	}
+
+	// Security: Cap client-submitted guest XP to a safe maximum (200 XP) to prevent arbitrary score inflation
 	if (typeof parsed.xp === 'number' && parsed.xp > 0) {
+		const safeXp = Math.min(200, Math.floor(parsed.xp));
 		const cur = await getProgress(userId);
-		if (parsed.xp > cur.xp) await addXp(userId, parsed.xp - cur.xp);
+		if (safeXp > cur.xp) {
+			await addXp(userId, safeXp - cur.xp);
+		}
 	}
 }
 
+// Security: In-memory sliding rate limiter to prevent brute-force attacks and registration spam
+const attemptStore = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxAttempts = 5, windowMs = 60_000): { allowed: boolean; waitSec: number } {
+	const now = Date.now();
+	const entry = attemptStore.get(key);
+	if (!entry || now > entry.resetAt) {
+		attemptStore.set(key, { count: 1, resetAt: now + windowMs });
+		return { allowed: true, waitSec: 0 };
+	}
+	if (entry.count >= maxAttempts) {
+		const waitSec = Math.ceil((entry.resetAt - now) / 1000);
+		return { allowed: false, waitSec };
+	}
+	entry.count++;
+	return { allowed: true, waitSec: 0 };
+}
+
 export const actions: Actions = {
-	register: async ({ request, cookies }) => {
+	register: async ({ request, cookies, getClientAddress }) => {
+		const clientIp = getClientAddress ? getClientAddress() : 'unknown';
+		const { allowed, waitSec } = checkRateLimit(`reg_${clientIp}`, 5, 120_000);
+		if (!allowed) {
+			return fail(429, { error: `คุณสร้างบัญชีถี่เกินไป กรุณารออีก ${waitSec} วินาทีแล้วลองใหม่` });
+		}
+
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
@@ -90,16 +125,30 @@ export const actions: Actions = {
 		throw redirect(303, '/');
 	},
 
-	login: async ({ request, cookies }) => {
+	login: async ({ request, cookies, getClientAddress }) => {
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
+
+		const clientIp = getClientAddress ? getClientAddress() : 'unknown';
+		const rateKey = `login_${clientIp}_${username.toLowerCase()}`;
+		const { allowed, waitSec } = checkRateLimit(rateKey, 6, 60_000);
+		if (!allowed) {
+			return fail(429, {
+				error: `เข้าสู่ระบบผิดพลาดหลายครั้ง กรุณารออีก ${waitSec} วินาทีเพื่อความปลอดภัย`,
+				username
+			});
+		}
 
 		try {
 			const row = await findUserByUsername(username);
 			if (!row || !verifyPassword(password, row.password_hash)) {
 				return fail(400, { error: 'Invalid username or password', username });
 			}
+
+			// Clear rate limit on successful authentication
+			attemptStore.delete(rateKey);
+
 			await mergeLocalProgress(row.id, local);
 			const session = await createSession(row.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);

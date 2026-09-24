@@ -30,6 +30,11 @@ from .db import (
     get_user_events,
     get_user_diagnostic_analytics,
 )
+from .analytics_engine import (
+    compute_tone_confusion_matrix,
+    compute_cohort_mastery,
+    determine_mastery_level,
+)
 
 load_dotenv()
 
@@ -51,8 +56,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Configuration
-origins = os.getenv("CORS_ORIGINS", "*").split(",")
+# CORS Configuration: W3C compliant - do not pair wildcard '*' with allow_credentials=True
+raw_origins = os.getenv("CORS_ORIGINS", "").strip()
+if raw_origins and raw_origins != "*":
+    origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+else:
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -231,4 +246,45 @@ async def list_events(user_id: str, limit: int = 50):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch learning events: {str(e)}",
+        )
+
+
+# -------------------------------------------------------------
+# 5. Cohort Analytics & Tone Confusion Matrix Endpoints (Slide 13 & 16)
+# -------------------------------------------------------------
+@app.get("/api/v1/analytics/cohort", tags=["Cohort Analytics"])
+async def get_cohort_analytics():
+    """
+    Computes cohort/group-level analytics for researchers and educators (NECTEC Slide 13 & 16):
+    - Class average accuracy
+    - Class Tone Confusion Matrix
+    - Knowledge Tracing 4-level distribution across learners
+    """
+    try:
+        mock_cohort_data = compute_cohort_mastery({})
+        return {
+            "service": "NECTEC Cohort Learning Analytics Engine",
+            "framework": "Knowledge Tracing 4-Level & Tone Confusion Matrix",
+            "data": mock_cohort_data
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compute cohort analytics: {str(e)}"
+        )
+
+
+@app.post("/api/v1/analytics/confusion-matrix", tags=["Diagnostic Analytics"])
+async def calculate_confusion_matrix(evaluations: List[Dict[str, Any]]):
+    """
+    Calculates a 4x4 Tone Confusion Matrix from raw evaluation records
+    using Scikit-learn and Pandas (NECTEC Slide 16).
+    """
+    try:
+        cm_data = compute_tone_confusion_matrix(evaluations)
+        return cm_data
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to calculate confusion matrix: {str(e)}"
         )

@@ -44,6 +44,7 @@ export const POST = async ({ locals, request, url, getClientAddress }: RequestEv
 		body.behavior_telemetry && body.scores && (body.pinyin || body.word_id)
 	);
 
+<<<<<<< Updated upstream
 	function extractCanonicalWord(rawWord: any, rawWordId?: any): string {
 		if (rawWord?.hanzi) return String(rawWord.hanzi).trim();
 		const idStr = String(rawWordId || rawWord?.id || rawWord || '').trim();
@@ -54,6 +55,45 @@ export const POST = async ({ locals, request, url, getClientAddress }: RequestEv
 			} catch {
 				return parts[parts.length - 1];
 			}
+=======
+	// Security: If logged in, bind strictly to authenticated session user ID.
+	// If unauthenticated, assign a guest identifier to prevent spoofing registered students' IDs.
+	const userId = locals.user?.id ? String(locals.user.id) : 'usr_uuid_guest';
+	const username = locals.user?.username || (locals.user ? `Learner_${locals.user.id}` : 'Guest_Learner');
+
+	const telemetry: PronunciationAssessmentTelemetry = {
+		eventType: 'pronunciation_evaluation',
+		timestamp: body.timestamp || new Date().toISOString(),
+		userId,
+		username,
+		word: {
+			id: body.word.id || body.word.hanzi,
+			hanzi: body.word.hanzi,
+			pinyin: body.word.pinyin,
+			meaning: body.word.meaning,
+			expectedTone: body.word.expectedTone,
+			tonePattern: body.word.tonePattern
+		},
+		behavior: {
+			listenedToExample: Boolean(body.behavior.listenedToExample),
+			listenCount: Number(body.behavior.listenCount) || 0,
+			listenTimestamps: Array.isArray(body.behavior.listenTimestamps) ? body.behavior.listenTimestamps : []
+		},
+		assessment: {
+			isPassed: Boolean(body.assessment.isPassed),
+			overallScore: Number(body.assessment.overallScore) || 0,
+			rawScore: Number(body.assessment.rawScore) || Number(body.assessment.overallScore) || 0,
+			isToneMatch: Boolean(body.assessment.isToneMatch),
+			isWordMatch: Boolean(body.assessment.isWordMatch),
+			recognizedWord: body.assessment.recognizedWord,
+			speechCandidates: Array.isArray(body.assessment.speechCandidates) ? body.assessment.speechCandidates : [],
+			syllableResults: Array.isArray(body.assessment.syllableResults) ? body.assessment.syllableResults : [],
+			acoustics: {
+				avgF0: Number(body.assessment.acoustics?.avgF0) || 0,
+				totalDurationMs: Number(body.assessment.acoustics?.totalDurationMs) || 0
+			},
+			overallFeedback: body.assessment.overallFeedback
+>>>>>>> Stashed changes
 		}
 		return idStr || 'chi_001';
 	}

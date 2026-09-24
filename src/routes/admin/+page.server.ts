@@ -4,8 +4,19 @@ import {
 	listAllCompletions,
 	findUserByUsername,
 	verifyPassword,
+<<<<<<< Updated upstream
 	createSession
+=======
+	createSession,
+	getResearchExportStats,
+	getCohortDiagnosticAnalytics
+>>>>>>> Stashed changes
 } from '$lib/server/db';
+import {
+	getCurriculumDifficultyAnalytics,
+	listAllLearnersWithInsights,
+	seedLearningAnalyticsDemoData
+} from '$lib/server/learning-analytics';
 import { TRACKS, units } from '$lib/data/lessons';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -18,9 +29,31 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw error(403, `Account "${locals.user.username}" is not an admin.`);
 	}
 
+<<<<<<< Updated upstream
 	const [users, completions] = await Promise.all([
 		listAllUsersWithProgress(),
 		listAllCompletions()
+=======
+	let initialUsers = await listAllUsersWithProgress();
+	if (initialUsers.length <= 1) {
+		await seedLearningAnalyticsDemoData();
+	}
+
+	const [
+		users,
+		completions,
+		researchStats,
+		cohortAnalytics,
+		curriculumDifficulty,
+		detailedLearners
+	] = await Promise.all([
+		listAllUsersWithProgress(),
+		listAllCompletions(),
+		getResearchExportStats(),
+		getCohortDiagnosticAnalytics(),
+		getCurriculumDifficultyAnalytics(),
+		listAllLearnersWithInsights()
+>>>>>>> Stashed changes
 	]);
 
 	const trackTotals = Object.fromEntries(
@@ -77,6 +110,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		needsLogin: false as const,
 		stats,
+<<<<<<< Updated upstream
+=======
+		researchStats,
+		cohortAnalytics,
+		curriculumDifficulty,
+		detailedLearners,
+>>>>>>> Stashed changes
 		users: usersWithDetail,
 		tracks: TRACKS.map((t) => ({
 			id: t.id,
@@ -120,5 +160,13 @@ export const actions: Actions = {
 			expires: new Date(session.expiresAt)
 		});
 		throw redirect(303, '/admin');
+	},
+	seedDemoCohort: async ({ locals }) => {
+		if (!locals.user?.isAdmin) {
+			throw error(403, 'Admin only');
+		}
+		const res = await seedLearningAnalyticsDemoData();
+		return res;
 	}
 };
+

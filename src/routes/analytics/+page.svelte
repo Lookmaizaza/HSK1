@@ -45,6 +45,12 @@
 		Wind
 >>>>>>> Stashed changes
 	} from '@lucide/svelte';
+<<<<<<< Updated upstream
+=======
+	import { speak } from '$lib/speech';
+	import ToneConfusionMatrix from '$lib/components/ToneConfusionMatrix.svelte';
+	import LearnerMasteryModel from '$lib/components/LearnerMasteryModel.svelte';
+>>>>>>> Stashed changes
 
 	let { data } = $props();
 
@@ -466,6 +472,7 @@
 		</div>
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 		<!-- Error Rate Card -->
 		<div class="rounded-2xl border bg-card p-4 space-y-1 shadow-sm">
 			<div class="flex items-center justify-between text-xs text-muted-foreground font-medium">
@@ -479,16 +486,19 @@
 				{stats?.avgPer && stats.avgPer > 0.2 ? 'ยังมีความคลาดเคลื่อนของหน่วยเสียง' : 'อยู่ในเกณฑ์ยอดเยี่ยม'}
 =======
 		<div class="flex items-center gap-2">
+=======
+		<div class="flex flex-wrap items-center gap-2">
+>>>>>>> Stashed changes
 			<a
-				href="/"
-				class="inline-flex items-center gap-1.5 rounded-xl border bg-card hover:bg-muted text-foreground px-4 py-2.5 text-xs font-bold transition shadow-xs active:scale-95"
+				href="/sus"
+				class="inline-flex items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 px-3.5 py-2 text-xs font-bold transition shadow-xs active:scale-95"
 			>
-				<Gamepad2 class="size-3.5" />
-				<span>ด่านเควสต์</span>
+				<CheckCircle2 class="size-3.5" />
+				<span>ประเมินความพึงพอใจ</span>
 			</a>
 			<a
 				href="/pitch"
-				class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-emerald-600/20 transition active:scale-95"
+				class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-bold shadow-md shadow-emerald-600/20 transition active:scale-95"
 			>
 				<Mic class="size-3.5" />
 				<span>ห้องฝึกพูดสด</span>
@@ -1240,6 +1250,12 @@
 				</div>
 			</div>
 		</section>
+
+		<!-- 4.2.1 Knowledge Tracing 4-Level Learner Mastery Model (NECTEC Slide 16) -->
+		<LearnerMasteryModel {stats} />
+
+		<!-- 4.2.2 Tone Confusion Matrix 4x4 Heatmap (NECTEC Slide 16) -->
+		<ToneConfusionMatrix confusionData={stats?.toneConfusionMatrix} />
 
 		<!-- 4.3 VISUAL MOUTH & TONGUE POSITION GUIDE (DRIVEN BY REAL MISTAKE WORDS) -->
 		<section class="rounded-3xl border bg-card p-5 sm:p-6 space-y-4 shadow-sm">

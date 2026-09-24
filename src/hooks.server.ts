@@ -2,8 +2,11 @@ import type { Handle } from '@sveltejs/kit';
 import { findUserBySession } from '$lib/server/db';
 import { env } from '$env/dynamic/private';
 
+// Security: In production, require explicit ADMIN_USERNAMES from environment variables.
+// In local dev, allow the dedicated 'admin' account. Never allow arbitrary user accounts by default.
+const rawAdminConfig = env.ADMIN_USERNAMES ?? (import.meta.env.DEV ? 'admin' : '');
 const ADMIN_USERNAMES = new Set(
-	(env.ADMIN_USERNAMES ?? '')
+	rawAdminConfig
 		.split(',')
 		.map((s) => s.trim().toLowerCase())
 		.filter(Boolean)
