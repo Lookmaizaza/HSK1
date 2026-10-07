@@ -16,10 +16,11 @@ function escapeCsvField(val: any): string {
 
 export const GET: RequestHandler = async ({ locals, url }) => {
 	// Security check: Only authenticated administrators can export research datasets
-	if (!locals.user) {
+	const admin = locals.realAdmin || locals.user;
+	if (!admin) {
 		throw error(401, 'Unauthorized: กรุณาเข้าสู่ระบบในฐานะผู้ดูแลระบบก่อนดาวน์โหลดข้อมูล');
 	}
-	if (!locals.user.isAdmin) {
+	if (!admin.isAdmin) {
 		throw error(403, 'Forbidden: บัญชีของคุณไม่มีสิทธิ์ผู้ดูแลระบบ (Admin) ในการส่งออกข้อมูลวิจัย');
 	}
 

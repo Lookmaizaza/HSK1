@@ -8,11 +8,18 @@ import {
 	completeLesson,
 	addXp
 } from '$lib/server/db';
+import { checkLoginProtection, handleLoginFailure, handleLoginSuccess } from '$lib/server/rateLimit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ locals, url }) => {
+export const load: PageServerLoad = (event) => {
+	const { locals, url } = event;
 	if (locals.user) throw redirect(303, '/');
-	return { mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login' };
+	const protection = checkLoginProtection(event, '');
+	return {
+		mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login',
+		isBlocked: protection.isBlocked,
+		remainingSeconds: protection.remainingSeconds
+	};
 };
 
 function setSessionCookie(
@@ -61,10 +68,22 @@ async function mergeLocalProgress(userId: number, raw: string | null) {
 }
 
 export const actions: Actions = {
-	register: async ({ request, cookies }) => {
+	register: async (event) => {
+		const { request, cookies } = event;
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
+
+		// Brute-force check on IP
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `มีการพยายามเข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับคำขอชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+				username,
+				isBlocked: true,
+				remainingSeconds: protection.remainingSeconds
+			});
+		}
 
 		if (username.length < 2) return fail(400, { error: 'Username must be at least 2 characters', username });
 		if (password.length < 6) return fail(400, { error: 'Password must be at least 6 characters', username });
@@ -75,6 +94,7 @@ export const actions: Actions = {
 			}
 
 			const user = await createUser(username, password);
+			handleLoginSuccess(event, username);
 			await mergeLocalProgress(user.id, local);
 			const session = await createSession(user.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);
@@ -90,16 +110,44 @@ export const actions: Actions = {
 		throw redirect(303, '/');
 	},
 
-	login: async ({ request, cookies }) => {
+	login: async (event) => {
+		const { request, cookies } = event;
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
+		// 1. Check rate limit before performing DB queries or bcrypt check
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับการเข้าสู่ระบบชั่วคราวเป็นเวลา 2 นาทีเพื่อความปลอดภัย (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+				username,
+				isBlocked: true,
+				remainingSeconds: protection.remainingSeconds
+			});
+		}
+
 		try {
 			const row = await findUserByUsername(username);
 			if (!row || !verifyPassword(password, row.password_hash)) {
-				return fail(400, { error: 'Invalid username or password', username });
+				const failure = await handleLoginFailure(event, username);
+				if (failure.isBlocked) {
+					return fail(429, {
+						error: `กรอกรหัสผ่านผิดติดต่อกันครบ 5 ครั้ง บัญชี/IP นี้ถูกระงับชั่วคราว 2 นาทีเพื่อความปลอดภัย (กรุณารออีก ${failure.remainingSeconds} วินาที)`,
+						username,
+						isBlocked: true,
+						remainingSeconds: failure.remainingSeconds
+					});
+				}
+				return fail(400, {
+					error: `ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (เหลือโอกาสลองอีก ${failure.attemptsRemaining} ครั้ง ก่อนถูกระงับชั่วคราว 2 นาที)`,
+					username
+				});
 			}
+
+			// Clear rate limit tracking on success
+			handleLoginSuccess(event, username);
+
 			await mergeLocalProgress(row.id, local);
 			const session = await createSession(row.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);

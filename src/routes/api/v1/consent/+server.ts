@@ -11,6 +11,16 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
 export const POST: RequestHandler = async ({ request, getClientAddress, locals }) => {
 	try {
+		// Admin accounts are system operators, exempt from learner research PDPA consent
+		if (locals.user?.isAdmin || locals.user?.role === 'admin') {
+			return json({
+				status: 'exempt',
+				userId: String(locals.user.id),
+				role: 'admin',
+				message: 'Administrator accounts are exempt from student PDPA research consent recording.'
+			});
+		}
+
 		const body = await request.json();
 		const userId = body.user_id || (locals.user ? String(locals.user.id) : 'usr_uuid_local');
 		const consentType = body.consent_type || 'pdpa_research_telemetry';
