@@ -702,7 +702,7 @@ export async function recordPronunciationEvaluation(payload: {
 }
 
 export async function getPronunciationEvaluations(
-	userId: string | string[],
+	userId?: string | string[],
 	limit = 50
 ): Promise<Array<{
 	id: number;
@@ -722,18 +722,29 @@ export async function getPronunciationEvaluations(
 	const client = getDb();
 	if (!client) return [];
 	await init();
-	const userIds = Array.isArray(userId) ? userId : [userId];
-	if (userIds.length === 0) return [];
-	const placeholders = userIds.map(() => '?').join(',');
-	const result = await client.execute({
-		sql: `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
-		             gop_overall, per_overall, tone_score, phoneme_details, created_at
-		      FROM pronunciation_evaluations
-		      WHERE user_id IN (${placeholders})
-		      ORDER BY created_at DESC
-		      LIMIT ?`,
-		args: [...userIds.map(String), limit]
-	});
+
+	let sql = `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
+	                  gop_overall, per_overall, tone_score, phoneme_details, created_at
+	           FROM pronunciation_evaluations
+	           ORDER BY created_at DESC
+	           LIMIT ?`;
+	let args: any[] = [limit];
+
+	if (userId) {
+		const userIds = (Array.isArray(userId) ? userId : [userId]).filter(Boolean);
+		if (userIds.length > 0) {
+			const placeholders = userIds.map(() => '?').join(',');
+			sql = `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
+			              gop_overall, per_overall, tone_score, phoneme_details, created_at
+			       FROM pronunciation_evaluations
+			       WHERE user_id IN (${placeholders})
+			       ORDER BY created_at DESC
+			       LIMIT ?`;
+			args = [...userIds.map(String), limit];
+		}
+	}
+
+	const result = await client.execute({ sql, args });
 
 	return result.rows.map((r) => {
 		let phonemeDetails = [];
@@ -760,7 +771,7 @@ export async function getPronunciationEvaluations(
 	});
 }
 
-export async function getPronunciationPhonemeErrorStats(userId: string | string[]): Promise<{
+export async function getPronunciationPhonemeErrorStats(userId?: string | string[]): Promise<{
 	totalAttempts: number;
 	avgGop: number;
 	avgPer: number;
@@ -1868,113 +1879,268 @@ export async function getAdvancedLearningAnalytics() {
 	const client = getDb();
 	await init();
 
-	// 1. Drop-off Funnel Analysis
-	let bottleneckStages: any[] = [];
+	if (!client) {
+		return {
+			dropOffFunnel: {
+				totalViews: 0,
+				totalAttempts: 0,
+				totalPassed: 0,
+				totalFailed: 0,
+				overallDropOffRate: 0,
+				bottleneckStages: []
+			},
+			phonemeSubstitutionMatrix: {
+				targets: ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x'],
+				matrix: {},
+				minimalPairs: []
+			},
+			toneConfusionHeatmap: {
+				matrix: [],
+				tonePitchProfiles: [],
+				keyFinding: 'ยังไม่มีข้อมูลการประเมินเสียงในระบบ'
+			},
+			lq5ListeningImpact: {
+				withListening: { sampleCount: 0, avgGop: 0, avgPer: 0, toneAccuracy: 0, passRate: 0 },
+				withoutListening: { sampleCount: 0, avgGop: 0, avgPer: 0, toneAccuracy: 0, passRate: 0 },
+				deltaGop: 0,
+				deltaTone: 0,
+				pedagogicalTakeaway: 'ยังไม่มีข้อมูลการบันทึกกิจกรรมการฟังในระบบ'
+			},
+			mistakeRepetition: {
+				highFrictionWords: [],
+				spacedRepetitionFunnel: [],
+				averageRetryUntilMastery: 0,
+				masteryRecoveryRate: 0
+			}
+		};
+	}
+
+	// 1. Drop-off Funnel Analysis (Real Data from DB)
 	let totalViews = 0;
 	let totalAttempts = 0;
 	let totalPassed = 0;
 	let totalFailed = 0;
+	let bottleneckStages: any[] = [];
 
-	if (client) {
-		try {
-			const stageRes = await client.execute(`
-				SELECT 
-					stage_id,
-					COUNT(CASE WHEN event_type = 'view' THEN 1 END) as views,
-					COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as attempts,
-					COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as passed,
-					COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as failed
-				FROM stage_telemetry
-				GROUP BY stage_id
-				HAVING views > 0 OR attempts > 0
-			`);
+	try {
+		// Attempts and outcomes from real evaluations
+		const evalCounts = await client.execute(`
+			SELECT 
+				COUNT(*) as total_attempts,
+				COUNT(CASE WHEN gop_overall >= 70 THEN 1 END) as total_passed,
+				COUNT(CASE WHEN gop_overall < 70 THEN 1 END) as total_failed
+			FROM pronunciation_evaluations
+		`);
+		totalAttempts = Number(evalCounts.rows[0]?.total_attempts || 0);
+		totalPassed = Number(evalCounts.rows[0]?.total_passed || 0);
+		totalFailed = Number(evalCounts.rows[0]?.total_failed || 0);
 
-			for (const r of stageRes.rows) {
-				const v = Number(r.views || 0);
-				const a = Number(r.attempts || 0);
-				const p = Number(r.passed || 0);
-				const f = Number(r.failed || 0);
-				totalViews += v;
-				totalAttempts += a;
-				totalPassed += p;
-				totalFailed += f;
+		// Total views/interactions from learning events & stage telemetry
+		const eventCounts = await client.execute('SELECT COUNT(*) as total_events FROM learning_events');
+		const telCounts = await client.execute('SELECT COUNT(*) as total_tel FROM stage_telemetry');
+		totalViews = Math.max(
+			Number(eventCounts.rows[0]?.total_events || 0) + Number(telCounts.rows[0]?.total_tel || 0),
+			totalAttempts
+		);
 
-				const dropRate = a > 0 ? Math.round((f / a) * 100) : (v > 0 && p === 0 ? 100 : 0);
-				bottleneckStages.push({
-					stageId: String(r.stage_id),
-					views: v,
-					attempts: a,
-					passed: p,
-					failed: f,
-					dropRate,
-					advice: dropRate >= 40
-						? 'อัตราหลุดสูงผิดปกติ: แนะนำให้ลดจำนวนข้อต่อด่าน หรือเพิ่มแบบฝึกหัดคำใบ้/การฟังนำ'
-						: dropRate >= 20
-						? 'ระดับความยากปานกลาง: ผู้เรียนบางส่วนติดขัดเรื่องวรรณยุกต์'
-						: 'ความราบรื่นดี: ผู้เรียนส่วนใหญ่จบด่านได้ตามเกณฑ์'
-				});
-			}
+		// Stage-level breakdown from real stage_telemetry and lesson_completions
+		const stageRes = await client.execute(`
+			SELECT 
+				stage_id,
+				COUNT(CASE WHEN event_type = 'view' THEN 1 END) as views,
+				COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as attempts,
+				COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as passed,
+				COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as failed
+			FROM stage_telemetry
+			GROUP BY stage_id
+			HAVING views > 0 OR attempts > 0
+		`);
 
-			bottleneckStages.sort((a, b) => b.dropRate - a.dropRate);
-			bottleneckStages = bottleneckStages.slice(0, 5);
-		} catch (e) {
-			console.warn('Failed to calculate drop-off funnel:', e);
+		const stageMap = new Map<string, { views: number; attempts: number; passed: number; failed: number }>();
+		for (const r of stageRes.rows) {
+			stageMap.set(String(r.stage_id), {
+				views: Number(r.views || 0),
+				attempts: Number(r.attempts || 0),
+				passed: Number(r.passed || 0),
+				failed: Number(r.failed || 0)
+			});
 		}
+
+		// Also incorporate real completions from lesson_completions table
+		const compRes = await client.execute(`
+			SELECT lesson_key, COUNT(*) as cnt
+			FROM lesson_completions
+			GROUP BY lesson_key
+		`);
+		for (const r of compRes.rows) {
+			const stId = String(r.lesson_key);
+			const cnt = Number(r.cnt || 0);
+			const cur = stageMap.get(stId) || { views: cnt * 2, attempts: cnt, passed: cnt, failed: 0 };
+			cur.passed = Math.max(cur.passed, cnt);
+			cur.attempts = Math.max(cur.attempts, cur.passed);
+			cur.views = Math.max(cur.views, cur.attempts);
+			stageMap.set(stId, cur);
+		}
+
+		for (const [stageId, data] of stageMap.entries()) {
+			const dropRate = data.attempts > 0 ? Math.round((data.failed / data.attempts) * 100) : 0;
+			bottleneckStages.push({
+				stageId,
+				views: data.views,
+				attempts: data.attempts,
+				passed: data.passed,
+				failed: data.failed,
+				dropRate,
+				advice: dropRate >= 40
+					? 'อัตราหลุดสูง: มีผู้เรียนติดขัดในด่านนี้ แนะนำปรับลดคำศัพท์หรือเพิ่มแบบฝึกหัดเทียบเสียง'
+					: dropRate >= 20
+					? 'ระดับความยากปานกลาง: ผู้เรียนบางส่วนติดขัดเรื่องวรรณยุกต์'
+					: 'ความราบรื่นดี: ผู้เรียนส่วนใหญ่จบด่านได้ตามเกณฑ์'
+			});
+		}
+
+		bottleneckStages.sort((a, b) => b.dropRate - a.dropRate || b.attempts - a.attempts);
+		bottleneckStages = bottleneckStages.slice(0, 5);
+	} catch (e) {
+		console.warn('Failed to calculate drop-off funnel from DB:', e);
 	}
 
-	// Baseline synthetic fallbacks if telemetry is brand new
-	if (totalViews === 0) {
-		totalViews = 142;
-		totalAttempts = 118;
-		totalPassed = 86;
-		totalFailed = 32;
-		bottleneckStages = [
-			{ stageId: 'hsk1-stage-3', views: 24, attempts: 21, passed: 12, failed: 9, dropRate: 43, advice: 'อัตราหลุดสูง: คำศัพท์กลุ่ม zh/ch ปะปนกัน แนะนำเพิ่มการ์ดเทียบเสียง' },
-			{ stageId: 'hsk1-stage-7', views: 19, attempts: 17, passed: 11, failed: 6, dropRate: 35, advice: 'ความยากปานกลาง: เสียงวรรณยุกต์ที่ 3 (上声) มีอัตราสับสนสูง' },
-			{ stageId: 'hsk2-stage-2', views: 15, attempts: 13, passed: 9, failed: 4, dropRate: 31, advice: 'คำศัพท์ 8 คำยาวเกินไป ควรแยกเป็นย่อย 2 ด่าน' },
-			{ stageId: 'hsk1-stage-11', views: 14, attempts: 12, passed: 9, failed: 3, dropRate: 25, advice: 'แนะนำเปิดตัวอย่างเสียงอัตโนมัติก่อนเปิดไมค์' },
-			{ stageId: 'hsk1-stage-1', views: 32, attempts: 30, passed: 26, failed: 4, dropRate: 13, advice: 'ด่านแรกเริ่มต้นได้ดี มีอัตราสำเร็จสูง' }
-		];
-	}
+	const overallDropOffRate = totalAttempts > 0 ? Math.round((totalFailed / totalAttempts) * 100) : 0;
 
-	const overallDropOffRate = totalViews > 0 ? Math.round(((totalViews - totalPassed) / totalViews) * 100) : 28;
-
-	// 2. Phoneme Substitution Matrix (Focus on retroflex vs dental sibilants)
+	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB)
 	const phonemeTargets = ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x'];
 	const matrixData: Record<string, Record<string, number>> = {};
 	for (const t of phonemeTargets) {
 		matrixData[t] = {};
 		for (const r of phonemeTargets) {
-			matrixData[t][r] = t === r ? 82 : 0;
+			matrixData[t][r] = 0;
 		}
 	}
-	// Common confusion observations in Thai learners of Mandarin
-	matrixData['zh']['z'] = 34;
-	matrixData['ch']['c'] = 29;
-	matrixData['sh']['s'] = 38;
-	matrixData['j']['q'] = 14;
-	matrixData['q']['x'] = 22;
-	matrixData['x']['s'] = 18;
 
-	const minimalPairRecommendations = [
-		{ target: 'zh', confusedWith: 'z', targetWord: '这', confusedWord: '做', example: '这 (zhè) vs 做 (zuò)', tip: 'zh ต้องม้วนปลายลิ้นแตะเพดานแข็ง ส่วน z ให้ปลายลิ้นแตะหลังฟันบนราบ' },
-		{ target: 'ch', confusedWith: 'c', targetWord: '茶', confusedWord: '菜', example: '茶 (chá) vs 菜 (cài)', tip: 'ch ม้วนลิ้นและพ่นลมแรง ส่วน c ไม่ม้วนลิ้นแต่พ่นลมเสียดแทรก' },
-		{ target: 'sh', confusedWith: 's', targetWord: '是', confusedWord: '四', example: '是 (shì) vs 四 (sì)', tip: 'sh ปลายลิ้นยกขึ้นใกล้เพดานแข็ง ส่วน s ยิ้มกว้างปลายลิ้นแตะหลังฟัน' },
-		{ target: 'q', confusedWith: 'x', targetWord: '七', confusedWord: '西', example: '七 (qī) vs 西 (xī)', tip: 'q มีลมพุ่งออกมามากกว่า x อย่างชัดเจน' },
-		{ target: 'j', confusedWith: 'q', targetWord: '九', confusedWord: '秋', example: '九 (jiǔ) vs 秋 (qiū)', tip: 'j ไม่มีลม (Unaspirated) ส่วน q พ่นลมแรง (Aspirated)' }
+	const observedSubstitutionCounts: Record<string, number> = {};
+
+	try {
+		// 1) From phoneme_evaluations table
+		const peRes = await client.execute(`
+			SELECT target, recognized, COUNT(*) as cnt 
+			FROM phoneme_evaluations 
+			WHERE target IS NOT NULL AND recognized IS NOT NULL 
+			GROUP BY target, recognized
+		`);
+		for (const r of peRes.rows) {
+			const t = String(r.target);
+			const rec = String(r.recognized);
+			const cnt = Number(r.cnt);
+			if (matrixData[t] && matrixData[t][rec] !== undefined) {
+				matrixData[t][rec] += cnt;
+			}
+			if (t !== rec) {
+				observedSubstitutionCounts[`${t}->${rec}`] = (observedSubstitutionCounts[`${t}->${rec}`] || 0) + cnt;
+			}
+		}
+
+		// 2) From pronunciation_evaluations phoneme_details
+		const proRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		for (const r of proRes.rows) {
+			let details: any[] = [];
+			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
+			for (const d of details) {
+				const t = String(d.target || '');
+				const rec = String(d.recognized || '');
+				if (matrixData[t] && matrixData[t][rec] !== undefined) {
+					matrixData[t][rec]++;
+				}
+				if (t && rec && t !== rec) {
+					observedSubstitutionCounts[`${t}->${rec}`] = (observedSubstitutionCounts[`${t}->${rec}`] || 0) + 1;
+				}
+			}
+		}
+
+		// Calculate accuracy percentage on diagonal
+		for (const t of phonemeTargets) {
+			const correct = matrixData[t][t] || 0;
+			let totalForTarget = 0;
+			for (const r of phonemeTargets) {
+				totalForTarget += matrixData[t][r];
+			}
+			if (totalForTarget > 0) {
+				matrixData[t][t] = Math.round((correct / totalForTarget) * 100);
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to calculate phoneme substitution matrix from DB:', e);
+	}
+
+	// Minimal pair recommendations prioritized by real DB observations
+	const basePairs = [
+		{ target: 'ch', confusedWith: 'c', targetWord: '茶', confusedWord: '菜', example: '茶 (chá) vs 菜 (cài)', anatomy: 'ch ม้วนลิ้นและพ่นลมแรง ส่วน c ไม่ม้วนลิ้นแต่พ่นลมเสียดแทรก' },
+		{ target: 'sh', confusedWith: 's', targetWord: '是', confusedWord: '四', example: '是 (shì) vs 四 (sì)', anatomy: 'sh ปลายลิ้นยกขึ้นใกล้เพดานแข็ง ส่วน s ยิ้มกว้างปลายลิ้นแตะหลังฟัน' },
+		{ target: 'zh', confusedWith: 'z', targetWord: '这', confusedWord: '做', example: '这 (zhè) vs 做 (zuò)', anatomy: 'zh ต้องม้วนปลายลิ้นแตะเพดานแข็ง ส่วน z ให้ปลายลิ้นแตะหลังฟันบนราบ' },
+		{ target: 'q', confusedWith: 'x', targetWord: '七', confusedWord: '西', example: '七 (qī) vs 西 (xī)', anatomy: 'q มีลมพุ่งออกมามากกว่า x อย่างชัดเจน' },
+		{ target: 'j', confusedWith: 'q', targetWord: '九', confusedWord: '秋', example: '九 (jiǔ) vs 秋 (qiū)', anatomy: 'j ไม่มีลม (Unaspirated) ส่วน q พ่นลมแรง (Aspirated)' }
 	];
 
-	// 3. Tone Confusion Heatmap (4x4 matrix: Target Tone vs Recognized Tone)
-	const toneMatrix = [
-		// Target Tone 1 (55 - High Flat)
-		{ targetTone: 1, recognizedT1: 91, recognizedT2: 3, recognizedT3: 2, recognizedT4: 4, label: 'เสียงที่ 1 (阴平 55)' },
-		// Target Tone 2 (35 - Rising)
-		{ targetTone: 2, recognizedT1: 6, recognizedT2: 74, recognizedT3: 16, recognizedT4: 4, label: 'เสียงที่ 2 (阳平 35)' },
-		// Target Tone 3 (214 - Dipping)
-		{ targetTone: 3, recognizedT1: 3, recognizedT2: 24, recognizedT3: 65, recognizedT4: 8, label: 'เสียงที่ 3 (上声 214)' },
-		// Target Tone 4 (51 - Falling)
-		{ targetTone: 4, recognizedT1: 5, recognizedT2: 3, recognizedT3: 6, recognizedT4: 86, label: 'เสียงที่ 4 (去声 51)' }
-	];
+	const minimalPairRecommendations = basePairs.map((pair) => {
+		const observedCount = observedSubstitutionCounts[`${pair.target}->${pair.confusedWith}`] || 0;
+		return {
+			target: pair.target,
+			confusedWith: pair.confusedWith,
+			targetWord: pair.targetWord,
+			confusedWord: pair.confusedWord,
+			example: pair.example,
+			observedCount,
+			tip: observedCount > 0
+				? `พบการออกเสียงสับสนในฐานข้อมูลจริง ${observedCount} ครั้ง: ${pair.anatomy}`
+				: pair.anatomy
+		};
+	}).sort((a, b) => b.observedCount - a.observedCount);
+
+	// 3. Tone Confusion Heatmap (Real 4x4 matrix computed from DB)
+	const toneCounts: Record<number, Record<number, number> & { total: number }> = {
+		1: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 },
+		2: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 },
+		3: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 },
+		4: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 }
+	};
+
+	try {
+		const toneRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		for (const r of toneRes.rows) {
+			let details: any[] = [];
+			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
+			for (const d of details) {
+				const t = Number(d.targetTone);
+				const det = Number(d.detectedTone);
+				if (t >= 1 && t <= 4 && det >= 1 && det <= 4) {
+					toneCounts[t][det]++;
+					toneCounts[t].total++;
+				}
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to calculate tone confusion heatmap from DB:', e);
+	}
+
+	const toneLabels: Record<number, string> = {
+		1: 'เสียงที่ 1 (阴平 55)',
+		2: 'เสียงที่ 2 (阳平 35)',
+		3: 'เสียงที่ 3 (上声 214)',
+		4: 'เสียงที่ 4 (去声 51)'
+	};
+
+	const toneMatrix = [1, 2, 3, 4].map((t) => {
+		const row = toneCounts[t];
+		const tot = row.total || 1;
+		return {
+			targetTone: t,
+			recognizedT1: Math.round((row[1] / tot) * 100),
+			recognizedT2: Math.round((row[2] / tot) * 100),
+			recognizedT3: Math.round((row[3] / tot) * 100),
+			recognizedT4: Math.round((row[4] / tot) * 100),
+			sampleCount: row.total,
+			label: toneLabels[t]
+		};
+	});
 
 	const tonePitchProfiles = [
 		{ tone: 1, name: 'เสียงที่ 1 (阴平 55)', chao: '55', thai: 'เสียงสามัญระดับสูงคงที่', contour: 'สูง-ราบ (High Level)', audioWord: '妈', pinyin: 'mā' },
@@ -1983,69 +2149,177 @@ export async function getAdvancedLearningAnalytics() {
 		{ tone: 4, name: 'เสียงที่ 4 (去声 51)', chao: '51', thai: 'เสียงโท (ตกฮวบลงต่ำ)', contour: 'สูง-ทิ้งดิ่งลงล่าง (High-Falling)', audioWord: '骂', pinyin: 'mà' }
 	];
 
-	// 4. LQ5 Listening Friction Index (Comparing with vs without listening)
+	const totalToneEvaluated = Object.values(toneCounts).reduce((s, r) => s + r.total, 0);
+	const keyFinding = totalToneEvaluated > 0
+		? `จากการวิเคราะห์ ${totalToneEvaluated} พยางค์ในฐานข้อมูล: เสียงที่ 3 (214) มีอัตราสับสนเป็นเสียงที่ 2 ถึง ${toneMatrix[2].recognizedT2}% และเสียงที่ 4 มีการตัดเสียงเป็นเสียงที่ 3 ถึง ${toneMatrix[3].recognizedT3}%`
+		: 'ยังไม่มีข้อมูลการประเมินเสียงวรรณยุกต์ในระบบ';
+
+	// 4. LQ5 Listening Friction Index (Real Comparison from DB)
+	let withCount = 0, withGopSum = 0, withToneSum = 0, withPerSum = 0, withPassCount = 0;
+	let withoutCount = 0, withoutGopSum = 0, withoutToneSum = 0, withoutPerSum = 0, withoutPassCount = 0;
+
+	try {
+		const leUsers = await client.execute(`
+			SELECT DISTINCT user_id 
+			FROM learning_events 
+			WHERE event_type = 'listened_to_example'
+		`);
+		const listeningUserIds = new Set(leUsers.rows.map((r) => String(r.user_id)));
+
+		const proRes = await client.execute(`
+			SELECT user_id, gop_overall, per_overall, tone_score 
+			FROM pronunciation_evaluations
+		`);
+
+		for (const r of proRes.rows) {
+			const uid = String(r.user_id);
+			const gop = Number(r.gop_overall || 0);
+			const tone = Number(r.tone_score || 0);
+			const per = Number(r.per_overall || 0);
+			const isPassed = gop >= 70 ? 1 : 0;
+
+			if (listeningUserIds.has(uid)) {
+				withCount++;
+				withGopSum += gop;
+				withToneSum += tone;
+				withPerSum += per;
+				withPassCount += isPassed;
+			} else {
+				withoutCount++;
+				withoutGopSum += gop;
+				withoutToneSum += tone;
+				withoutPerSum += per;
+				withoutPassCount += isPassed;
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to calculate LQ5 listening friction index from DB:', e);
+	}
+
+	const withAvgGop = withCount > 0 ? Number((withGopSum / withCount).toFixed(1)) : 0;
+	const withAvgPer = withCount > 0 ? Number((withPerSum / withCount).toFixed(1)) : 0;
+	const withToneAccuracy = withCount > 0 ? Number((withToneSum / withCount).toFixed(1)) : 0;
+	const withPassRate = withCount > 0 ? Number(((withPassCount / withCount) * 100).toFixed(1)) : 0;
+
+	const withoutAvgGop = withoutCount > 0 ? Number((withoutGopSum / withoutCount).toFixed(1)) : 0;
+	const withoutAvgPer = withoutCount > 0 ? Number((withoutPerSum / withoutCount).toFixed(1)) : 0;
+	const withoutToneAccuracy = withoutCount > 0 ? Number((withoutToneSum / withoutCount).toFixed(1)) : 0;
+	const withoutPassRate = withoutCount > 0 ? Number(((withoutPassCount / withoutCount) * 100).toFixed(1)) : 0;
+
+	const deltaGop = Number((withAvgGop - withoutAvgGop).toFixed(1));
+	const deltaTone = Number((withToneAccuracy - withoutToneAccuracy).toFixed(1));
+
+	const totalEvalsCount = withCount + withoutCount;
+	const pedagogicalTakeaway = totalEvalsCount > 0
+		? `จากการเปรียบเทียบข้อมูลจริง ${totalEvalsCount} ครั้ง: ผู้เรียนที่กดฟังเสียงตัวอย่างก่อนพูด มีคะแนน GOP เฉลี่ยสูงกว่า ${deltaGop > 0 ? '+' + deltaGop : deltaGop}% (${withAvgGop} vs ${withoutAvgGop}) และความถูกต้องวรรณยุกต์ ${deltaTone > 0 ? '+' + deltaTone : deltaTone}%`
+		: 'ยังไม่มีข้อมูลการประเมินเสียงเพียงพอสำหรับการเปรียบเทียบ';
+
 	const lq5ListeningImpact = {
 		withListening: {
-			sampleCount: 184,
-			avgGop: 88.6,
-			avgPer: 7.8,
-			toneAccuracy: 89.2,
-			passRate: 91.5
+			sampleCount: withCount,
+			avgGop: withAvgGop,
+			avgPer: withAvgPer,
+			toneAccuracy: withToneAccuracy,
+			passRate: withPassRate
 		},
 		withoutListening: {
-			sampleCount: 96,
-			avgGop: 72.1,
-			avgPer: 18.4,
-			toneAccuracy: 66.8,
-			passRate: 68.2
+			sampleCount: withoutCount,
+			avgGop: withoutAvgGop,
+			avgPer: withoutAvgPer,
+			toneAccuracy: withoutToneAccuracy,
+			passRate: withoutPassRate
 		},
-		deltaGop: +16.5,
-		deltaTone: +22.4,
-		pedagogicalTakeaway: 'การกดฟังเสียงเจ้าของภาษาก่อนออกเสียง ช่วยเพิ่มคะแนน GOP ถึง +16.5% และลดการสับสนวรรณยุกต์ลงถึง 22.4% แนะนำให้เปิดเสียงตัวอย่างบังคับในด่านที่มีอัตราผ่านต่ำกว่า 70%'
+		deltaGop,
+		deltaTone,
+		pedagogicalTakeaway
 	};
 
-	// 5. Mistake Repetition Rate (Vocab that learners get stuck on repeatedly)
+	// 5. Mistake Repetition Rate (Real Data from DB)
 	let highFrictionWords: any[] = [];
-	if (client) {
-		try {
-			const mistRes = await client.execute(`
-				SELECT hanzi, pinyin, meaning, COUNT(*) as fail_count, COUNT(DISTINCT user_id) as affected_users
-				FROM user_mistakes
-				GROUP BY hanzi, pinyin, meaning
-				ORDER BY fail_count DESC
-				LIMIT 5
-			`);
-			for (const r of mistRes.rows) {
-				const fc = Number(r.fail_count);
-				highFrictionWords.push({
-					hanzi: String(r.hanzi),
-					pinyin: String(r.pinyin),
-					meaning: String(r.meaning),
-					failCount: fc,
-					affectedUsers: Number(r.affected_users),
-					recoveryRate: Math.max(50, Math.min(92, Math.round(100 - (fc * 3.2)))),
-					repetitionRisk: fc >= 5 ? 'วิกฤต (ต้องทบทวนด่วน)' : 'ปานกลาง'
-				});
+	let averageRetryUntilMastery = 0;
+	let masteryRecoveryRate = 0;
+	let spacedRepetitionFunnel: any[] = [];
+
+	try {
+		// Real high-friction vocabulary from user_mistakes
+		const mistRes = await client.execute(`
+			SELECT hanzi, pinyin, meaning, COUNT(*) as fail_count, COUNT(DISTINCT user_id) as affected_users
+			FROM user_mistakes
+			GROUP BY hanzi, pinyin, meaning
+			ORDER BY fail_count DESC
+			LIMIT 5
+		`);
+
+		for (const r of mistRes.rows) {
+			const fc = Number(r.fail_count);
+			highFrictionWords.push({
+				hanzi: String(r.hanzi),
+				pinyin: String(r.pinyin),
+				meaning: String(r.meaning),
+				failCount: fc,
+				affectedUsers: Number(r.affected_users),
+				recoveryRate: Math.max(30, Math.round(100 - (fc * 2.5))),
+				repetitionRisk: fc >= 10 ? 'วิกฤต (พบผิดมากกว่า 10 ครั้ง)' : 'ปานกลาง'
+			});
+		}
+
+		// Real retries and recovery from pronunciation evaluations
+		const multiRes = await client.execute(`
+			SELECT 
+				COUNT(*) as multi_count,
+				AVG(tries) as avg_tries,
+				COUNT(CASE WHEN max_gop >= 70 THEN 1 END) as recovered_count,
+				COUNT(CASE WHEN max_gop >= 85 THEN 1 END) as mastered_count
+			FROM (
+				SELECT user_id, word_id, COUNT(*) as tries, MAX(gop_overall) as max_gop
+				FROM pronunciation_evaluations
+				GROUP BY user_id, word_id
+				HAVING tries > 1
+			)
+		`);
+
+		const multiRow = multiRes.rows[0];
+		const multiCount = Number(multiRow?.multi_count || 0);
+		const recoveredCount = Number(multiRow?.recovered_count || 0);
+		const masteredCount = Number(multiRow?.mastered_count || 0);
+
+		if (multiCount > 0) {
+			averageRetryUntilMastery = Number(Number(multiRow?.avg_tries || 0).toFixed(1));
+			masteryRecoveryRate = Number(((recoveredCount / multiCount) * 100).toFixed(1));
+		}
+
+		const totalMistakesCountRes = await client.execute('SELECT COUNT(*) as total_cnt FROM user_mistakes');
+		const totalMistakesCount = Number(totalMistakesCountRes.rows[0]?.total_cnt || 0);
+
+		spacedRepetitionFunnel = [
+			{
+				stage: '1. ผิดพลาดครั้งแรก (First Encounter)',
+				rate: 0,
+				label: `${totalMistakesCount} รายการ`,
+				desc: 'คำศัพท์ที่ตรวจพบข้อผิดพลาดและถูกบันทึกเพื่อกำหนดรอบทบทวน'
+			},
+			{
+				stage: '2. มีประวัติฝึกซ้ำ (Practice Retries)',
+				rate: multiCount > 0 && totalMistakesCount > 0 ? Math.round((multiCount / totalMistakesCount) * 100) : 0,
+				label: `${multiCount} คำ (${multiCount > 0 && totalMistakesCount > 0 ? Math.round((multiCount / totalMistakesCount) * 100) : 0}%)`,
+				desc: `ผู้เรียนกลับมาฝึกซ้ำเฉลี่ย ${averageRetryUntilMastery} ครั้งต่อคำศัพท์`
+			},
+			{
+				stage: '3. บรรลุเกณฑ์ผ่าน (GOP ≥ 70)',
+				rate: masteryRecoveryRate,
+				label: `${masteryRecoveryRate}% แก้ตัวสำเร็จ`,
+				desc: `${recoveredCount} จาก ${multiCount} คำ สามารถออกเสียงผ่านเกณฑ์มาตรฐาน`
+			},
+			{
+				stage: '4. เชี่ยวชาญแม่นยำ (GOP ≥ 85)',
+				rate: multiCount > 0 ? Number(((masteredCount / multiCount) * 100).toFixed(1)) : 0,
+				label: `${multiCount > 0 ? Number(((masteredCount / multiCount) * 100).toFixed(1)) : 0}% แม่นยำสูง`,
+				desc: `${masteredCount} คำที่ผู้เรียนออกเสียงได้ระดับเจ้าของภาษา`
 			}
-		} catch {}
-	}
-
-	if (highFrictionWords.length === 0) {
-		highFrictionWords = [
-			{ hanzi: '去', pinyin: 'qù', meaning: 'ไป', failCount: 14, affectedUsers: 6, recoveryRate: 71.4, repetitionRisk: 'วิกฤต (เสียง ü หลัง q)' },
-			{ hanzi: '茶', pinyin: 'chá', meaning: 'ชา', failCount: 11, affectedUsers: 5, recoveryRate: 68.2, repetitionRisk: 'วิกฤต (เสียง ch + วรรณยุกต์ 2)' },
-			{ hanzi: '是', pinyin: 'shì', meaning: 'คือ/ใช่', failCount: 9, affectedUsers: 5, recoveryRate: 82.5, repetitionRisk: 'ปานกลาง (เสียง sh ลิ้นไม่ม้วน)' },
-			{ hanzi: '四', pinyin: 'sì', meaning: 'สี่', failCount: 8, affectedUsers: 4, recoveryRate: 78.9, repetitionRisk: 'ปานกลาง (สับสนกับ 是)' },
-			{ hanzi: '吃', pinyin: 'chī', meaning: 'กิน', failCount: 7, affectedUsers: 4, recoveryRate: 85.0, repetitionRisk: 'ปานกลาง (พ่นลมไม่พอ)' }
 		];
+	} catch (e) {
+		console.warn('Failed to calculate mistake repetition rate from DB:', e);
 	}
-
-	const spacedRepetitionFunnel = [
-		{ stage: '1. ผิดพลาดครั้งแรก (First Encounter)', rate: 0, label: '0% สำเร็จ', desc: 'ตรวจพบข้อผิดพลาดและถูกบันทึกเพื่อกำหนดรอบทบทวน' },
-		{ stage: '2. ทบทวนรอบที่ 1 (Spaced Review Cycle 1)', rate: 48.5, label: '48.5% แก้ตัวสำเร็จ', desc: 'วนกลับมาฝึกซ้ำใน 24 ชั่วโมง มีอัตราการพูดถูกเพิ่มขึ้น +48.5%' },
-		{ stage: '3. ทบทวนรอบที่ 2 (Spaced Review Cycle 2)', rate: 74.2, label: '74.2% เชี่ยวชาญ', desc: 'วนกลับมาในวันที่ 3 อัตราผ่านเกณฑ์เฉลี่ย 74.2% (Mastery Threshold)' },
-		{ stage: '4. คงทนถาวร (7-Day Retention Check)', rate: 89.5, label: '89.5% จดจำแม่นยำ', desc: 'ตรวจสอบซ้ำหลัง 7 วัน ผู้เรียน 89.5% ออกเสียงได้ถูกต้องถาวร' }
-	];
 
 	return {
 		dropOffFunnel: {
@@ -2064,14 +2338,14 @@ export async function getAdvancedLearningAnalytics() {
 		toneConfusionHeatmap: {
 			matrix: toneMatrix,
 			tonePitchProfiles,
-			keyFinding: 'คนไทยกว่า 24% ออกเสียงที่ 3 (214) ลอยขึ้นเร็วเกินไปจนเครื่องตรวจจับเป็นเสียงที่ 2 (35)'
+			keyFinding
 		},
 		lq5ListeningImpact,
 		mistakeRepetition: {
 			highFrictionWords,
 			spacedRepetitionFunnel,
-			averageRetryUntilMastery: 2.4,
-			masteryRecoveryRate: 74.2
+			averageRetryUntilMastery,
+			masteryRecoveryRate
 		}
 	};
 }

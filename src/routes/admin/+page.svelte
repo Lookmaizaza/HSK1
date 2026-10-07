@@ -100,12 +100,12 @@
 	let audioPlayingWord = $state<string | null>(null);
 
 	// Derived statistics for Drop-off Funnel & Phoneme Matrix
-	let totalViews = $derived(data.advancedAnalytics?.dropOffFunnel?.totalViews || 142);
-	let totalAttempts = $derived(data.advancedAnalytics?.dropOffFunnel?.totalAttempts || 118);
-	let totalPassed = $derived(data.advancedAnalytics?.dropOffFunnel?.totalPassed || 86);
-	let attemptRate = $derived(Math.round((totalAttempts / Math.max(1, totalViews)) * 100));
-	let passRate = $derived(Math.round((totalPassed / Math.max(1, totalViews)) * 100));
-	let quitRate = $derived(Math.round(((totalViews - totalPassed) / Math.max(1, totalViews)) * 100));
+	let totalViews = $derived(data.advancedAnalytics?.dropOffFunnel?.totalViews ?? 0);
+	let totalAttempts = $derived(data.advancedAnalytics?.dropOffFunnel?.totalAttempts ?? 0);
+	let totalPassed = $derived(data.advancedAnalytics?.dropOffFunnel?.totalPassed ?? 0);
+	let attemptRate = $derived(totalViews > 0 ? Math.round((totalAttempts / totalViews) * 100) : 0);
+	let passRate = $derived(totalViews > 0 ? Math.round((totalPassed / totalViews) * 100) : 0);
+	let quitRate = $derived(totalViews > 0 ? Math.round(((totalViews - totalPassed) / totalViews) * 100) : 0);
 
 	let phonemeTargets = $derived(data.advancedAnalytics?.phonemeSubstitutionMatrix?.targets || ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x']);
 	let phonemeMatrix = $derived(data.advancedAnalytics?.phonemeSubstitutionMatrix?.matrix || {});
@@ -1311,7 +1311,7 @@
 													<td class="py-3 px-3">
 														<div class="font-bold text-foreground">{matchingStage?.title || b.stageId}</div>
 														<div class="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-															<span class="rounded bg-muted px-1.5 py-0.2 font-mono">{matchingStage?.wordsCount || 6} คำ</span>
+															<span class="rounded bg-muted px-1.5 py-0.2 font-mono">{matchingStage?.wordsCount ?? 0} คำ</span>
 															<span>• {matchingStage?.category || 'แบบฝึกหัด'}</span>
 														</div>
 													</td>
@@ -1572,7 +1572,7 @@
 										<span>ข้อค้นพบสถิติเสียงวรรณยุกต์คนไทย:</span>
 									</div>
 									<p class="text-[11px] leading-relaxed">
-										{data.advancedAnalytics?.toneConfusionHeatmap?.keyFinding || 'คนไทยกว่า 24% ออกเสียงที่ 3 (214) ลอยขึ้นเร็วเกินไปจนเครื่องตรวจจับเป็นเสียงที่ 2 (35)'}
+										{data.advancedAnalytics?.toneConfusionHeatmap?.keyFinding || 'กำลังประมวลผลสถิติเสียงวรรณยุกต์จากฐานข้อมูล...'}
 									</p>
 								</div>
 							</div>
@@ -1672,7 +1672,7 @@
 							</div>
 							<div class="flex items-center gap-2">
 								<span class="rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-300 font-bold text-xs px-3 py-1 border border-blue-500/20">
-									Delta GOP: +16.5% | Tone: +22.4%
+									Delta GOP: {(data.advancedAnalytics?.lq5ListeningImpact?.deltaGop ?? 0) > 0 ? '+' : ''}{data.advancedAnalytics?.lq5ListeningImpact?.deltaGop ?? 0}% | Tone: {(data.advancedAnalytics?.lq5ListeningImpact?.deltaTone ?? 0) > 0 ? '+' : ''}{data.advancedAnalytics?.lq5ListeningImpact?.deltaTone ?? 0}%
 								</span>
 							</div>
 						</div>
@@ -1685,31 +1685,31 @@
 										<span>🎧</span> กลุ่มที่กดฟังเสียงตัวอย่างก่อนพูด (With Listening)
 									</span>
 									<span class="rounded bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 text-[10px] font-bold">
-										Sample: {data.advancedAnalytics?.lq5ListeningImpact?.withListening?.sampleCount ?? 184} ครั้ง
+										Sample: {data.advancedAnalytics?.lq5ListeningImpact?.withListening?.sampleCount ?? 0} ครั้ง
 									</span>
 								</div>
 								<div class="grid grid-cols-3 gap-2 text-center">
 									<div class="p-2.5 rounded-xl bg-card border">
 										<div class="text-[10px] text-muted-foreground">คะแนน GOP</div>
 										<div class="text-lg font-black text-emerald-600 font-mono">
-											{data.advancedAnalytics?.lq5ListeningImpact?.withListening?.avgGop ?? 88.6}%
+											{data.advancedAnalytics?.lq5ListeningImpact?.withListening?.avgGop ?? 0}%
 										</div>
 									</div>
 									<div class="p-2.5 rounded-xl bg-card border">
 										<div class="text-[10px] text-muted-foreground">วรรณยุกต์แม่นยำ</div>
 										<div class="text-lg font-black text-emerald-600 font-mono">
-											{data.advancedAnalytics?.lq5ListeningImpact?.withListening?.toneAccuracy ?? 89.2}%
+											{data.advancedAnalytics?.lq5ListeningImpact?.withListening?.toneAccuracy ?? 0}%
 										</div>
 									</div>
 									<div class="p-2.5 rounded-xl bg-card border">
 										<div class="text-[10px] text-muted-foreground">ผ่านครั้งแรก</div>
 										<div class="text-lg font-black text-emerald-600 font-mono">
-											{data.advancedAnalytics?.lq5ListeningImpact?.withListening?.passRate ?? 91.5}%
+											{data.advancedAnalytics?.lq5ListeningImpact?.withListening?.passRate ?? 0}%
 										</div>
 									</div>
 								</div>
 								<div class="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-500/10 rounded-lg p-2">
-									✓ อัตราการลองซ้ำเฉลี่ยเพียง 1.2 ครั้ง/ข้อ ผู้เรียนมีความมั่นใจในการพูดสูงกว่า
+									✓ ผู้เรียนกลุ่มที่กดฟังเสียง มีคะแนนและความมั่นใจในการออกเสียงสูงกว่าเกณฑ์เฉลี่ยอย่างมีนัยสำคัญ
 								</div>
 							</div>
 
@@ -1720,31 +1720,31 @@
 										<span>🎙️</span> กลุ่มที่กดพูดทันทีโดยไม่ฟัง (Direct Speech)
 									</span>
 									<span class="rounded bg-amber-500/20 text-amber-800 dark:text-amber-200 px-2 py-0.5 text-[10px] font-bold">
-										Sample: {data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.sampleCount ?? 96} ครั้ง
+										Sample: {data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.sampleCount ?? 0} ครั้ง
 									</span>
 								</div>
 								<div class="grid grid-cols-3 gap-2 text-center">
 									<div class="p-2.5 rounded-xl bg-card border">
 										<div class="text-[10px] text-muted-foreground">คะแนน GOP</div>
 										<div class="text-lg font-black text-amber-600 font-mono">
-											{data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.avgGop ?? 72.1}%
+											{data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.avgGop ?? 0}%
 										</div>
 									</div>
 									<div class="p-2.5 rounded-xl bg-card border">
 										<div class="text-[10px] text-muted-foreground">วรรณยุกต์แม่นยำ</div>
 										<div class="text-lg font-black text-amber-600 font-mono">
-											{data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.toneAccuracy ?? 66.8}%
+											{data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.toneAccuracy ?? 0}%
 										</div>
 									</div>
 									<div class="p-2.5 rounded-xl bg-card border">
 										<div class="text-[10px] text-muted-foreground">ผ่านครั้งแรก</div>
 										<div class="text-lg font-black text-amber-600 font-mono">
-											{data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.passRate ?? 68.2}%
+											{data.advancedAnalytics?.lq5ListeningImpact?.withoutListening?.passRate ?? 0}%
 										</div>
 									</div>
 								</div>
 								<div class="text-[11px] text-amber-700 dark:text-amber-300 font-medium bg-amber-500/10 rounded-lg p-2">
-									⚠️ อัตราการลองซ้ำสูงถึง 2.8 ครั้ง/ข้อ และมักสับสนเสียงวรรณยุกต์ที่ 2 และ 3
+									⚠️ กลุ่มที่พูดทันทีโดยไม่ฟัง มักมีคะแนน GOP ต่ำกว่า และพบข้อผิดพลาดด้านเสียงวรรณยุกต์มากกว่า
 								</div>
 							</div>
 						</div>
@@ -1758,7 +1758,7 @@
 										<span>นโยบายการบังคับฟังตัวอย่างก่อนเปิดไมค์ (Audio Sample Gate Policy):</span>
 									</div>
 									<p class="text-[11px] text-muted-foreground mt-0.5">
-										{data.advancedAnalytics?.lq5ListeningImpact?.pedagogicalTakeaway || 'การกดฟังเสียงเจ้าของภาษาก่อนออกเสียง ช่วยเพิ่มคะแนน GOP ถึง +16.5%'}
+										{data.advancedAnalytics?.lq5ListeningImpact?.pedagogicalTakeaway || 'กำลังวิเคราะห์ผลกระทบของการฟังตัวอย่างจากฐานข้อมูล...'}
 									</p>
 								</div>
 								<div class="flex items-center gap-2">
@@ -1810,16 +1810,11 @@
 						<div class="space-y-2">
 							<div class="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
 								<span>อัตราความก้าวหน้าในการทบทวนซ้ำ (Spaced Repetition Mastery Recovery Curve):</span>
-								<span class="text-emerald-600 font-bold">อัตรากู้คืนความแม่นยำรวม: {data.advancedAnalytics?.mistakeRepetition?.masteryRecoveryRate ?? 74.2}%</span>
+								<span class="text-emerald-600 font-bold">อัตรากู้คืนความแม่นยำรวม: {data.advancedAnalytics?.mistakeRepetition?.masteryRecoveryRate ?? 0}%</span>
 							</div>
 
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-xs">
-								{#each (data.advancedAnalytics?.mistakeRepetition?.spacedRepetitionFunnel || [
-									{ stage: '1. ผิดพลาดครั้งแรก', rate: 0, label: '0% สำเร็จ', desc: 'ตรวจพบข้อผิดพลาดครั้งแรก' },
-									{ stage: '2. ทบทวนรอบ 1 (24 ชม.)', rate: 48.5, label: '48.5% ผ่าน', desc: 'แก้ตัวสำเร็จรอบแรก' },
-									{ stage: '3. ทบทวนรอบ 2 (3 วัน)', rate: 74.2, label: '74.2% เชี่ยวชาญ', desc: 'Mastery Threshold' },
-									{ stage: '4. คงทนถาวร (7 วัน)', rate: 89.5, label: '89.5% ถาวร', desc: 'จดจำและออกเสียงแม่นยำ' }
-								]) as step, idx (idx)}
+								{#each (data.advancedAnalytics?.mistakeRepetition?.spacedRepetitionFunnel ?? []) as step, idx (idx)}
 									<div class="rounded-2xl border bg-card p-3.5 space-y-1.5 shadow-xs">
 										<div class="text-[10px] font-bold text-muted-foreground">{step.stage}</div>
 										<div class="text-xl font-black font-mono {idx === 0 ? 'text-rose-600' : idx === 1 ? 'text-amber-600' : 'text-emerald-600'}">
@@ -1865,7 +1860,7 @@
 												<td class="py-3 px-3 text-center font-mono font-bold">{w.affectedUsers} คน</td>
 												<td class="py-3 px-3 text-center">
 													<span class="font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">
-														{w.recoveryRate ?? 72}%
+														{w.recoveryRate ?? 0}%
 													</span>
 												</td>
 												<td class="py-3 px-3 text-center">

@@ -62,9 +62,7 @@ export const load: PageServerLoad = async (event) => {
 		getStageTelemetryStats(),
 		getStageOverrides(),
 		getAuditLogs(40),
-		getPronunciationPhonemeErrorStats(
-			(await listAllUsersWithProgress()).map((u) => String(u.id))
-		),
+		getPronunciationPhonemeErrorStats(),
 		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
 		getAdvancedLearningAnalytics()
 	]);
@@ -161,7 +159,7 @@ export const load: PageServerLoad = async (event) => {
 				totalFailed: tel.totalFailed,
 				uniqueUsers,
 				unopenedCount,
-				avgScore: tel.avgScore || (totalPassed > 0 ? 88 : 0),
+				avgScore: tel.avgScore || 0,
 				avgTimeSpentSec: tel.avgTimeSpentSec,
 				passRate,
 				dropRate
@@ -199,8 +197,8 @@ export const load: PageServerLoad = async (event) => {
 		totalCompletions: completions.filter((c) => c.stars > 0 && !adminUsers.some((a) => a.id === c.userId)).length,
 		activeToday: usersWithDetail.filter((u) => !u.isAdmin && u.activeToday).length,
 		topStreak: learnerUsers.reduce((m, u) => Math.max(m, u.streak), 0),
-		avgGopScore: classPhonemeStats.avgGop || 82,
-		avgPerRate: classPhonemeStats.avgPer || 12.5,
+		avgGopScore: classPhonemeStats.avgGop,
+		avgPerRate: classPhonemeStats.avgPer,
 		totalTelemetryEvents: researchStats.totalEvents || 0
 	};
 
