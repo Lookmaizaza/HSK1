@@ -103,9 +103,11 @@ def fast_yin_16k(audio: np.ndarray, sr: int = 44100):
 
     return f0, vol
 
-def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000, desc: str = "Train", max_sylls: int = 7):
+def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000, desc: str = "Train", max_sylls: int = 7, apply_gates: bool = True):
     """
-    Scans AISHELL-3 content.txt and audio files sequentially with Acoustic Quality Gates.
+    Scans AISHELL-3 content.txt and audio files sequentially.
+    If apply_gates=True: filters contours using Acoustic Quality Gates (for clean prototype training).
+    If apply_gates=False: keeps all valid voiced syllables as raw unconstrained speech (for real-world testing).
     """
     content_file = os.path.join(split_dir, "content.txt")
     wav_root = os.path.join(split_dir, "wav")
@@ -121,7 +123,8 @@ def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000,
     total_processed = 0
     start_time = time.time()
 
-    print(f"🎙️ [{desc}] Extracting pristine tone contours (target: {target_per_tone} per tone, max {max_sylls} syllables/utt)...")
+    gate_desc = "with Acoustic Quality Gates" if apply_gates else "RAW Unconstrained (No Gates)"
+    print(f"🎙️ [{desc}] Extracting tone contours ({gate_desc}, target: {target_per_tone} per tone, max {max_sylls} syllables/utt)...")
     sys.stdout.flush()
 
     for pass_num, current_max_sylls in [(1, max_sylls), (2, max_sylls + 3)]:
@@ -166,15 +169,19 @@ def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000,
             if np.sum(voiced_mask) < 12:
                 continue
 
-            # Per-speaker pitch range (5th and 95th percentiles)
+            # Per-speaker pitch range (5th and 95th percentiles) with anchor span
             spk_min_hz = float(np.percentile(f0[voiced_mask], 5))
             spk_max_hz = float(np.percentile(f0[voiced_mask], 95))
-            if spk_max_hz <= spk_min_hz + 25.0:
-                continue
+            mid_hz = (spk_min_hz + spk_max_hz) / 2.0
+            # Natural vocal dynamic range across tones is at least 0.8-1.0 octave (mid_hz * 0.45)
+            # Enforcing span prevents over-stretching narrow utterances onto the full 1.0-5.0 scale
+            span_hz = max(spk_max_hz - spk_min_hz, mid_hz * 0.45)
+            anchor_min = max(65.0, mid_hz - span_hz / 2.0)
+            anchor_max = min(500.0, mid_hz + span_hz / 2.0)
 
-            # Logarithmic Chao 1.0 - 5.0 normalization
-            log_min = np.log2(spk_min_hz)
-            log_max = np.log2(spk_max_hz)
+            # Logarithmic Chao 1.0 - 5.0 normalization anchored to vocal baseline
+            log_min = np.log2(anchor_min)
+            log_max = np.log2(anchor_max)
             chao = np.zeros_like(f0)
             chao[voiced_mask] = np.clip(
                 1.0 + 4.0 * (np.log2(f0[voiced_mask]) - log_min) / (log_max - log_min),
@@ -228,12 +235,12 @@ def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000,
                 peak_global = s_win + peak_local
                 peak_vol = norm_vol[peak_global]
 
-                # Tight vowel nucleus expansion (cutoff at 40% of peak volume)
+                # Tight vowel nucleus expansion (cutoff at 35% of peak volume)
                 left = peak_global
                 while (
                     left > 0
                     and f0[left - 1] > 0
-                    and norm_vol[left - 1] >= peak_vol * 0.40
+                    and norm_vol[left - 1] >= peak_vol * 0.35
                     and (peak_global - left) < 16
                 ):
                     left -= 1
@@ -242,7 +249,7 @@ def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000,
                 while (
                     right < len(f0) - 1
                     and f0[right + 1] > 0
-                    and norm_vol[right + 1] >= peak_vol * 0.40
+                    and norm_vol[right + 1] >= peak_vol * 0.35
                     and (right - peak_global) < 16
                 ):
                     right += 1
@@ -258,19 +265,40 @@ def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000,
                 if np.max(np.abs(np.diff(sub_chao))) > 1.8:
                     continue
 
-                # Acoustic Quality Gates:
-                # Tone 1: High Level (Upper register, flat)
-                if tone == 1 and not (np.mean(sub_chao) >= 3.1 and sub_chao[0] >= 3.0 and sub_chao[-1] >= 2.6):
-                    continue
-                # Tone 2: Rising (Ends higher than lowest inflection)
-                if tone == 2 and not (sub_chao[-1] > np.min(sub_chao) + 0.25 and sub_chao[-1] >= 2.8):
-                    continue
-                # Tone 3: Low Register or Dipping
-                if tone == 3 and not (np.min(sub_chao) <= 3.0 and (sub_chao[-1] > np.min(sub_chao) or sub_chao[0] > sub_chao[-1])):
-                    continue
-                # Tone 4: Falling (Starts higher than it ends)
-                if tone == 4 and not (sub_chao[0] > sub_chao[-1] + 0.35 and sub_chao[0] >= 3.0):
-                    continue
+                # Acoustic Quality Gates (Authentic Mandarin Contours):
+                if apply_gates:
+                    # Tone 1: High Level (Upper register, flat)
+                    if tone == 1 and not (
+                        np.mean(sub_chao) >= 3.1
+                        and sub_chao[0] >= 3.0
+                        and sub_chao[-1] >= 2.8
+                        and abs(sub_chao[0] - sub_chao[-1]) <= 0.95
+                    ):
+                        continue
+                    # Tone 2: Rising (Ends higher than start and lowest inflection)
+                    if tone == 2 and not (
+                        sub_chao[-1] >= np.min(sub_chao) + 0.35
+                        and sub_chao[-1] > sub_chao[0] + 0.15
+                        and sub_chao[-1] >= 2.9
+                    ):
+                        continue
+                    # Tone 3: Low Dipping or Low Register (上声 214 / 半上 21)
+                    # Stays in lower register, does not start high like Tone 4
+                    if tone == 3 and not (
+                        sub_chao[0] <= 3.3
+                        and np.min(sub_chao) <= 2.6
+                        and np.mean(sub_chao) <= 3.0
+                        and (sub_chao[0] - sub_chao[-1]) <= 1.2
+                    ):
+                        continue
+                    # Tone 4: High Falling (去声 51)
+                    # Starts high in upper register, falls sharply into lower register
+                    if tone == 4 and not (
+                        sub_chao[0] >= 3.4
+                        and (sub_chao[0] - sub_chao[-1]) >= 0.85
+                        and sub_chao[-1] <= 3.2
+                    ):
+                        continue
 
                 # Resample to NUM_TIME_STEPS (50 points)
                 t_orig = np.linspace(0, 1, len(sub_chao))
@@ -310,35 +338,51 @@ def extract_syllables_from_aishell3(split_dir: str, target_per_tone: int = 8000,
 
     return all_features, all_labels
 
-def get_or_create_cache(data_dir: str, cache_dir: str, train_target: int = 8000, test_target: int = 2000, reextract: bool = False):
+def get_or_create_cache(data_dir: str, cache_dir: str, train_target: int = 2500, test_target: int = 2000, reextract: bool = False):
     """
-    Loads train & test datasets from .npz cache or extracts from raw AISHELL-3 files.
+    Loads train & test datasets from .npz cache or extracts from raw AISHELL-3 train & test directories.
+    Option 2:
+      - Train set is extracted with Acoustic Quality Gates (apply_gates=True) to learn clean prototypical contours.
+      - Test set is extracted as Raw Unconstrained Speech (apply_gates=False) for realistic, unbiased evaluation.
     """
     train_cache = os.path.join(cache_dir, "aishell3_train_cache.npz")
-    val_cache = os.path.join(cache_dir, "aishell3_val_cache.npz")
     test_cache = os.path.join(cache_dir, "aishell3_test_cache.npz")
 
-    # Prefer validation split if available to preserve Blind Test integrity
-    target_eval_cache = val_cache if os.path.exists(val_cache) else test_cache
-
-    if not reextract and os.path.exists(train_cache) and os.path.exists(target_eval_cache):
+    # 1. Train Cache
+    if not reextract and os.path.exists(train_cache):
         print(f"📦 Loading pre-extracted train cache: {train_cache}")
         train_data = np.load(train_cache)
-        print(f"📦 Loading pre-extracted evaluation cache: {target_eval_cache}")
-        eval_data = np.load(target_eval_cache)
-        return (train_data["features"], train_data["labels"]), (eval_data["features"], eval_data["labels"])
+        train_feats = train_data["features"]
+        train_labels = train_data["labels"]
+    else:
+        train_dir = os.path.join(data_dir, "train")
+        train_feats, train_labels = extract_syllables_from_aishell3(
+            train_dir,
+            target_per_tone=train_target,
+            desc="Train Set (Clean Reference Prototypes)",
+            max_sylls=7,
+            apply_gates=True
+        )
+        print(f"💾 Saving Train cache to {train_cache}...")
+        np.savez_compressed(train_cache, features=train_feats, labels=train_labels)
 
-    # Extract Train Set
-    train_dir = os.path.join(data_dir, "train")
-    train_feats, train_labels = extract_syllables_from_aishell3(train_dir, target_per_tone=train_target, desc="Train Set", max_sylls=7)
-    print(f"💾 Saving Train cache to {train_cache}...")
-    np.savez_compressed(train_cache, features=train_feats, labels=train_labels)
-
-    # Extract Test Set
-    test_dir = os.path.join(data_dir, "test")
-    test_feats, test_labels = extract_syllables_from_aishell3(test_dir, target_per_tone=test_target, desc="Test Set", max_sylls=7)
-    print(f"💾 Saving Test cache to {test_cache}...")
-    np.savez_compressed(test_cache, features=test_feats, labels=test_labels)
+    # 2. Test Cache (Raw Unconstrained Speech)
+    if not reextract and os.path.exists(test_cache):
+        print(f"📦 Loading pre-extracted test cache: {test_cache}")
+        test_data = np.load(test_cache)
+        test_feats = test_data["features"]
+        test_labels = test_data["labels"]
+    else:
+        test_dir = os.path.join(data_dir, "test")
+        test_feats, test_labels = extract_syllables_from_aishell3(
+            test_dir,
+            target_per_tone=test_target,
+            desc="Test Set (Raw Unconstrained Speech)",
+            max_sylls=7,
+            apply_gates=False
+        )
+        print(f"💾 Saving Test cache to {test_cache}...")
+        np.savez_compressed(test_cache, features=test_feats, labels=test_labels)
 
     return (train_feats, train_labels), (test_feats, test_labels)
 
@@ -441,8 +485,9 @@ class ToneClassifierCNN_BiLSTM(nn.Module):
         # x: [Batch, 2, 50] (Chao, Volume)
         # Calculate pitch velocity (Delta) and acceleration (Delta^2)
         pitch = x[:, 0:1, :]
-        delta = torch.diff(pitch, dim=-1, prepend=pitch[:, :, :1])
-        accel = torch.diff(delta, dim=-1, prepend=delta[:, :, :1])
+        # Scale velocity and acceleration to match [1, 5] pitch range magnitude
+        delta = torch.diff(pitch, dim=-1, prepend=pitch[:, :, :1]) * 10.0
+        accel = torch.diff(delta, dim=-1, prepend=delta[:, :, :1]) * 5.0
         full_input = torch.cat([x, delta, accel], dim=1)  # [Batch, 4, 50]
 
         c1 = self.conv1(full_input)
@@ -621,14 +666,14 @@ def main():
         default=r"C:\Users\lookm\OneDrive\Desktop\data_aishell3",
         help="Path to AISHELL-3 dataset directory",
     )
-    parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs (default: 50)")
-    parser.add_argument("--batch-size", type=int, default=128, help="Batch size for training (default: 128)")
-    parser.add_argument("--lr", type=float, default=0.0015, help="Learning rate (default: 0.0015)")
+    parser.add_argument("--epochs", type=int, default=35, help="Number of training epochs (default: 35)")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size for training (default: 64)")
+    parser.add_argument("--lr", type=float, default=0.002, help="Learning rate (default: 0.002)")
     parser.add_argument(
         "--train-samples-per-tone",
         type=int,
-        default=8000,
-        help="Balanced target samples per tone for training (default: 8000, total = 32000)",
+        default=2500,
+        help="Balanced target samples per tone for training (default: 2500, total = 10000)",
     )
     parser.add_argument(
         "--test-samples-per-tone",
@@ -639,7 +684,7 @@ def main():
     parser.add_argument(
         "--device",
         type=str,
-        default="cuda",
+        default="cuda" if torch.cuda.is_available() else "cpu",
         help="Device to use ('cuda' or 'cpu')",
     )
     parser.add_argument(

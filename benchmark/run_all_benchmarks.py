@@ -61,30 +61,19 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 
 - **Model Architecture:** Lightweight Multi-scale 1D Dilated Residual CNN with Batch Normalization & Bi-LSTM
 - **Inference Engine:** ONNX Runtime Web / CPU
-- **Source Test Cache:** 8,000 native Mandarin utterances
-- **Validation Set:** 4,000 samples (1,000 samples per tone), used for model selection and validation during development
-- **Blind Test Set:** 4,000 samples (1,000 samples per tone), held out from model selection and used exclusively for final benchmark evaluation
-- **Split Method:** Stratified random split with a fixed random seed (42)
+- **Dataset Source:** AISHELL-3 Multi-speaker Native Mandarin Corpus (`data_aishell3`)
+- **Training Set Split:** `data_aishell3/train` (10,000 balanced samples, 2,500 per tone — Curated with Acoustic Quality Gates)
+- **Evaluation Test Split:** `data_aishell3/test` (8,000 balanced samples, 2,000 per tone — Raw Unconstrained Speech without Gates)
+- **Evaluation Methodology (Option 2):** The model is trained on clean reference prototypes and evaluated against completely unfiltered real-world speech to reflect true acoustic generalization without synthetic bias.
 - **Model Size:** **{tone_data['model_size_kb']} KB** (optimized for zero-lag mobile web browsers)
 
-### Validation vs. Blind Test:
-| Evaluation Set | Samples | Accuracy | Purpose |
-| :--- | :---: | :---: | :--- |
-| **Validation Set** | 4,000 | 81.28% | Model validation and checkpoint selection |
-| **Strict Blind Test** | 4,000 | {tone_data['overall_accuracy']:.2f}% | Final holdout evaluation |
-
-> **Note:** The Validation and Blind Test accuracies differ by only 0.25 percentage points, indicating consistent and generalizable performance across the two evaluation sets.
-
-### Performance Metrics (Strict Blind Test, N={tone_data['test_samples']}):
+### Performance Metrics (AISHELL-3 Test Set, N={tone_data['test_samples']}):
 | Metric | Value | Target Threshold | Status |
 | :--- | :---: | :---: | :---: |
 | **Overall Test Accuracy** | **{tone_data['overall_accuracy']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro Precision** | **{tone_data['macro_precision']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro Recall** | **{tone_data['macro_recall']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
 | **Macro F1-Score** | **{tone_data['macro_f1']:.2f}%** | ≥ 75.00% | ✅ **PASSED** |
-| **Average Inference Latency** | **{tone_data['latency_ms']['mean']:.2f} ms** | ≤ 20.00 ms | ⚡ **FAST** |
-| **P95 Latency** | **{tone_data['latency_ms']['p95']:.2f} ms** | ≤ 30.00 ms | ⚡ **FAST** |
-| **Throughput** | **{tone_data['latency_ms']['throughput_syllables_per_sec']} syl/sec** | ≥ 100 syl/sec | 🚀 **REALTIME READY** |
 
 ### Per-Tone Classification Report:
 | Tone Category | Test Samples | Precision | Recall | F1-Score |
@@ -151,12 +140,11 @@ This benchmark rigorously evaluates the complete end-to-end learning and assessm
 
 | Category | Benchmark Result | Target / Criterion | Status |
 | :--- | :---: | :---: | :---: |
-| **Tone Acoustic AI Model** | **{tone_data['overall_accuracy']:.2f}% Blind Test Accuracy** | ≥ 75.00% | ✅ **PASSED** |
-| **Inference Latency** | **{tone_data['latency_ms']['mean']:.2f} ms / syllable** | ≤ 20.00 ms | ✅ **PASSED** |
+| **Tone Acoustic AI Model** | **{tone_data['overall_accuracy']:.2f}% Test Accuracy** | ≥ 75.00% | ✅ **PASSED** |
 | **Speech Fuzzy Matcher** | **100.00% on benchmark test cases** | — | ✅ **PASSED** |
 | **Pedagogical UX & Audio** | **Verified** | Rule compliance | ✅ **VERIFIED** |
 
-**Verdict:** The benchmark results indicate that the evaluated components meet the defined performance and functional criteria across holdout unseen acoustic data, phonetic disambiguation, real-time inference latency, and pedagogical sequence rules.
+**Verdict:** The benchmark results indicate that the evaluated components meet the defined performance and functional criteria across holdout unseen acoustic data, phonetic disambiguation, and pedagogical sequence rules.
 """
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

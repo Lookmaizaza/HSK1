@@ -32,17 +32,37 @@
 </script>
 
 <header class="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
-	<div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-		<div class="flex items-center gap-2">
+	<div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-3">
+		<div class="flex items-center gap-3">
 			{#if showBack}
 				<Button variant="ghost" size="icon" href={backHref}>
 					<ArrowLeft class="size-5" />
 				</Button>
 			{/if}
 			<a href="/" class="flex items-center gap-2 font-extrabold tracking-tight">
-				<span class="flex size-9 items-center justify-center rounded-xl bg-primary text-xl text-primary-foreground">語</span>
-				<span class="text-lg">ปากจีน</span>
+				<span class="flex size-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-xl text-white shadow-md shadow-emerald-500/20">語</span>
+				<div class="leading-none">
+					<span class="text-lg font-black tracking-tight">ปากจีน</span>
+					<span class="hidden sm:inline-block ml-1.5 text-[10px] font-bold tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">ฝึกออกเสียงภาษาจีน</span>
+				</div>
 			</a>
+
+			<!-- Desktop Nav Links -->
+			<nav class="hidden md:flex items-center gap-1 ml-4 border-l pl-4">
+				<a href="/" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-foreground">
+					หน้าแรก
+				</a>
+				<a href="/pitch" class="rounded-xl px-3 py-1.5 text-xs font-bold transition bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 flex items-center gap-1.5">
+					<span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+					ห้องฝึกออกเสียง
+				</a>
+				<a href="/talk" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground">
+					สถานการณ์จำลอง
+				</a>
+				<a href="/analytics" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground">
+					สมุดพกผลการเรียน
+				</a>
+			</nav>
 		</div>
 		<div class="flex items-center gap-3 text-sm font-semibold">
 			<span class="flex items-center gap-1 text-orange-500">
