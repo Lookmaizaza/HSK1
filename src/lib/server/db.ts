@@ -418,7 +418,7 @@ export async function completeLesson(userId: number, lessonKey: string, stars: n
 // Admin queries
 
 export function isUserAdmin(username: string): boolean {
-	const adminNames = (env.ADMIN_USERNAMES ?? 'lookmai,admin')
+	const adminNames = (env.ADMIN_USERNAMES ?? 'admin')
 		.split(',')
 		.map((s) => s.trim().toLowerCase())
 		.filter(Boolean);
@@ -429,7 +429,7 @@ export async function getAdminUserIds(): Promise<string[]> {
 	const client = getDb();
 	if (!client) return [];
 	await init();
-	const adminNames = (env.ADMIN_USERNAMES ?? 'lookmai,admin')
+	const adminNames = (env.ADMIN_USERNAMES ?? 'admin')
 		.split(',')
 		.map((s) => s.trim().toLowerCase())
 		.filter(Boolean);

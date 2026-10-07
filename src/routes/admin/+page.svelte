@@ -359,7 +359,7 @@
 						required
 						autocomplete="username"
 						value={form?.username ?? ''}
-						placeholder="เช่น lookmai หรือ admin"
+						placeholder="เช่น admin"
 					/>
 				</div>
 				<div class="grid gap-2">
