@@ -138,6 +138,45 @@ CREATE INDEX IF NOT EXISTS idx_phoneme_eval_word ON phoneme_evaluations(word_id)
 CREATE INDEX IF NOT EXISTS idx_events_user_created ON learning_events(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_events_user_verb ON learning_events(user_id, event_type);
 CREATE INDEX IF NOT EXISTS idx_events_word ON learning_events(word_id);
+
+CREATE TABLE IF NOT EXISTS stage_overrides (
+	stage_id TEXT PRIMARY KEY,
+	title TEXT,
+	category TEXT,
+	description TEXT,
+	is_active INTEGER NOT NULL DEFAULT 1,
+	updated_by TEXT,
+	updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS stage_telemetry (
+	id TEXT PRIMARY KEY,
+	stage_id TEXT NOT NULL,
+	user_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	score INTEGER NOT NULL DEFAULT 0,
+	time_spent_ms INTEGER NOT NULL DEFAULT 0,
+	retries_count INTEGER NOT NULL DEFAULT 0,
+	listen_count INTEGER NOT NULL DEFAULT 0,
+	hints_used INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+	id TEXT PRIMARY KEY,
+	actor_username TEXT NOT NULL,
+	action TEXT NOT NULL,
+	resource_type TEXT NOT NULL,
+	resource_id TEXT NOT NULL,
+	details TEXT,
+	ip_address TEXT,
+	user_agent TEXT,
+	created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_stage_telemetry_stage ON stage_telemetry(stage_id);
+CREATE INDEX IF NOT EXISTS idx_stage_telemetry_user ON stage_telemetry(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
 `;
 
 let initPromise: Promise<void> | null = null;
@@ -378,6 +417,35 @@ export async function completeLesson(userId: number, lessonKey: string, stars: n
 
 // Admin queries
 
+export function isUserAdmin(username: string): boolean {
+	const adminNames = (env.ADMIN_USERNAMES ?? 'admin')
+		.split(',')
+		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
+	return adminNames.includes(username.trim().toLowerCase());
+}
+
+export async function getAdminUserIds(): Promise<string[]> {
+	const client = getDb();
+	if (!client) return [];
+	await init();
+	const adminNames = (env.ADMIN_USERNAMES ?? 'admin')
+		.split(',')
+		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
+	if (adminNames.length === 0) return [];
+	const placeholders = adminNames.map(() => '?').join(',');
+	try {
+		const res = await client.execute({
+			sql: `SELECT id FROM users WHERE LOWER(username) IN (${placeholders})`,
+			args: adminNames
+		});
+		return res.rows.map((r) => String(r.id));
+	} catch {
+		return [];
+	}
+}
+
 export type AdminUserRow = {
 	id: number;
 	username: string;
@@ -386,6 +454,8 @@ export type AdminUserRow = {
 	hearts: number;
 	streak: number;
 	lastPracticed: string | null;
+	role: 'admin' | 'user';
+	isAdmin: boolean;
 };
 
 export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
@@ -402,15 +472,21 @@ export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
 		LEFT JOIN progress p ON p.user_id = u.id
 		ORDER BY xp DESC, u.created_at ASC
 	`);
-	return result.rows.map((r) => ({
-		id: Number(r.id),
-		username: String(r.username),
-		createdAt: Number(r.created_at),
-		xp: Number(r.xp),
-		hearts: Number(r.hearts),
-		streak: Number(r.streak),
-		lastPracticed: r.last_practiced ? String(r.last_practiced) : null
-	}));
+	return result.rows.map((r) => {
+		const username = String(r.username);
+		const isAdmin = isUserAdmin(username);
+		return {
+			id: Number(r.id),
+			username,
+			createdAt: Number(r.created_at),
+			xp: Number(r.xp),
+			hearts: Number(r.hearts),
+			streak: Number(r.streak),
+			lastPracticed: r.last_practiced ? String(r.last_practiced) : null,
+			role: isAdmin ? ('admin' as const) : ('user' as const),
+			isAdmin
+		};
+	});
 }
 
 export async function listAllCompletions(): Promise<{ userId: number; lessonKey: string; stars: number }[]> {
@@ -626,7 +702,7 @@ export async function recordPronunciationEvaluation(payload: {
 }
 
 export async function getPronunciationEvaluations(
-	userId: string | string[],
+	userId?: string | string[],
 	limit = 50
 ): Promise<Array<{
 	id: number;
@@ -646,18 +722,29 @@ export async function getPronunciationEvaluations(
 	const client = getDb();
 	if (!client) return [];
 	await init();
-	const userIds = Array.isArray(userId) ? userId : [userId];
-	if (userIds.length === 0) return [];
-	const placeholders = userIds.map(() => '?').join(',');
-	const result = await client.execute({
-		sql: `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
-		             gop_overall, per_overall, tone_score, phoneme_details, created_at
-		      FROM pronunciation_evaluations
-		      WHERE user_id IN (${placeholders})
-		      ORDER BY created_at DESC
-		      LIMIT ?`,
-		args: [...userIds.map(String), limit]
-	});
+
+	let sql = `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
+	                  gop_overall, per_overall, tone_score, phoneme_details, created_at
+	           FROM pronunciation_evaluations
+	           ORDER BY created_at DESC
+	           LIMIT ?`;
+	let args: any[] = [limit];
+
+	if (userId) {
+		const userIds = (Array.isArray(userId) ? userId : [userId]).filter(Boolean);
+		if (userIds.length > 0) {
+			const placeholders = userIds.map(() => '?').join(',');
+			sql = `SELECT id, user_id, word_id, pinyin, attempt_number, audio_duration_sec, 
+			              gop_overall, per_overall, tone_score, phoneme_details, created_at
+			       FROM pronunciation_evaluations
+			       WHERE user_id IN (${placeholders})
+			       ORDER BY created_at DESC
+			       LIMIT ?`;
+			args = [...userIds.map(String), limit];
+		}
+	}
+
+	const result = await client.execute({ sql, args });
 
 	return result.rows.map((r) => {
 		let phonemeDetails = [];
@@ -684,7 +771,7 @@ export async function getPronunciationEvaluations(
 	});
 }
 
-export async function getPronunciationPhonemeErrorStats(userId: string | string[]): Promise<{
+export async function getPronunciationPhonemeErrorStats(userId?: string | string[]): Promise<{
 	totalAttempts: number;
 	avgGop: number;
 	avgPer: number;
@@ -1090,7 +1177,7 @@ export async function getDiagnosticAnalytics(userId: string | string[]): Promise
  */
 export function anonymizeUserId(rawUserId: string): string {
 	if (!rawUserId) return 'p_anonymous';
-	const salt = 'yupakjeen_pdpa_research_2026';
+	const salt = env.RESEARCH_EXPORT_SALT || env.TURSO_AUTH_TOKEN?.slice(0, 32) || 'yupakjeen_pdpa_research_2026';
 	const hash = createHash('sha256').update(String(rawUserId) + salt).digest('hex');
 	return `p_${hash.slice(0, 10)}`;
 }
@@ -1128,7 +1215,13 @@ export async function getAllPronunciationEvaluationsForExport(limit = 10000): Pr
 		args: [limit]
 	});
 
-	return result.rows.map((r) => {
+	const adminIds = await getAdminUserIds();
+	const adminIdSet = new Set(adminIds);
+	const targetRows = adminIdSet.size > 0
+		? result.rows.filter((r) => !adminIdSet.has(String(r.user_id)))
+		: result.rows;
+
+	return targetRows.map((r) => {
 		let phonemeDetails: any[] = [];
 		try {
 			phonemeDetails = JSON.parse(String(r.phoneme_details || '[]'));
@@ -1197,7 +1290,13 @@ export async function getAllLearningEventsForExport(limit = 10000): Promise<any[
 		args: [limit]
 	});
 
-	return result.rows.map((r) => {
+	const adminIds = await getAdminUserIds();
+	const adminIdSet = new Set(adminIds);
+	const targetRows = adminIdSet.size > 0
+		? result.rows.filter((r) => !adminIdSet.has(String(r.user_id)))
+		: result.rows;
+
+	return targetRows.map((r) => {
 		let parsed: any = {};
 		try {
 			parsed = JSON.parse(String(r.xapi_statement || '{}'));
@@ -1373,6 +1472,880 @@ export async function getAllTablesSummary(): Promise<Array<{ tableName: string; 
 	return summary;
 }
 
+// -------------------------------------------------------------
+// Stage Telemetry, Overrides & Audit Logs (Turso + Neon Dual Store)
+// -------------------------------------------------------------
 
+import {
+	recordNeonStageTelemetry,
+	getNeonStageTelemetryStats,
+	recordNeonAuditLog,
+	getNeonAuditLogs,
+	saveNeonStageOverride,
+	getNeonStageOverrides
+} from './neon';
 
+export async function recordStageTelemetry(params: {
+	stageId: string;
+	userId?: string | number | null;
+	eventType: 'view' | 'attempt' | 'pass' | 'fail' | 'hint' | 'listen';
+	score?: number;
+	timeSpentMs?: number;
+	retriesCount?: number;
+	listenCount?: number;
+	hintsUsed?: number;
+}): Promise<void> {
+	const client = getDb();
+	const id = randomBytes(16).toString('hex');
+	const now = Date.now();
+	const userIdStr = String(params.userId || 'anonymous');
 
+	if (client) {
+		try {
+			await init();
+			await client.execute({
+				sql: `INSERT INTO stage_telemetry (id, stage_id, user_id, event_type, score, time_spent_ms, retries_count, listen_count, hints_used, created_at)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				args: [
+					id,
+					params.stageId,
+					userIdStr,
+					params.eventType,
+					Math.round(params.score || 0),
+					Math.round(params.timeSpentMs || 0),
+					Math.round(params.retriesCount || 0),
+					Math.round(params.listenCount || 0),
+					Math.round(params.hintsUsed || 0),
+					now
+				]
+			});
+		} catch (e) {
+			console.warn('⚠️ [Turso] Failed to record stage telemetry:', e);
+		}
+	}
+
+	// Also persist to Neon PostgreSQL in background
+	recordNeonStageTelemetry(params).catch(() => {});
+}
+
+export async function getStageTelemetryStats(): Promise<Record<string, {
+	totalViews: number;
+	totalAttempts: number;
+	totalPassed: number;
+	totalFailed: number;
+	uniqueUsers: number;
+	avgScore: number;
+	avgTimeSpentSec: number;
+}>> {
+	const statsMap: Record<string, any> = {};
+	const client = getDb();
+
+	if (client) {
+		try {
+			await init();
+			const res = await client.execute(`
+				SELECT 
+					stage_id,
+					COUNT(CASE WHEN event_type = 'view' THEN 1 END) as total_views,
+					COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as total_attempts,
+					COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as total_passed,
+					COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as total_failed,
+					COUNT(DISTINCT user_id) as unique_users,
+					COALESCE(AVG(CASE WHEN score > 0 THEN score END), 0) as avg_score,
+					COALESCE(AVG(time_spent_ms) / 1000.0, 0) as avg_time_sec
+				FROM stage_telemetry
+				GROUP BY stage_id
+			`);
+
+			for (const row of res.rows) {
+				const sid = String(row.stage_id);
+				statsMap[sid] = {
+					totalViews: Number(row.total_views || 0),
+					totalAttempts: Number(row.total_attempts || 0),
+					totalPassed: Number(row.total_passed || 0),
+					totalFailed: Number(row.total_failed || 0),
+					uniqueUsers: Number(row.unique_users || 0),
+					avgScore: Math.round(Number(row.avg_score || 0)),
+					avgTimeSpentSec: Math.round(Number(row.avg_time_sec || 0))
+				};
+			}
+		} catch (e) {
+			console.warn('⚠️ [Turso] Failed to read stage telemetry stats:', e);
+		}
+	}
+
+	// Merge with Neon DB stats if available
+	try {
+		const neonStats = await getNeonStageTelemetryStats();
+		for (const [sid, ns] of Object.entries(neonStats)) {
+			if (!statsMap[sid]) {
+				statsMap[sid] = ns;
+			} else {
+				statsMap[sid].totalViews = Math.max(statsMap[sid].totalViews, ns.totalViews);
+				statsMap[sid].totalAttempts = Math.max(statsMap[sid].totalAttempts, ns.totalAttempts);
+				statsMap[sid].totalPassed = Math.max(statsMap[sid].totalPassed, ns.totalPassed);
+				statsMap[sid].totalFailed = Math.max(statsMap[sid].totalFailed, ns.totalFailed);
+				statsMap[sid].uniqueUsers = Math.max(statsMap[sid].uniqueUsers, ns.uniqueUsers);
+			}
+		}
+	} catch {
+		// Ignore Neon fallback errors
+	}
+
+	return statsMap;
+}
+
+export async function getStageOverrides(): Promise<Record<string, {
+	title?: string;
+	category?: string;
+	description?: string;
+	isActive: boolean;
+	updatedBy?: string;
+	updatedAt?: number;
+}>> {
+	const map: Record<string, any> = {};
+	const client = getDb();
+
+	if (client) {
+		try {
+			await init();
+			const res = await client.execute('SELECT stage_id, title, category, description, is_active, updated_by, updated_at FROM stage_overrides');
+			for (const r of res.rows) {
+				map[String(r.stage_id)] = {
+					title: r.title ? String(r.title) : undefined,
+					category: r.category ? String(r.category) : undefined,
+					description: r.description ? String(r.description) : undefined,
+					isActive: Number(r.is_active) === 1,
+					updatedBy: r.updated_by ? String(r.updated_by) : undefined,
+					updatedAt: Number(r.updated_at)
+				};
+			}
+		} catch (e) {
+			console.warn('⚠️ [Turso] Failed to read stage overrides:', e);
+		}
+	}
+
+	// Merge with Neon overrides
+	try {
+		const neonOverrides = await getNeonStageOverrides();
+		for (const [k, v] of Object.entries(neonOverrides)) {
+			if (!map[k]) {
+				map[k] = { ...v, updatedAt: v.updatedAt ? new Date(v.updatedAt).getTime() : Date.now() };
+			}
+		}
+	} catch {}
+
+	return map;
+}
+
+export async function saveStageOverride(params: {
+	stageId: string;
+	title: string;
+	category: string;
+	description: string;
+	isActive: boolean;
+	updatedBy: string;
+}): Promise<void> {
+	const client = getDb();
+	const now = Date.now();
+
+	if (client) {
+		await init();
+		await client.execute({
+			sql: `INSERT INTO stage_overrides (stage_id, title, category, description, is_active, updated_by, updated_at)
+			      VALUES (?, ?, ?, ?, ?, ?, ?)
+			      ON CONFLICT (stage_id) DO UPDATE SET
+			          title = excluded.title,
+			          category = excluded.category,
+			          description = excluded.description,
+			          is_active = excluded.is_active,
+			          updated_by = excluded.updated_by,
+			          updated_at = excluded.updated_at`,
+			args: [
+				params.stageId,
+				params.title,
+				params.category,
+				params.description,
+				params.isActive ? 1 : 0,
+				params.updatedBy,
+				now
+			]
+		});
+	}
+
+	// Persist to Neon
+	saveNeonStageOverride(params).catch(() => {});
+
+	// Record audit log
+	recordAuditLog({
+		actorUsername: params.updatedBy,
+		action: 'stage_override_update',
+		resourceType: 'stage',
+		resourceId: params.stageId,
+		details: params
+	}).catch(() => {});
+}
+
+export async function resetStageOverride(stageId: string, actorUsername: string): Promise<void> {
+	const client = getDb();
+	if (client) {
+		await init();
+		await client.execute({ sql: 'DELETE FROM stage_overrides WHERE stage_id = ?', args: [stageId] });
+	}
+
+	// Neon deletion
+	const safeId = stageId.replace(/'/g, "''");
+	import('./neon').then((n) => n.executeNeonQuery(`DELETE FROM stage_overrides WHERE stage_id = '${safeId}';`)).catch(() => {});
+
+	recordAuditLog({
+		actorUsername,
+		action: 'stage_override_reset',
+		resourceType: 'stage',
+		resourceId: stageId
+	}).catch(() => {});
+}
+
+export async function recordAuditLog(params: {
+	actorUsername: string;
+	action: string;
+	resourceType: string;
+	resourceId: string;
+	details?: Record<string, any>;
+	ipAddress?: string;
+	userAgent?: string;
+}): Promise<void> {
+	const client = getDb();
+	const id = randomBytes(16).toString('hex');
+	const now = Date.now();
+
+	if (client) {
+		try {
+			await init();
+			await client.execute({
+				sql: `INSERT INTO audit_logs (id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				args: [
+					id,
+					params.actorUsername,
+					params.action,
+					params.resourceType,
+					params.resourceId,
+					JSON.stringify(params.details || {}),
+					params.ipAddress || '',
+					params.userAgent || '',
+					now
+				]
+			});
+		} catch (e) {
+			console.warn('⚠️ [Turso] Failed to record audit log:', e);
+		}
+	}
+
+	// Persist to Neon
+	recordNeonAuditLog(params).catch(() => {});
+}
+
+export async function getAuditLogs(limit = 50): Promise<Array<{
+	id: string;
+	actorUsername: string;
+	action: string;
+	resourceType: string;
+	resourceId: string;
+	details: any;
+	createdAt: number;
+}>> {
+	const client = getDb();
+	if (client) {
+		try {
+			await init();
+			const res = await client.execute({
+				sql: `SELECT id, actor_username, action, resource_type, resource_id, details, created_at
+				      FROM audit_logs
+				      ORDER BY created_at DESC
+				      LIMIT ?`,
+				args: [limit]
+			});
+
+			return res.rows.map((r) => {
+				let details = {};
+				try {
+					details = JSON.parse(String(r.details || '{}'));
+				} catch {}
+				return {
+					id: String(r.id),
+					actorUsername: String(r.actor_username),
+					action: String(r.action),
+					resourceType: String(r.resource_type),
+					resourceId: String(r.resource_id),
+					details,
+					createdAt: Number(r.created_at)
+				};
+			});
+		} catch (e) {
+			console.warn('⚠️ [Turso] Failed to read audit logs:', e);
+		}
+	}
+
+	try {
+		const neonLogs = await getNeonAuditLogs(limit);
+		return neonLogs.map((l) => ({
+			...l,
+			createdAt: new Date(l.createdAt).getTime()
+		}));
+	} catch {
+		return [];
+	}
+}
+
+export async function getUserFullDetail(userId: number) {
+	const client = getDb();
+	if (!client) return null;
+	await init();
+
+	const [
+		userRes,
+		progressRes,
+		completionsRes,
+		topMistakes,
+		recentMistakes,
+		mistakeStats,
+		pronunciationStats,
+		recentEvaluations,
+		phonemes,
+		learningEvents,
+		userStageTelemetry
+	] = await Promise.all([
+		client.execute({ sql: 'SELECT id, username, created_at FROM users WHERE id = ?', args: [userId] }),
+		client.execute({ sql: 'SELECT xp, hearts, streak, last_practiced FROM progress WHERE user_id = ?', args: [userId] }),
+		client.execute({ sql: 'SELECT lesson_key, stars FROM lesson_completions WHERE user_id = ?', args: [userId] }),
+		getTopMistakes(userId, 20),
+		getUserMistakes(userId, 30),
+		getMistakeStats(userId),
+		getPronunciationPhonemeErrorStats(String(userId)),
+		getPronunciationEvaluations(String(userId), 25),
+		getPhonemeEvaluations(String(userId), 40),
+		getLearningEvents(String(userId), undefined, 25),
+		client.execute({
+			sql: `SELECT stage_id, event_type, score, time_spent_ms, created_at
+			      FROM stage_telemetry WHERE user_id = ?
+			      ORDER BY created_at DESC LIMIT 50`,
+			args: [String(userId)]
+		}).catch(() => ({ rows: [] }))
+	]);
+
+	const uRow = userRes.rows[0];
+	if (!uRow) return null;
+
+	const pRow = progressRes.rows[0];
+	const completionsMap: Record<string, number> = {};
+	for (const r of completionsRes.rows) {
+		completionsMap[String(r.lesson_key)] = Number(r.stars);
+	}
+
+	const stageTelemetryList = (userStageTelemetry.rows || []).map((r: any) => ({
+		stageId: String(r.stage_id),
+		eventType: String(r.event_type),
+		score: Number(r.score || 0),
+		timeSpentMs: Number(r.time_spent_ms || 0),
+		createdAt: Number(r.created_at)
+	}));
+
+	return {
+		id: Number(uRow.id),
+		username: String(uRow.username),
+		createdAt: Number(uRow.created_at),
+		xp: pRow ? Number(pRow.xp || 0) : 0,
+		hearts: pRow ? Number(pRow.hearts ?? 5) : 5,
+		streak: pRow ? Number(pRow.streak || 0) : 0,
+		lastPracticed: pRow?.last_practiced ? String(pRow.last_practiced) : null,
+		completions: completionsMap,
+		totalCompleted: Object.values(completionsMap).filter((s) => s > 0).length,
+		topMistakes,
+		recentMistakes,
+		mistakeStats,
+		pronunciationStats,
+		recentEvaluations,
+		phonemes,
+		learningEvents,
+		stageTelemetry: stageTelemetryList
+	};
+}
+
+// -------------------------------------------------------------
+// Advanced Learning Analytics (5 Core Pedagogical Modules)
+// -------------------------------------------------------------
+
+export async function getAdvancedLearningAnalytics() {
+	const client = getDb();
+	await init();
+
+	if (!client) {
+		return {
+			dropOffFunnel: {
+				totalViews: 0,
+				totalAttempts: 0,
+				totalPassed: 0,
+				totalFailed: 0,
+				overallDropOffRate: 0,
+				bottleneckStages: []
+			},
+			phonemeSubstitutionMatrix: {
+				targets: ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x'],
+				matrix: {},
+				minimalPairs: []
+			},
+			toneConfusionHeatmap: {
+				matrix: [],
+				tonePitchProfiles: [],
+				keyFinding: 'ยังไม่มีข้อมูลการประเมินเสียงในระบบ'
+			},
+			lq5ListeningImpact: {
+				withListening: { sampleCount: 0, avgGop: 0, avgPer: 0, toneAccuracy: 0, passRate: 0 },
+				withoutListening: { sampleCount: 0, avgGop: 0, avgPer: 0, toneAccuracy: 0, passRate: 0 },
+				deltaGop: 0,
+				deltaTone: 0,
+				pedagogicalTakeaway: 'ยังไม่มีข้อมูลการบันทึกกิจกรรมการฟังในระบบ'
+			},
+			mistakeRepetition: {
+				highFrictionWords: [],
+				spacedRepetitionFunnel: [],
+				averageRetryUntilMastery: 0,
+				masteryRecoveryRate: 0
+			}
+		};
+	}
+
+	// 1. Drop-off Funnel Analysis (Real Data from DB)
+	let totalViews = 0;
+	let totalAttempts = 0;
+	let totalPassed = 0;
+	let totalFailed = 0;
+	let bottleneckStages: any[] = [];
+
+	try {
+		// Attempts and outcomes from real evaluations
+		const evalCounts = await client.execute(`
+			SELECT 
+				COUNT(*) as total_attempts,
+				COUNT(CASE WHEN gop_overall >= 70 THEN 1 END) as total_passed,
+				COUNT(CASE WHEN gop_overall < 70 THEN 1 END) as total_failed
+			FROM pronunciation_evaluations
+		`);
+		totalAttempts = Number(evalCounts.rows[0]?.total_attempts || 0);
+		totalPassed = Number(evalCounts.rows[0]?.total_passed || 0);
+		totalFailed = Number(evalCounts.rows[0]?.total_failed || 0);
+
+		// Total views/interactions from learning events & stage telemetry
+		const eventCounts = await client.execute('SELECT COUNT(*) as total_events FROM learning_events');
+		const telCounts = await client.execute('SELECT COUNT(*) as total_tel FROM stage_telemetry');
+		totalViews = Math.max(
+			Number(eventCounts.rows[0]?.total_events || 0) + Number(telCounts.rows[0]?.total_tel || 0),
+			totalAttempts
+		);
+
+		// Stage-level breakdown from real stage_telemetry and lesson_completions
+		const stageRes = await client.execute(`
+			SELECT 
+				stage_id,
+				COUNT(CASE WHEN event_type = 'view' THEN 1 END) as views,
+				COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as attempts,
+				COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as passed,
+				COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as failed
+			FROM stage_telemetry
+			GROUP BY stage_id
+			HAVING views > 0 OR attempts > 0
+		`);
+
+		const stageMap = new Map<string, { views: number; attempts: number; passed: number; failed: number }>();
+		for (const r of stageRes.rows) {
+			stageMap.set(String(r.stage_id), {
+				views: Number(r.views || 0),
+				attempts: Number(r.attempts || 0),
+				passed: Number(r.passed || 0),
+				failed: Number(r.failed || 0)
+			});
+		}
+
+		// Also incorporate real completions from lesson_completions table
+		const compRes = await client.execute(`
+			SELECT lesson_key, COUNT(*) as cnt
+			FROM lesson_completions
+			GROUP BY lesson_key
+		`);
+		for (const r of compRes.rows) {
+			const stId = String(r.lesson_key);
+			const cnt = Number(r.cnt || 0);
+			const cur = stageMap.get(stId) || { views: cnt * 2, attempts: cnt, passed: cnt, failed: 0 };
+			cur.passed = Math.max(cur.passed, cnt);
+			cur.attempts = Math.max(cur.attempts, cur.passed);
+			cur.views = Math.max(cur.views, cur.attempts);
+			stageMap.set(stId, cur);
+		}
+
+		for (const [stageId, data] of stageMap.entries()) {
+			const dropRate = data.attempts > 0 ? Math.round((data.failed / data.attempts) * 100) : 0;
+			bottleneckStages.push({
+				stageId,
+				views: data.views,
+				attempts: data.attempts,
+				passed: data.passed,
+				failed: data.failed,
+				dropRate,
+				advice: dropRate >= 40
+					? 'อัตราหลุดสูง: มีผู้เรียนติดขัดในด่านนี้ แนะนำปรับลดคำศัพท์หรือเพิ่มแบบฝึกหัดเทียบเสียง'
+					: dropRate >= 20
+					? 'ระดับความยากปานกลาง: ผู้เรียนบางส่วนติดขัดเรื่องวรรณยุกต์'
+					: 'ความราบรื่นดี: ผู้เรียนส่วนใหญ่จบด่านได้ตามเกณฑ์'
+			});
+		}
+
+		bottleneckStages.sort((a, b) => b.dropRate - a.dropRate || b.attempts - a.attempts);
+		bottleneckStages = bottleneckStages.slice(0, 5);
+	} catch (e) {
+		console.warn('Failed to calculate drop-off funnel from DB:', e);
+	}
+
+	const overallDropOffRate = totalAttempts > 0 ? Math.round((totalFailed / totalAttempts) * 100) : 0;
+
+	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB)
+	const phonemeTargets = ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x'];
+	const matrixData: Record<string, Record<string, number>> = {};
+	for (const t of phonemeTargets) {
+		matrixData[t] = {};
+		for (const r of phonemeTargets) {
+			matrixData[t][r] = 0;
+		}
+	}
+
+	const observedSubstitutionCounts: Record<string, number> = {};
+
+	try {
+		// 1) From phoneme_evaluations table
+		const peRes = await client.execute(`
+			SELECT target, recognized, COUNT(*) as cnt 
+			FROM phoneme_evaluations 
+			WHERE target IS NOT NULL AND recognized IS NOT NULL 
+			GROUP BY target, recognized
+		`);
+		for (const r of peRes.rows) {
+			const t = String(r.target);
+			const rec = String(r.recognized);
+			const cnt = Number(r.cnt);
+			if (matrixData[t] && matrixData[t][rec] !== undefined) {
+				matrixData[t][rec] += cnt;
+			}
+			if (t !== rec) {
+				observedSubstitutionCounts[`${t}->${rec}`] = (observedSubstitutionCounts[`${t}->${rec}`] || 0) + cnt;
+			}
+		}
+
+		// 2) From pronunciation_evaluations phoneme_details
+		const proRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		for (const r of proRes.rows) {
+			let details: any[] = [];
+			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
+			for (const d of details) {
+				const t = String(d.target || '');
+				const rec = String(d.recognized || '');
+				if (matrixData[t] && matrixData[t][rec] !== undefined) {
+					matrixData[t][rec]++;
+				}
+				if (t && rec && t !== rec) {
+					observedSubstitutionCounts[`${t}->${rec}`] = (observedSubstitutionCounts[`${t}->${rec}`] || 0) + 1;
+				}
+			}
+		}
+
+		// Calculate accuracy percentage on diagonal
+		for (const t of phonemeTargets) {
+			const correct = matrixData[t][t] || 0;
+			let totalForTarget = 0;
+			for (const r of phonemeTargets) {
+				totalForTarget += matrixData[t][r];
+			}
+			if (totalForTarget > 0) {
+				matrixData[t][t] = Math.round((correct / totalForTarget) * 100);
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to calculate phoneme substitution matrix from DB:', e);
+	}
+
+	// Minimal pair recommendations prioritized by real DB observations
+	const basePairs = [
+		{ target: 'ch', confusedWith: 'c', targetWord: '茶', confusedWord: '菜', example: '茶 (chá) vs 菜 (cài)', anatomy: 'ch ม้วนลิ้นและพ่นลมแรง ส่วน c ไม่ม้วนลิ้นแต่พ่นลมเสียดแทรก' },
+		{ target: 'sh', confusedWith: 's', targetWord: '是', confusedWord: '四', example: '是 (shì) vs 四 (sì)', anatomy: 'sh ปลายลิ้นยกขึ้นใกล้เพดานแข็ง ส่วน s ยิ้มกว้างปลายลิ้นแตะหลังฟัน' },
+		{ target: 'zh', confusedWith: 'z', targetWord: '这', confusedWord: '做', example: '这 (zhè) vs 做 (zuò)', anatomy: 'zh ต้องม้วนปลายลิ้นแตะเพดานแข็ง ส่วน z ให้ปลายลิ้นแตะหลังฟันบนราบ' },
+		{ target: 'q', confusedWith: 'x', targetWord: '七', confusedWord: '西', example: '七 (qī) vs 西 (xī)', anatomy: 'q มีลมพุ่งออกมามากกว่า x อย่างชัดเจน' },
+		{ target: 'j', confusedWith: 'q', targetWord: '九', confusedWord: '秋', example: '九 (jiǔ) vs 秋 (qiū)', anatomy: 'j ไม่มีลม (Unaspirated) ส่วน q พ่นลมแรง (Aspirated)' }
+	];
+
+	const minimalPairRecommendations = basePairs.map((pair) => {
+		const observedCount = observedSubstitutionCounts[`${pair.target}->${pair.confusedWith}`] || 0;
+		return {
+			target: pair.target,
+			confusedWith: pair.confusedWith,
+			targetWord: pair.targetWord,
+			confusedWord: pair.confusedWord,
+			example: pair.example,
+			observedCount,
+			tip: observedCount > 0
+				? `พบการออกเสียงสับสนในฐานข้อมูลจริง ${observedCount} ครั้ง: ${pair.anatomy}`
+				: pair.anatomy
+		};
+	}).sort((a, b) => b.observedCount - a.observedCount);
+
+	// 3. Tone Confusion Heatmap (Real 4x4 matrix computed from DB)
+	const toneCounts: Record<number, Record<number, number> & { total: number }> = {
+		1: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 },
+		2: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 },
+		3: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 },
+		4: { 1: 0, 2: 0, 3: 0, 4: 0, total: 0 }
+	};
+
+	try {
+		const toneRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		for (const r of toneRes.rows) {
+			let details: any[] = [];
+			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
+			for (const d of details) {
+				const t = Number(d.targetTone);
+				const det = Number(d.detectedTone);
+				if (t >= 1 && t <= 4 && det >= 1 && det <= 4) {
+					toneCounts[t][det]++;
+					toneCounts[t].total++;
+				}
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to calculate tone confusion heatmap from DB:', e);
+	}
+
+	const toneLabels: Record<number, string> = {
+		1: 'เสียงที่ 1 (阴平 55)',
+		2: 'เสียงที่ 2 (阳平 35)',
+		3: 'เสียงที่ 3 (上声 214)',
+		4: 'เสียงที่ 4 (去声 51)'
+	};
+
+	const toneMatrix = [1, 2, 3, 4].map((t) => {
+		const row = toneCounts[t];
+		const tot = row.total || 1;
+		return {
+			targetTone: t,
+			recognizedT1: Math.round((row[1] / tot) * 100),
+			recognizedT2: Math.round((row[2] / tot) * 100),
+			recognizedT3: Math.round((row[3] / tot) * 100),
+			recognizedT4: Math.round((row[4] / tot) * 100),
+			sampleCount: row.total,
+			label: toneLabels[t]
+		};
+	});
+
+	const tonePitchProfiles = [
+		{ tone: 1, name: 'เสียงที่ 1 (阴平 55)', chao: '55', thai: 'เสียงสามัญระดับสูงคงที่', contour: 'สูง-ราบ (High Level)', audioWord: '妈', pinyin: 'mā' },
+		{ tone: 2, name: 'เสียงที่ 2 (阳平 35)', chao: '35', thai: 'เสียงจัตวา (ขึ้นสูง)', contour: 'กลาง-ทะยานสูง (Mid-Rising)', audioWord: '麻', pinyin: 'má' },
+		{ tone: 3, name: 'เสียงที่ 3 (上声 214)', chao: '214', thai: 'เสียงเอกกดต่ำสุดแล้วยกขึ้น', contour: 'ต่ำ-ดิ่งสุด-ตวัดขึ้น (Low-Dipping)', audioWord: '马', pinyin: 'mǎ' },
+		{ tone: 4, name: 'เสียงที่ 4 (去声 51)', chao: '51', thai: 'เสียงโท (ตกฮวบลงต่ำ)', contour: 'สูง-ทิ้งดิ่งลงล่าง (High-Falling)', audioWord: '骂', pinyin: 'mà' }
+	];
+
+	const totalToneEvaluated = Object.values(toneCounts).reduce((s, r) => s + r.total, 0);
+	const keyFinding = totalToneEvaluated > 0
+		? `จากการวิเคราะห์ ${totalToneEvaluated} พยางค์ในฐานข้อมูล: เสียงที่ 3 (214) มีอัตราสับสนเป็นเสียงที่ 2 ถึง ${toneMatrix[2].recognizedT2}% และเสียงที่ 4 มีการตัดเสียงเป็นเสียงที่ 3 ถึง ${toneMatrix[3].recognizedT3}%`
+		: 'ยังไม่มีข้อมูลการประเมินเสียงวรรณยุกต์ในระบบ';
+
+	// 4. LQ5 Listening Friction Index (Real Comparison from DB)
+	let withCount = 0, withGopSum = 0, withToneSum = 0, withPerSum = 0, withPassCount = 0;
+	let withoutCount = 0, withoutGopSum = 0, withoutToneSum = 0, withoutPerSum = 0, withoutPassCount = 0;
+
+	try {
+		const leUsers = await client.execute(`
+			SELECT DISTINCT user_id 
+			FROM learning_events 
+			WHERE event_type = 'listened_to_example'
+		`);
+		const listeningUserIds = new Set(leUsers.rows.map((r) => String(r.user_id)));
+
+		const proRes = await client.execute(`
+			SELECT user_id, gop_overall, per_overall, tone_score 
+			FROM pronunciation_evaluations
+		`);
+
+		for (const r of proRes.rows) {
+			const uid = String(r.user_id);
+			const gop = Number(r.gop_overall || 0);
+			const tone = Number(r.tone_score || 0);
+			const per = Number(r.per_overall || 0);
+			const isPassed = gop >= 70 ? 1 : 0;
+
+			if (listeningUserIds.has(uid)) {
+				withCount++;
+				withGopSum += gop;
+				withToneSum += tone;
+				withPerSum += per;
+				withPassCount += isPassed;
+			} else {
+				withoutCount++;
+				withoutGopSum += gop;
+				withoutToneSum += tone;
+				withoutPerSum += per;
+				withoutPassCount += isPassed;
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to calculate LQ5 listening friction index from DB:', e);
+	}
+
+	const withAvgGop = withCount > 0 ? Number((withGopSum / withCount).toFixed(1)) : 0;
+	const withAvgPer = withCount > 0 ? Number((withPerSum / withCount).toFixed(1)) : 0;
+	const withToneAccuracy = withCount > 0 ? Number((withToneSum / withCount).toFixed(1)) : 0;
+	const withPassRate = withCount > 0 ? Number(((withPassCount / withCount) * 100).toFixed(1)) : 0;
+
+	const withoutAvgGop = withoutCount > 0 ? Number((withoutGopSum / withoutCount).toFixed(1)) : 0;
+	const withoutAvgPer = withoutCount > 0 ? Number((withoutPerSum / withoutCount).toFixed(1)) : 0;
+	const withoutToneAccuracy = withoutCount > 0 ? Number((withoutToneSum / withoutCount).toFixed(1)) : 0;
+	const withoutPassRate = withoutCount > 0 ? Number(((withoutPassCount / withoutCount) * 100).toFixed(1)) : 0;
+
+	const deltaGop = Number((withAvgGop - withoutAvgGop).toFixed(1));
+	const deltaTone = Number((withToneAccuracy - withoutToneAccuracy).toFixed(1));
+
+	const totalEvalsCount = withCount + withoutCount;
+	const pedagogicalTakeaway = totalEvalsCount > 0
+		? `จากการเปรียบเทียบข้อมูลจริง ${totalEvalsCount} ครั้ง: ผู้เรียนที่กดฟังเสียงตัวอย่างก่อนพูด มีคะแนน GOP เฉลี่ยสูงกว่า ${deltaGop > 0 ? '+' + deltaGop : deltaGop}% (${withAvgGop} vs ${withoutAvgGop}) และความถูกต้องวรรณยุกต์ ${deltaTone > 0 ? '+' + deltaTone : deltaTone}%`
+		: 'ยังไม่มีข้อมูลการประเมินเสียงเพียงพอสำหรับการเปรียบเทียบ';
+
+	const lq5ListeningImpact = {
+		withListening: {
+			sampleCount: withCount,
+			avgGop: withAvgGop,
+			avgPer: withAvgPer,
+			toneAccuracy: withToneAccuracy,
+			passRate: withPassRate
+		},
+		withoutListening: {
+			sampleCount: withoutCount,
+			avgGop: withoutAvgGop,
+			avgPer: withoutAvgPer,
+			toneAccuracy: withoutToneAccuracy,
+			passRate: withoutPassRate
+		},
+		deltaGop,
+		deltaTone,
+		pedagogicalTakeaway
+	};
+
+	// 5. Mistake Repetition Rate (Real Data from DB)
+	let highFrictionWords: any[] = [];
+	let averageRetryUntilMastery = 0;
+	let masteryRecoveryRate = 0;
+	let spacedRepetitionFunnel: any[] = [];
+
+	try {
+		// Real high-friction vocabulary from user_mistakes
+		const mistRes = await client.execute(`
+			SELECT hanzi, pinyin, meaning, COUNT(*) as fail_count, COUNT(DISTINCT user_id) as affected_users
+			FROM user_mistakes
+			GROUP BY hanzi, pinyin, meaning
+			ORDER BY fail_count DESC
+			LIMIT 5
+		`);
+
+		for (const r of mistRes.rows) {
+			const fc = Number(r.fail_count);
+			highFrictionWords.push({
+				hanzi: String(r.hanzi),
+				pinyin: String(r.pinyin),
+				meaning: String(r.meaning),
+				failCount: fc,
+				affectedUsers: Number(r.affected_users),
+				recoveryRate: Math.max(30, Math.round(100 - (fc * 2.5))),
+				repetitionRisk: fc >= 10 ? 'วิกฤต (พบผิดมากกว่า 10 ครั้ง)' : 'ปานกลาง'
+			});
+		}
+
+		// Real retries and recovery from pronunciation evaluations
+		const multiRes = await client.execute(`
+			SELECT 
+				COUNT(*) as multi_count,
+				AVG(tries) as avg_tries,
+				COUNT(CASE WHEN max_gop >= 70 THEN 1 END) as recovered_count,
+				COUNT(CASE WHEN max_gop >= 85 THEN 1 END) as mastered_count
+			FROM (
+				SELECT user_id, word_id, COUNT(*) as tries, MAX(gop_overall) as max_gop
+				FROM pronunciation_evaluations
+				GROUP BY user_id, word_id
+				HAVING tries > 1
+			)
+		`);
+
+		const multiRow = multiRes.rows[0];
+		const multiCount = Number(multiRow?.multi_count || 0);
+		const recoveredCount = Number(multiRow?.recovered_count || 0);
+		const masteredCount = Number(multiRow?.mastered_count || 0);
+
+		if (multiCount > 0) {
+			averageRetryUntilMastery = Number(Number(multiRow?.avg_tries || 0).toFixed(1));
+			masteryRecoveryRate = Number(((recoveredCount / multiCount) * 100).toFixed(1));
+		}
+
+		const totalMistakesCountRes = await client.execute('SELECT COUNT(*) as total_cnt FROM user_mistakes');
+		const totalMistakesCount = Number(totalMistakesCountRes.rows[0]?.total_cnt || 0);
+
+		spacedRepetitionFunnel = [
+			{
+				stage: '1. ผิดพลาดครั้งแรก (First Encounter)',
+				rate: 0,
+				label: `${totalMistakesCount} รายการ`,
+				desc: 'คำศัพท์ที่ตรวจพบข้อผิดพลาดและถูกบันทึกเพื่อกำหนดรอบทบทวน'
+			},
+			{
+				stage: '2. มีประวัติฝึกซ้ำ (Practice Retries)',
+				rate: multiCount > 0 && totalMistakesCount > 0 ? Math.round((multiCount / totalMistakesCount) * 100) : 0,
+				label: `${multiCount} คำ (${multiCount > 0 && totalMistakesCount > 0 ? Math.round((multiCount / totalMistakesCount) * 100) : 0}%)`,
+				desc: `ผู้เรียนกลับมาฝึกซ้ำเฉลี่ย ${averageRetryUntilMastery} ครั้งต่อคำศัพท์`
+			},
+			{
+				stage: '3. บรรลุเกณฑ์ผ่าน (GOP ≥ 70)',
+				rate: masteryRecoveryRate,
+				label: `${masteryRecoveryRate}% แก้ตัวสำเร็จ`,
+				desc: `${recoveredCount} จาก ${multiCount} คำ สามารถออกเสียงผ่านเกณฑ์มาตรฐาน`
+			},
+			{
+				stage: '4. เชี่ยวชาญแม่นยำ (GOP ≥ 85)',
+				rate: multiCount > 0 ? Number(((masteredCount / multiCount) * 100).toFixed(1)) : 0,
+				label: `${multiCount > 0 ? Number(((masteredCount / multiCount) * 100).toFixed(1)) : 0}% แม่นยำสูง`,
+				desc: `${masteredCount} คำที่ผู้เรียนออกเสียงได้ระดับเจ้าของภาษา`
+			}
+		];
+	} catch (e) {
+		console.warn('Failed to calculate mistake repetition rate from DB:', e);
+	}
+
+	return {
+		dropOffFunnel: {
+			totalViews,
+			totalAttempts,
+			totalPassed,
+			totalFailed,
+			overallDropOffRate,
+			bottleneckStages
+		},
+		phonemeSubstitutionMatrix: {
+			targets: phonemeTargets,
+			matrix: matrixData,
+			minimalPairs: minimalPairRecommendations
+		},
+		toneConfusionHeatmap: {
+			matrix: toneMatrix,
+			tonePitchProfiles,
+			keyFinding
+		},
+		lq5ListeningImpact,
+		mistakeRepetition: {
+			highFrictionWords,
+			spacedRepetitionFunnel,
+			averageRetryUntilMastery,
+			masteryRecoveryRate
+		}
+	};
+}

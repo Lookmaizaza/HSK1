@@ -56,18 +56,43 @@
 	let speechTranscript = '';
 	let speechCandidates: string[] = [];
 	let recognizedWord = $state<string>('');
+
+	let stageStartTime = Date.now();
+	let listenCount = 0;
+	let hintsUsed = 0;
+	let retriesCount = 0;
+	let stageCompleted = false;
+
+	function sendStageTelemetry(eventType: 'view' | 'attempt' | 'pass' | 'fail' | 'hint' | 'listen', score = 0) {
+		if (!stageId || typeof window === 'undefined') return;
+		const timeSpentMs = Date.now() - stageStartTime;
+		fetch('/api/v1/telemetry/stage-event', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				stageId,
+				eventType,
+				score,
+				timeSpentMs,
+				retriesCount,
+				listenCount,
+				hintsUsed
+			})
+		}).catch(() => {});
+	}
 	
 	onMount(() => {
 		if (!stageData) {
 			goto('/');
-		} else {
-			playAudioIfListenSpeak(stageData.challenges[0]);
 		}
 	});
 
 	onDestroy(() => {
 		clearAudioTimer();
 		stopRecording();
+		if (!stageCompleted) {
+			sendStageTelemetry('fail');
+		}
 	});
 
 	const currentChallenge = $derived(stageData?.challenges[currentIndex]);
@@ -463,6 +488,8 @@
 	}
 
 	function triggerVictory() {
+		stageCompleted = true;
+		sendStageTelemetry('pass', 100);
 		phase = 'victory';
 		progress.addXp(25);
 		if (stageId) progress.completeLesson(stageId, 3);

@@ -3,10 +3,25 @@
 declare global {
 	namespace App {
 		interface Locals {
-			user: { id: number; username: string; isAdmin: boolean } | null;
+			user: {
+				id: number;
+				username: string;
+				isAdmin: boolean;
+				role: 'admin' | 'user';
+				isImpersonated?: boolean;
+				realAdminUsername?: string;
+			} | null;
+			realAdmin?: { id: number; username: string; isAdmin: boolean; role: 'admin' } | null;
 		}
 		interface PageData {
-			user: { id: number; username: string; isAdmin: boolean } | null;
+			user: {
+				id: number;
+				username: string;
+				isAdmin: boolean;
+				role: 'admin' | 'user';
+				isImpersonated?: boolean;
+				realAdminUsername?: string;
+			} | null;
 		}
 	}
 }

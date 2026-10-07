@@ -51,13 +51,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Configuration
-origins = os.getenv("CORS_ORIGINS", "*").split(",")
+# CORS Configuration (Strict origin policy with credentials support)
+cors_raw = os.getenv("CORS_ORIGINS", "").strip()
+if cors_raw and cors_raw != "*":
+    origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
+    allow_creds = True
+elif cors_raw == "*":
+    origins = ["*"]
+    allow_creds = False
+else:
+    origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "https://hsk-orpin.vercel.app",
+    ]
+    allow_creds = True
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=allow_creds,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

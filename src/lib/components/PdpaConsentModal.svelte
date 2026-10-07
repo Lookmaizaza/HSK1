@@ -2,7 +2,7 @@
 <script lang="ts">
 	import { ShieldCheck, Mic, Lock, CheckCircle2, AlertCircle, Volume2, Sparkles } from '@lucide/svelte';
 
-	let { user = null }: { user?: { id: number; username: string } | null } = $props();
+	let { user = null }: { user?: { id: number; username: string; isAdmin?: boolean; role?: 'admin' | 'user' } | null } = $props();
 
 	let isOpen = $state(false);
 	let isRequestingMic = $state(false);
@@ -16,18 +16,19 @@
 
 	// Check consent whenever user logs in or page loads
 	$effect(() => {
-		if (!user || !user.id) {
-			// If not logged in, DO NOT show PDPA modal
+		// CRITICAL SEPARATION: If not logged in OR if user is an ADMIN, NEVER show PDPA modal.
+		// Administrators manage the platform and are NOT subjects of student learning research.
+		if (!user || !user.id || user.isAdmin || user.role === 'admin') {
 			isOpen = false;
 			return;
 		}
 
-		// User is logged in: Check user-specific consent record
+		// Regular student/learner is logged in: Check user-specific consent record
 		const userStorageKey = `yupakjeen_pdpa_consent_user_${user.id}`;
 		const storedConsent = localStorage.getItem(userStorageKey);
 
 		if (!storedConsent) {
-			// Only show after user is logged in and hasn't consented yet
+			// Only show after learner is logged in and hasn't consented yet
 			isOpen = true;
 		} else {
 			isOpen = false;
