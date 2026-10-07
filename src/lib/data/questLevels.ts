@@ -148,8 +148,8 @@ function deriveThemeInfo(
  * Generates a difficulty-laddered challenge sequence for a stage:
  *
  * Difficulty progression per stage (8 words → 8–10 challenges):
- *  1. [EASY]   listen_speak  — ฟังแล้วพูดตาม (word 0)  warmup
- *  2. [EASY]   translate     — เลือกความหมาย (word 1)
+ *  1. [EASY]   translate     — เลือกความหมาย (word 1) เริ่มต้นแบบเบาๆ
+ *  2. [EASY]   listen_speak  — ฟังแล้วพูดตาม (word 0) สลับมาอยู่ข้อที่ไม่ใช่ข้อแรก
  *  3. [EASY]   translate     — เลือกความหมาย (word 2)
  *  4. [MED]    speak         — พูดคำเดี่ยว (word 3)
  *  5. [MED]    speak         — พูดคำเดี่ยว (word 4)
@@ -170,7 +170,21 @@ function chunkPresets(presets: TonePreset[], hskLevel: number): QuestStage[] {
 		const challenges: Challenge[] = [];
 
 		// ── EASY tier ──────────────────────────────────────────────────
-		// 1. Listen & Speak warmup (word 0)
+		// 1. Translate multiple-choice (word 1) — ให้เริ่มด้วยข้อแปลความหมายก่อน ไม่ขึ้นเสียงพูดทันที
+		if (chunk[1]) {
+			const word = chunk[1];
+			const wrongPool = allThaiMeanings.filter((t) => t !== word.thai);
+			const choices = shuffleArray([word.thai, ...shuffleArray(wrongPool).slice(0, 2)]);
+			challenges.push({
+				id: `c-${stageIndex}-1-translate`,
+				type: 'translate',
+				word,
+				choices,
+				correctChoiceIndex: choices.indexOf(word.thai)
+			});
+		}
+
+		// 2. Listen & Speak warmup (word 0) — สลับมาอยู่ข้อที่ไม่ใช่ข้อแรก
 		if (chunk[0]) {
 			challenges.push({
 				id: `c-${stageIndex}-0-listen`,
@@ -179,20 +193,19 @@ function chunkPresets(presets: TonePreset[], hskLevel: number): QuestStage[] {
 			});
 		}
 
-		// 2-3. Translate multiple-choice (3 choices) — words 1, 2
-		[1, 2].forEach((idx) => {
-			const word = chunk[idx];
-			if (!word) return;
+		// 3. Translate multiple-choice (word 2)
+		if (chunk[2]) {
+			const word = chunk[2];
 			const wrongPool = allThaiMeanings.filter((t) => t !== word.thai);
 			const choices = shuffleArray([word.thai, ...shuffleArray(wrongPool).slice(0, 2)]);
 			challenges.push({
-				id: `c-${stageIndex}-${idx}-translate`,
+				id: `c-${stageIndex}-2-translate`,
 				type: 'translate',
 				word,
 				choices,
 				correctChoiceIndex: choices.indexOf(word.thai)
 			});
-		});
+		}
 
 		// ── MEDIUM tier ────────────────────────────────────────────────
 		// 4-5. Speak recall — words 3, 4

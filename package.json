@@ -10,7 +10,8 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"db:inspect": "node scripts/inspect_db.js"
+		"db:inspect": "node scripts/inspect_db.js",
+		"benchmark": "python benchmark/run_all_benchmarks.py"
 	},
 	"devDependencies": {
 		"@fontsource-variable/inter": "^5.2.8",
