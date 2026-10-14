@@ -17,6 +17,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 type Action =
 	| { action: 'addXp'; amount: number }
+	| { action: 'recordMistake' }
 	| { action: 'loseHeart' }
 	| { action: 'refillHearts' }
 	| { action: 'completeLesson'; key: string; stars: number };
@@ -30,8 +31,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		case 'addXp':
 			await addXp(uid, Math.max(0, Math.floor(body.amount)));
 			break;
+		case 'recordMistake':
 		case 'loseHeart':
-			await loseHeart(uid);
+			// No heart depletion penalty: mistakes are tracked via user_mistakes table
 			break;
 		case 'refillHearts':
 			await refillHearts(uid, MAX_HEARTS);

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield, BarChart2, Award } from '@lucide/svelte';
+	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield, BarChart2, Award, AlertCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { progress } from '$lib/progress.svelte';
 	import { apiKey } from '$lib/apiKey.svelte';
@@ -60,7 +60,7 @@
 					สถานการณ์จำลอง
 				</a>
 				<a href="/analytics" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground">
-					สมุดพกผลการเรียน
+					รายงานผลการเรียนรู้
 				</a>
 				<a href="/assessment" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1">
 					<Award class="size-3.5 text-amber-500" />
@@ -77,9 +77,9 @@
 				<Zap class="size-4 fill-yellow-400" />
 				{progress.xp}
 			</span>
-			<span class="flex items-center gap-1 text-rose-500">
-				<Heart class="size-4 fill-rose-500" />
-				{progress.hearts}
+			<span class="flex items-center gap-1 text-rose-500 text-xs font-bold bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20" title="จำนวนข้อที่ออกเสียงผิดสะสม">
+				<AlertCircle class="size-3.5 text-rose-500" />
+				<span>{progress.mistakes} ผิด</span>
 			</span>
 			<Button variant="ghost" size="icon" onclick={openSettings} aria-label="Settings">
 				<SettingsIcon class="size-5" />

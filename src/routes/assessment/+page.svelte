@@ -515,7 +515,7 @@
 						class="flex-1 font-bold gap-2 py-6 rounded-2xl"
 					>
 						<BarChart3 class="size-5" />
-						ดูสมุดพกผลการเรียน
+						ดูรายงานผลการเรียนรู้
 					</Button>
 				</div>
 			</div>

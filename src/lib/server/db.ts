@@ -316,13 +316,14 @@ export type ProgressRow = {
 	xp: number;
 	hearts: number;
 	streak: number;
+	mistakes: number;
 	lastPracticed: string | null;
 	completed: Record<string, number>;
 };
 
 export async function getProgress(userId: number): Promise<ProgressRow> {
 	const client = getDb();
-	if (!client) return { xp: 0, hearts: 5, streak: 0, lastPracticed: null, completed: {} };
+	if (!client) return { xp: 0, hearts: 5, streak: 0, mistakes: 0, lastPracticed: null, completed: {} };
 	await init();
 	const progRes = await client.execute({
 		sql: 'SELECT xp, hearts, streak, last_practiced FROM progress WHERE user_id = ?',
@@ -330,6 +331,10 @@ export async function getProgress(userId: number): Promise<ProgressRow> {
 	});
 	const compRes = await client.execute({
 		sql: 'SELECT lesson_key, stars FROM lesson_completions WHERE user_id = ?',
+		args: [userId]
+	});
+	const mistakesRes = await client.execute({
+		sql: 'SELECT COUNT(*) as count FROM user_mistakes WHERE user_id = ?',
 		args: [userId]
 	});
 
@@ -343,6 +348,7 @@ export async function getProgress(userId: number): Promise<ProgressRow> {
 		xp: row ? Number(row.xp) : 0,
 		hearts: row ? Number(row.hearts) : 5,
 		streak: row ? Number(row.streak) : 0,
+		mistakes: Number(mistakesRes.rows[0]?.count ?? 0),
 		lastPracticed: row?.last_practiced ? String(row.last_practiced) : null,
 		completed
 	};

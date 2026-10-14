@@ -31,7 +31,8 @@
 		Activity,
 		AudioLines,
 		Play,
-		CheckCircle2
+		CheckCircle2,
+		AlertCircle
 	} from '@lucide/svelte';
 	import { ALL_QUEST_STAGES, type QuestStage } from '$lib/data/questLevels';
 	import { speak } from '$lib/speech';
@@ -344,7 +345,7 @@
 					<div class="mb-2 flex size-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
 						<TrendingUp class="size-5" />
 					</div>
-					<div class="text-sm font-bold leading-tight">สมุดพกผลการเรียน</div>
+					<div class="text-sm font-bold leading-tight">รายงานผลการเรียนรู้</div>
 					<div class="mt-0.5 text-[11px] font-medium text-white/80">สถิติและคำที่ควรฝึกซ้ำ</div>
 				</a>
 			</div>
@@ -439,11 +440,11 @@
 				<div class="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">สถานะผู้เรียนของคุณ</div>
 				<div class="grid grid-cols-3 gap-2 text-center">
 					<div class="rounded-2xl border bg-muted/40 p-3">
-						<div class="flex items-center justify-center text-red-500 mb-1">
-							<Heart class="size-5 fill-red-500" />
+						<div class="flex items-center justify-center text-rose-500 mb-1">
+							<AlertCircle class="size-5 text-rose-500" />
 						</div>
-						<div class="text-lg font-black text-foreground">{progress.hearts}</div>
-						<div class="text-[10px] text-muted-foreground">พลังชีวิต</div>
+						<div class="text-lg font-black text-foreground">{progress.mistakes}</div>
+						<div class="text-[10px] text-muted-foreground">ข้อที่ผิดสะสม</div>
 					</div>
 
 					<div class="rounded-2xl border bg-muted/40 p-3">

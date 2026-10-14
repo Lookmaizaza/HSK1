@@ -7,6 +7,7 @@ type Progress = {
 	xp: number;
 	hearts: number;
 	streak: number;
+	mistakes: number;
 	lastPracticed: string | null;
 	completed: Record<string, number>;
 };
@@ -15,7 +16,7 @@ const STORAGE_KEY = 'hsk-progress';
 const MAX_HEARTS = 5;
 
 function defaultProgress(): Progress {
-	return { xp: 0, hearts: MAX_HEARTS, streak: 0, lastPracticed: null, completed: {} };
+	return { xp: 0, hearts: MAX_HEARTS, streak: 0, mistakes: 0, lastPracticed: null, completed: {} };
 }
 
 function loadLocal(): Progress {
@@ -88,6 +89,9 @@ export const progress = {
 	get streak() {
 		return state.streak;
 	},
+	get mistakes() {
+		return state.mistakes ?? 0;
+	},
 	get completed() {
 		return state.completed;
 	},
@@ -107,10 +111,15 @@ export const progress = {
 		else saveLocal(snapshot());
 	},
 
-	loseHeart() {
-		state.hearts = Math.max(0, state.hearts - 1);
-		if (state.loggedIn) pushServer({ action: 'loseHeart' });
+	recordMistake() {
+		state.mistakes = (state.mistakes ?? 0) + 1;
+		if (state.loggedIn) pushServer({ action: 'recordMistake' });
 		else saveLocal(snapshot());
+	},
+
+	loseHeart() {
+		// No heart penalty: record mistake count instead
+		this.recordMistake();
 	},
 
 	refillHearts() {
@@ -137,6 +146,7 @@ function snapshot(): Progress {
 		xp: state.xp,
 		hearts: state.hearts,
 		streak: state.streak,
+		mistakes: state.mistakes ?? 0,
 		lastPracticed: state.lastPracticed,
 		completed: { ...state.completed }
 	};
