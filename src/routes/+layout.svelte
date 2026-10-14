@@ -4,6 +4,7 @@
 	import { initProgress } from '$lib/progress.svelte';
 	import InAppBrowserGuard from '$lib/components/InAppBrowserGuard.svelte';
 	import PdpaConsentModal from '$lib/components/PdpaConsentModal.svelte';
+	import AssessmentPromptModal from '$lib/components/AssessmentPromptModal.svelte';
 
 	let { children, data } = $props();
 
@@ -19,4 +20,5 @@
 {@render children()}
 <InAppBrowserGuard />
 <PdpaConsentModal user={data.user} />
+<AssessmentPromptModal user={data.user} />
 

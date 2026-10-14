@@ -138,6 +138,36 @@ CREATE INDEX IF NOT EXISTS idx_phoneme_eval_word ON phoneme_evaluations(word_id)
 CREATE INDEX IF NOT EXISTS idx_events_user_created ON learning_events(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_events_user_verb ON learning_events(user_id, event_type);
 CREATE INDEX IF NOT EXISTS idx_events_word ON learning_events(word_id);
+
+CREATE TABLE IF NOT EXISTS assessment_records (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	test_type TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	pinyin TEXT NOT NULL,
+	target_tone INTEGER NOT NULL,
+	detected_tone INTEGER NOT NULL,
+	tone_confidence REAL NOT NULL DEFAULT 0,
+	tone_score REAL NOT NULL DEFAULT 0,
+	gop_overall REAL NOT NULL DEFAULT 0,
+	per_overall REAL NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS assessment_summaries (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	test_type TEXT NOT NULL,
+	total_words INTEGER NOT NULL DEFAULT 20,
+	correct_tones INTEGER NOT NULL DEFAULT 0,
+	avg_tone_score REAL NOT NULL DEFAULT 0,
+	avg_gop REAL NOT NULL DEFAULT 0,
+	avg_per REAL NOT NULL DEFAULT 0,
+	completed_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_assessment_user_type ON assessment_records(user_id, test_type);
+CREATE INDEX IF NOT EXISTS idx_assessment_summary_user ON assessment_summaries(user_id, test_type);
 `;
 
 let initPromise: Promise<void> | null = null;
@@ -1371,6 +1401,125 @@ export async function getAllTablesSummary(): Promise<Array<{ tableName: string; 
 	}
 
 	return summary;
+}
+
+// ---------------------------------------------------------------------------
+// HSK 1-3 Pre/Mid/Post Assessment Engine
+// ---------------------------------------------------------------------------
+
+export type AssessmentRecordInput = {
+	userId: string;
+	testType: 'pre' | 'mid' | 'post';
+	wordId: string;
+	pinyin: string;
+	targetTone: number;
+	detectedTone: number;
+	toneConfidence: number;
+	toneScore: number;
+	gopOverall: number;
+	perOverall: number;
+};
+
+export type AssessmentSummaryInput = {
+	userId: string;
+	testType: 'pre' | 'mid' | 'post';
+	totalWords: number;
+	correctTones: number;
+	avgToneScore: number;
+	avgGop: number;
+	avgPer: number;
+};
+
+export async function recordAssessmentWord(input: AssessmentRecordInput): Promise<void> {
+	const client = getDb();
+	if (!client) return;
+	await init();
+
+	await client.execute({
+		sql: `INSERT INTO assessment_records (
+			user_id, test_type, word_id, pinyin, target_tone, detected_tone,
+			tone_confidence, tone_score, gop_overall, per_overall, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		args: [
+			input.userId,
+			input.testType,
+			input.wordId,
+			input.pinyin,
+			input.targetTone,
+			input.detectedTone,
+			input.toneConfidence,
+			input.toneScore,
+			input.gopOverall,
+			input.perOverall,
+			Date.now()
+		]
+	});
+}
+
+export async function saveAssessmentSummary(input: AssessmentSummaryInput): Promise<void> {
+	const client = getDb();
+	if (!client) return;
+	await init();
+
+	await client.execute({
+		sql: `INSERT INTO assessment_summaries (
+			user_id, test_type, total_words, correct_tones, avg_tone_score, avg_gop, avg_per, completed_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		args: [
+			input.userId,
+			input.testType,
+			input.totalWords,
+			input.correctTones,
+			input.avgToneScore,
+			input.avgGop,
+			input.avgPer,
+			Date.now()
+		]
+	});
+}
+
+export async function getUserAssessmentStatus(userId: string): Promise<{
+	hasPre: boolean;
+	hasMid: boolean;
+	hasPost: boolean;
+	summaries: Record<string, any>;
+}> {
+	const client = getDb();
+	if (!client) {
+		return { hasPre: false, hasMid: false, hasPost: false, summaries: {} };
+	}
+	await init();
+
+	const res = await client.execute({
+		sql: `SELECT test_type, total_words, correct_tones, avg_tone_score, avg_gop, avg_per, completed_at 
+		      FROM assessment_summaries 
+		      WHERE user_id = ? 
+		      ORDER BY completed_at DESC`,
+		args: [userId]
+	});
+
+	const summaries: Record<string, any> = {};
+	for (const row of res.rows) {
+		const type = String(row.test_type);
+		if (!summaries[type]) {
+			summaries[type] = {
+				testType: type,
+				totalWords: Number(row.total_words),
+				correctTones: Number(row.correct_tones),
+				avgToneScore: Number(row.avg_tone_score),
+				avgGop: Number(row.avg_gop),
+				avgPer: Number(row.avg_per),
+				completedAt: Number(row.completed_at)
+			};
+		}
+	}
+
+	return {
+		hasPre: !!summaries['pre'],
+		hasMid: !!summaries['mid'],
+		hasPost: !!summaries['post'],
+		summaries
+	};
 }
 
 

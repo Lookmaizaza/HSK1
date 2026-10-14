@@ -11,6 +11,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"db:inspect": "node scripts/inspect_db.js",
+		"export:eval": "node scripts/export_pre_post.js",
 		"benchmark": "python benchmark/run_all_benchmarks.py"
 	},
 	"devDependencies": {

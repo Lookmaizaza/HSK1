@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield, BarChart2 } from '@lucide/svelte';
+	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield, BarChart2, Award } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { progress } from '$lib/progress.svelte';
 	import { apiKey } from '$lib/apiKey.svelte';
@@ -61,6 +61,10 @@
 				</a>
 				<a href="/analytics" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground">
 					สมุดพกผลการเรียน
+				</a>
+				<a href="/assessment" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1">
+					<Award class="size-3.5 text-amber-500" />
+					แบบทดสอบวัดผล HSK
 				</a>
 			</nav>
 		</div>
