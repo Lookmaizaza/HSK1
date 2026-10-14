@@ -64,7 +64,7 @@
 				</a>
 				<a href="/assessment" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1">
 					<Award class="size-3.5 text-amber-500" />
-					แบบทดสอบวัดผล HSK
+					ประเมินทักษะการออกเสียง
 				</a>
 			</nav>
 		</div>

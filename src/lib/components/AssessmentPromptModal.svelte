@@ -54,8 +54,8 @@
 					return;
 				}
 				promptType = 'pre';
-				promptTitle = '🎯 แบบทดสอบก่อนเรียน (Pre-test)';
-				promptSubtitle = 'เพื่อวัดระดับทักษะการออกเสียงเริ่มต้นของคุณ กรุณาทำแบบทดสอบสั้นๆ 20 คำ (ใช้เวลาประมาณ 3 นาที)';
+				promptTitle = '🎯 ประเมินก่อนเรียน (Pre-assessment)';
+				promptSubtitle = 'เพื่อวัดระดับทักษะการออกเสียงเริ่มต้นของคุณ กรุณาทำแบบประเมินสั้นๆ 20 คำ (ใช้เวลาประมาณ 3 นาที)';
 				promptBadge = 'ก่อนเริ่มเรียน';
 				promptBadgeColor = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
 				isOpen = true;
@@ -71,8 +71,8 @@
 					return;
 				}
 				promptType = 'mid';
-				promptTitle = '📊 แบบทดสอบระหว่างเรียน (Mid-test)';
-				promptSubtitle = 'คุณฝึกฝนเก็บคะแนนไปได้พอสมควรแล้ว! มาลองวัดผลระหว่างเรียน 20 คำเพื่อดูว่าเสียงเริ่มนิ่งขึ้นหรือไม่';
+				promptTitle = '📊 ประเมินระหว่างเรียน (Mid-assessment)';
+				promptSubtitle = 'คุณฝึกฝนเก็บคะแนนไปได้พอสมควรแล้ว! มาลองประเมินทักษะระหว่างเรียน 20 คำเพื่อดูว่าเสียงเริ่มนิ่งขึ้นหรือไม่';
 				promptBadge = 'ระหว่างการเรียนรู้';
 				promptBadgeColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
 				isOpen = true;
@@ -88,8 +88,8 @@
 					return;
 				}
 				promptType = 'post';
-				promptTitle = '🏆 แบบทดสอบหลังเรียน (Post-test)';
-				promptSubtitle = 'ยินดีด้วยที่คุณผ่านบทเรียนมาอย่างต่อเนื่อง! มาทำแบบทดสอบวัดผลสัมฤทธิ์ทางการศึกษาครั้งสุดท้ายเพื่อสรุปพัฒนาการกัน';
+				promptTitle = '🏆 ประเมินหลังเรียน (Post-assessment)';
+				promptSubtitle = 'ยินดีด้วยที่คุณผ่านบทเรียนมาอย่างต่อเนื่อง! มาประเมินทักษะครั้งสุดท้ายเพื่อสรุปพัฒนาการทางการศึกษากัน';
 				promptBadge = 'หลังจบบทเรียน';
 				promptBadgeColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
 				isOpen = true;
@@ -150,7 +150,7 @@
 			<div class="space-y-2 mb-6 text-xs text-muted-foreground bg-muted/30 p-3.5 rounded-2xl border">
 				<div class="flex items-center gap-2">
 					<CheckCircle2 class="size-4 text-emerald-500 shrink-0" />
-					<span>ข้อสอบมาตรฐาน HSK 1–3 จำนวน <strong>20 คำ</strong></span>
+					<span>ชุดคำมาตรฐาน HSK 1–3 จำนวน <strong>20 คำ</strong></span>
 				</div>
 				<div class="flex items-center gap-2">
 					<CheckCircle2 class="size-4 text-emerald-500 shrink-0" />
@@ -169,7 +169,7 @@
 					class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-6 rounded-2xl shadow-lg shadow-emerald-600/20 text-sm gap-2"
 				>
 					<Sparkles class="size-4" />
-					เริ่มทำแบบทดสอบเลย
+					เริ่มประเมินทักษะเลย
 					<ChevronRight class="size-4" />
 				</Button>
 

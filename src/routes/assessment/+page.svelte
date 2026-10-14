@@ -291,7 +291,7 @@
 </script>
 
 <svelte:head>
-	<title>แบบทดสอบวัดผล HSK — {typeLabels[testType]?.label || 'แบบทดสอบ'}</title>
+	<title>ประเมินทักษะการออกเสียง — {typeLabels[testType]?.label || 'การประเมิน'}</title>
 </svelte:head>
 
 <div class="min-h-screen bg-gradient-to-b from-background via-muted/20 to-background text-foreground flex flex-col">
@@ -448,7 +448,7 @@
 				</span>
 
 				<h2 class="text-2xl sm:text-3xl font-black tracking-tight mb-2">
-					บันทึกผลการทดสอบเรียบร้อย!
+					บันทึกผลการประเมินเรียบร้อย!
 				</h2>
 				<p class="text-sm text-muted-foreground mb-6">
 					ข้อมูลสัทศาสตร์ของคุณได้รับการจัดเก็บเข้าสู่ฐานข้อมูลงานวิจัยเรียบร้อยแล้ว
