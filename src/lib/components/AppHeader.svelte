@@ -77,10 +77,6 @@
 				<Zap class="size-4 fill-yellow-400" />
 				{progress.xp}
 			</span>
-			<span class="flex items-center gap-1 text-rose-500 text-xs font-bold bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20" title="จำนวนข้อที่ออกเสียงผิดสะสม">
-				<AlertCircle class="size-3.5 text-rose-500" />
-				<span>{progress.mistakes} ผิด</span>
-			</span>
 			<Button variant="ghost" size="icon" onclick={openSettings} aria-label="Settings">
 				<SettingsIcon class="size-5" />
 			</Button>

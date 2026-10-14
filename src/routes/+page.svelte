@@ -438,15 +438,7 @@
 			<!-- Quick Stats Card -->
 			<div class="rounded-3xl border bg-card p-4 sm:p-5 shadow-sm">
 				<div class="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">สถานะผู้เรียนของคุณ</div>
-				<div class="grid grid-cols-3 gap-2 text-center">
-					<div class="rounded-2xl border bg-muted/40 p-3">
-						<div class="flex items-center justify-center text-rose-500 mb-1">
-							<AlertCircle class="size-5 text-rose-500" />
-						</div>
-						<div class="text-lg font-black text-foreground">{progress.mistakes}</div>
-						<div class="text-[10px] text-muted-foreground">ข้อที่ผิดสะสม</div>
-					</div>
-
+				<div class="grid grid-cols-2 gap-3 text-center">
 					<div class="rounded-2xl border bg-muted/40 p-3">
 						<div class="flex items-center justify-center text-blue-500 mb-1">
 							<Zap class="size-5 fill-blue-500" />
