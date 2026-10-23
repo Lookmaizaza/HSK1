@@ -51,6 +51,7 @@
 	let phase = $state<'challenge' | 'flashcard' | 'victory'>('challenge');
 	let flashcardIndex = $state(0);
 	let showHint = $state(false); // For toggling pinyin/thai
+	let stageMistakes = $state(0);
 	
 	let speechRecognizer: ReturnType<typeof createRecognizer> = null;
 	let speechTranscript = '';
@@ -124,10 +125,9 @@
 			} else {
 				feedbackType = 'error';
 				feedbackMessage = 'ผิด! คำแปลที่ถูกคือ: ' + currentChallenge.word.thai;
-				progress.loseHeart();
-				if (!checkGameOver()) {
-					setTimeout(nextChallenge, 2500);
-				}
+				stageMistakes++;
+				progress.recordMistake();
+				setTimeout(nextChallenge, 2000);
 			}
 		}
 	}
@@ -288,12 +288,11 @@
 					} else {
 						feedbackType = 'error';
 						feedbackMessage = sentenceRes.feedback;
-						progress.loseHeart();
-						if (!checkGameOver()) {
-							setTimeout(() => {
-								if (feedbackType === 'error') feedbackType = 'none';
-							}, 2000);
-						}
+						stageMistakes++;
+						progress.recordMistake();
+						setTimeout(() => {
+							if (feedbackType === 'error') feedbackType = 'none';
+						}, 2000);
 					}
 					return;
 				}
@@ -418,12 +417,11 @@
 						})
 					}).catch(() => {});
 
-					progress.loseHeart();
-					if (!checkGameOver()) {
-						setTimeout(() => {
-							if (feedbackType === 'error') feedbackType = 'none';
-						}, 1800);
-					}
+					stageMistakes++;
+					progress.recordMistake();
+					setTimeout(() => {
+						if (feedbackType === 'error') feedbackType = 'none';
+					}, 1800);
 				}
 			} else {
 				feedbackType = 'error';
@@ -437,15 +435,6 @@
 			feedbackType = 'error';
 			feedbackMessage = 'เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง';
 		}
-	}
-
-	function checkGameOver() {
-		if (progress.hearts === 0) {
-			alert('หัวใจหมดแล้ว! กลับไปพักผ่อนแล้วมาท้าทายใหม่นะ');
-			goto('/');
-			return true;
-		}
-		return false;
 	}
 
 	function nextFlashcard() {
@@ -481,7 +470,22 @@
 				<Sparkles class="size-16 text-yellow-500" />
 			</div>
 			<h1 class="text-3xl font-extrabold text-foreground mb-2">สำเร็จบทเรียน!</h1>
-			<p class="text-muted-foreground mb-8">คุณได้รับ +25 XP และทบทวนคำศัพท์เรียบร้อยแล้ว</p>
+			<p class="text-muted-foreground mb-4">คุณได้รับ +25 XP และทบทวนคำศัพท์เรียบร้อยแล้ว</p>
+
+			<!-- Stage Mistake Summary (Only shown at victory) -->
+			<div class="mb-8 p-4 rounded-2xl bg-card border shadow-xs max-w-xs w-full text-center">
+				{#if stageMistakes === 0}
+					<div class="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm flex items-center justify-center gap-1.5">
+						<Sparkles class="size-4" />
+						<span>ยอดเยี่ยม! ไม่ผิดเลยแม้แต่ข้อเดียว</span>
+					</div>
+				{:else}
+					<div class="text-xs text-muted-foreground">
+						จำนวนข้อที่ผิดในด่านนี้: <strong class="text-rose-500 text-sm font-black">{stageMistakes} ครั้ง</strong>
+					</div>
+				{/if}
+			</div>
+
 			<a href="/" class="w-full rounded-2xl bg-primary py-4 text-center font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90">
 				กลับไปหน้าแผนที่
 			</a>
@@ -518,10 +522,6 @@
 			</a>
 			<div class="h-4 flex-1 overflow-hidden rounded-full bg-muted">
 				<div class="h-full rounded-full bg-green-500 transition-all duration-500" style="width: {progressPercent}%"></div>
-			</div>
-			<div class="flex items-center gap-1.5 font-bold text-red-500">
-				<Heart class="size-6 fill-red-500" />
-				<span class="text-lg">{progress.hearts}</span>
 			</div>
 		</div>
 
