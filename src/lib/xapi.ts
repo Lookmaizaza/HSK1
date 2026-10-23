@@ -43,6 +43,8 @@ export type PronunciationAssessmentTelemetry = {
 	mode?: 'quest' | 'free_pitch';
 	userId?: string | number;
 	username?: string;
+	practiceMode?: 'stage' | 'word';
+	stageId?: string;
 	word: WordTargetInfo;
 	behavior: ListeningBehavior;
 	assessment: {

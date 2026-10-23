@@ -1,7 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { recordMistake } from '$lib/server/db';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 import type { RequestHandler } from './$types';
+
+// Vercel serverless default is 10s; reasoning models need more headroom.
+export const config = { maxDuration: 60 };
 
 type Tone = 2 | 3;
 
@@ -132,7 +136,17 @@ async function callThaiLLM(
 	return data?.choices?.[0]?.message?.content ?? '';
 }
 
-export const POST: RequestHandler = async ({ request, fetch, locals }) => {
+export const POST: RequestHandler = async (event) => {
+	const { request, fetch, locals } = event;
+	const rate = consumeRateLimit(
+		`ai:evaluate:${locals.user ? `u${locals.user.id}` : extractClientIp(event)}`,
+		120,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many requests. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
 	const body = (await request.json()) as EvalRequest;
 	const { target, said, tone } = body;
 

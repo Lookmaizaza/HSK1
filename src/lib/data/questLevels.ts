@@ -27,6 +27,108 @@ export type QuestStage = {
 	challenges: Challenge[];
 };
 
+export const MAX_STAGES_PER_LEVEL = 10;
+
+export function parseQuestChallenges(value: string): Challenge[] | null {
+	try {
+		const parsed: unknown = JSON.parse(value);
+		if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 50) return null;
+
+		const ids = new Set<string>();
+		const challenges: Challenge[] = [];
+		for (const item of parsed) {
+			if (!item || typeof item !== 'object') return null;
+			const challenge = item as Record<string, unknown>;
+			const word = challenge.word as Record<string, unknown> | null;
+			const type = challenge.type;
+			const id = challenge.id;
+			if (
+				typeof id !== 'string' || !id.trim() || id.length > 100 || ids.has(id) ||
+				!['speak', 'listen_speak', 'translate', 'sentence_build'].includes(String(type)) ||
+				!word || typeof word !== 'object' ||
+				typeof word.hanzi !== 'string' || !word.hanzi.trim() ||
+				typeof word.pinyin !== 'string' || !word.pinyin.trim() ||
+				typeof word.thai !== 'string' || !word.thai.trim() ||
+				typeof word.english !== 'string' ||
+				typeof word.tone !== 'number' || !Number.isInteger(word.tone) || word.tone < 1 || word.tone > 5 ||
+				!['1st', '2nd', '3rd', '4th', 'sandhi', 'pair'].includes(String(word.category))
+			) return null;
+
+			let syllables: TonePreset['syllables'];
+			if (word.syllables !== undefined) {
+				if (!Array.isArray(word.syllables)) return null;
+				syllables = [];
+				for (const item of word.syllables) {
+					if (!item || typeof item !== 'object') return null;
+					const syllable = item as Record<string, unknown>;
+					if (
+						typeof syllable.hanzi !== 'string' ||
+						typeof syllable.pinyin !== 'string' ||
+						typeof syllable.baseTone !== 'number' || !Number.isInteger(syllable.baseTone) ||
+						syllable.baseTone < 1 || syllable.baseTone > 5 ||
+						typeof syllable.surfaceTone !== 'number' || !Number.isInteger(syllable.surfaceTone) ||
+						syllable.surfaceTone < 1 || syllable.surfaceTone > 5 ||
+						(syllable.sandhiDescription !== undefined && typeof syllable.sandhiDescription !== 'string')
+					) return null;
+					syllables.push({
+						hanzi: syllable.hanzi,
+						pinyin: syllable.pinyin,
+						baseTone: syllable.baseTone as TonePreset['tone'],
+						surfaceTone: syllable.surfaceTone as TonePreset['tone'],
+						sandhiDescription: syllable.sandhiDescription as string | undefined
+					});
+				}
+			}
+
+			ids.add(id);
+			const preset: TonePreset = {
+				id: typeof word.id === 'string' ? word.id : id,
+				hanzi: word.hanzi,
+				pinyin: word.pinyin,
+				english: word.english,
+				thai: word.thai,
+				tone: word.tone as TonePreset['tone'],
+				category: word.category as TonePreset['category']
+			};
+			if (typeof word.description === 'string') preset.description = word.description;
+			if (typeof word.tonePattern === 'string') preset.tonePattern = word.tonePattern;
+			if (syllables) preset.syllables = syllables;
+			const result: Challenge = {
+				id,
+				type: type as ChallengeType,
+				word: preset
+			};
+
+			if (type === 'translate') {
+				if (
+					!Array.isArray(challenge.choices) || challenge.choices.length < 2 || challenge.choices.length > 8 ||
+					!challenge.choices.every((choice) => typeof choice === 'string' && choice.trim()) ||
+					typeof challenge.correctChoiceIndex !== 'number' ||
+					!Number.isInteger(challenge.correctChoiceIndex) ||
+					challenge.correctChoiceIndex < 0 || challenge.correctChoiceIndex >= challenge.choices.length
+				) return null;
+				result.choices = challenge.choices as string[];
+				result.correctChoiceIndex = challenge.correctChoiceIndex;
+			}
+
+			if (type === 'sentence_build') {
+				if (
+					typeof challenge.sentenceHanzi !== 'string' || !challenge.sentenceHanzi.trim() ||
+					typeof challenge.sentencePinyin !== 'string' ||
+					typeof challenge.sentenceThai !== 'string'
+				) return null;
+				result.sentenceHanzi = challenge.sentenceHanzi;
+				result.sentencePinyin = challenge.sentencePinyin;
+				result.sentenceThai = challenge.sentenceThai;
+			}
+			challenges.push(result);
+		}
+		return challenges;
+	} catch {
+		return null;
+	}
+}
+
 const WORDS_PER_STAGE = 8;
 
 // ข้อมูลธีมและหมวดหมู่ของบทเรียน — สกัดจากคำศัพท์ในกลุ่ม (ไม่ใช้คำว่าด่าน)

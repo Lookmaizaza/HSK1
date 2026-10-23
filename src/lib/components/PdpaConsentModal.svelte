@@ -2,7 +2,13 @@
 <script lang="ts">
 	import { ShieldCheck, Mic, Lock, CheckCircle2, AlertCircle, Volume2, Sparkles } from '@lucide/svelte';
 
-	let { user = null }: { user?: { id: number; username: string } | null } = $props();
+	let {
+		user = null,
+		initiallyOpen = false
+	}: {
+		user?: { id: number; username: string } | null;
+		initiallyOpen?: boolean;
+	} = $props();
 
 	let isOpen = $state(false);
 	let isRequestingMic = $state(false);
@@ -14,24 +20,10 @@
 	let audioConsent = $state(true);
 	let researchConsent = $state(true);
 
-	// Check consent whenever user logs in or page loads
+	// The server is the source of truth: it checks the consent record in the DB
+	// and only renders this modal when the learner has not consented yet.
 	$effect(() => {
-		if (!user || !user.id) {
-			// If not logged in, DO NOT show PDPA modal
-			isOpen = false;
-			return;
-		}
-
-		// User is logged in: Check user-specific consent record
-		const userStorageKey = `yupakjeen_pdpa_consent_user_${user.id}`;
-		const storedConsent = localStorage.getItem(userStorageKey);
-
-		if (!storedConsent) {
-			// Only show after user is logged in and hasn't consented yet
-			isOpen = true;
-		} else {
-			isOpen = false;
-		}
+		isOpen = Boolean(initiallyOpen && user?.id);
 	});
 
 	async function requestMicrophonePermission(): Promise<boolean> {

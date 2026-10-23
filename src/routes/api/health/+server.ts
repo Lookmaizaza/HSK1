@@ -1,35 +1,32 @@
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
-import { env } from '$env/dynamic/private';
+import type { RequestHandler } from './$types';
 
-export const GET = async () => {
-	const rawUrl = env.TURSO_DATABASE_URL?.trim();
-	const rawToken = env.TURSO_AUTH_TOKEN?.trim();
-	const hasUrl = !!rawUrl;
-	const hasToken = !!rawToken;
+export const GET: RequestHandler = async ({ locals }) => {
 	const client = getDb();
-
-	let dbStatus = 'disconnected';
-	let dbError: string | null = null;
+	let database = 'disconnected';
 
 	if (client) {
 		try {
 			const res = await client.execute('SELECT 1 AS ok');
-			dbStatus = res.rows.length > 0 ? 'connected' : 'no_rows';
-		} catch (e) {
-			dbStatus = 'error';
-			dbError = e instanceof Error ? e.message : String(e);
+			database = res.rows.length > 0 ? 'connected' : 'no_rows';
+		} catch (err) {
+			console.error('[health] Database check failed:', err);
+			database = 'error';
 		}
 	}
 
-	return json({
+	const isHealthy = database === 'connected';
+	const admin = locals.realAdmin || locals.user;
+	const payload = {
+		status: isHealthy ? 'ok' : 'degraded',
+		database,
 		timestamp: new Date().toISOString(),
-		database: {
-			hasTursoUrl: hasUrl,
-			hasTursoToken: hasToken,
-			urlPreview: rawUrl ? `${rawUrl.slice(0, 16)}...` : null,
-			status: dbStatus,
-			error: dbError
-		}
+		...(admin?.isAdmin ? { details: 'Admin-visible diagnostics are available in /admin.' } : {})
+	};
+
+	return json(payload, {
+		status: isHealthy ? 200 : 503,
+		headers: { 'Cache-Control': 'no-store' }
 	});
 };

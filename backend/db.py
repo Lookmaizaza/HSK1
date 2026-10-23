@@ -18,8 +18,13 @@ def get_clean_database_url(url: str) -> str:
     """Normalize database connection string for asyncpg (strip parameters if needed or enforce ssl)."""
     if not url:
         return ""
-    # asyncpg expects postgresql:// or postgres://
-    return url
+    try:
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(url)
+        # asyncpg does not accept query params like sslmode or channel_binding directly
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, "", parsed.fragment))
+    except Exception:
+        return url
 
 
 async def init_db_pool() -> Optional[asyncpg.Pool]:
@@ -31,8 +36,9 @@ async def init_db_pool() -> Optional[asyncpg.Pool]:
 
     try:
         # Neon PostgreSQL requires SSL
+        clean_dsn = get_clean_database_url(DATABASE_URL)
         pool = await asyncpg.create_pool(
-            dsn=DATABASE_URL,
+            dsn=clean_dsn,
             min_size=1,
             max_size=10,
             ssl="require" if "sslmode=require" in DATABASE_URL or "neon.tech" in DATABASE_URL else None

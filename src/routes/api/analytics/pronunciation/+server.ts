@@ -15,15 +15,29 @@ import {
 // - mode: 'history' (list of evaluations) | 'stats' (aggregated phoneme error stats)
 // - limit: number of records (default: 50)
 export const GET = async ({ locals, url }: RequestEvent) => {
+<<<<<<< Updated upstream
 	// BUG-07 FIX: always use the authenticated session user — never trust a userId from the
 	// query string, as that would let any logged-in user read another user's data.
 	if (!locals.user) {
 		throw error(401, 'Authentication required.');
+=======
+	if (!locals.user) {
+		throw error(401, 'Login required to read pronunciation analytics.');
+>>>>>>> Stashed changes
 	}
 	const targetUserId = String(locals.user.id);
 
+	const ownUserId = String(locals.user.id);
+	const paramUserId = url.searchParams.get('userId')?.trim();
+	const isAdmin = Boolean(locals.user.isAdmin || locals.user.role === 'admin');
+
+	if (paramUserId && paramUserId !== ownUserId && !isAdmin) {
+		throw error(403, 'You can only read your own pronunciation analytics.');
+	}
+
+	const targetUserId = paramUserId || ownUserId;
 	const mode = url.searchParams.get('mode') || 'history';
-	const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 200);
+	const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit')) || 50, 200));
 
 	if (mode === 'stats') {
 		const stats = await getPronunciationPhonemeErrorStats(targetUserId);
@@ -85,9 +99,47 @@ function normalizeWordId(rawId: string): string {
 	return clean;
 }
 
+<<<<<<< Updated upstream
 	for (const item of rawItems) {
     const userId = String(locals.user?.user_id || 'usr_uuid_local');
     const wordId = String(item.word_id || '');
+=======
+// POST /api/analytics/pronunciation
+// Body: LearnerPronunciationPayload or { items: LearnerPronunciationPayload[] }
+export const POST = async ({ locals, request }: RequestEvent) => {
+	if (!locals.user) {
+		throw error(401, 'Login required to record pronunciation analytics.');
+	}
+
+	// Identity is always taken from the session; never trust a client-supplied user_id.
+	const authenticatedUserId = String(locals.user.id);
+
+	let body: any;
+	try {
+		body = await request.json();
+	} catch {
+		throw error(400, 'Invalid JSON body');
+	}
+
+	const rawItems = Array.isArray(body)
+		? body
+		: Array.isArray(body.items)
+			? body.items
+			: [body];
+
+	if (rawItems.length === 0) {
+		throw error(400, 'No evaluation items provided.');
+	}
+
+	const processedItems: LearnerPronunciationPayload[] = [];
+
+	for (const item of rawItems) {
+		const userId = authenticatedUserId;
+		const wordId = normalizeWordId(String(item.word_id || ''));
+		const pinyin = String(item.pinyin || '');
+		const attemptNumber = Number(item.attempt_number || 1);
+		const audioDurationSec = Number(item.audio_duration_sec || 0);
+>>>>>>> Stashed changes
 
     const pinyin = String(item.pinyin || '');
     const attemptNumber = Number(item.attempt_number || 1);

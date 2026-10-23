@@ -6,11 +6,20 @@ import {
 } from '$lib/xapi';
 import {
 	recordPronunciationEvaluation,
+<<<<<<< Updated upstream
 	recordLearningEvent,
 	recordUserConsent
 } from '$lib/server/db';
 import { recordPhonemesToNeon } from '$lib/server/neon';
 import type { StandardTelemetryPayload } from '$lib/telemetry/adapter';
+=======
+	recordPhonemeEvaluations,
+	recordLearningEvent,
+	getUserConsent
+} from '$lib/server/db';
+import { extractTargetPhonemes } from '$lib/pronunciation';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
+>>>>>>> Stashed changes
 
 // GET /api/v1/telemetry/score-ingest (Health & Contract Specification Check)
 export const GET = async () => {
@@ -31,8 +40,23 @@ export const GET = async () => {
 };
 
 // POST /api/v1/telemetry/score-ingest
+<<<<<<< Updated upstream
 export const POST = async ({ locals, request, url, getClientAddress }: RequestEvent) => {
 	let body: any;
+=======
+export const POST = async (event: RequestEvent) => {
+	const { locals, request, url } = event;
+	const rate = consumeRateLimit(
+		`telemetry:${locals.user ? `u${locals.user.id}` : extractClientIp(event)}`,
+		300,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many telemetry requests. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
+	let body: Partial<PronunciationAssessmentTelemetry>;
+>>>>>>> Stashed changes
 	try {
 		body = await request.json();
 	} catch {
@@ -44,6 +68,7 @@ export const POST = async ({ locals, request, url, getClientAddress }: RequestEv
 		body.behavior_telemetry && body.scores && (body.pinyin || body.word_id)
 	);
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 	function extractCanonicalWord(rawWord: any, rawWordId?: any): string {
 		if (rawWord?.hanzi) return String(rawWord.hanzi).trim();
@@ -60,12 +85,27 @@ export const POST = async ({ locals, request, url, getClientAddress }: RequestEv
 	// If unauthenticated, assign a guest identifier to prevent spoofing registered students' IDs.
 	const userId = locals.user?.id ? String(locals.user.id) : 'usr_uuid_guest';
 	const username = locals.user?.username || (locals.user ? `Learner_${locals.user.id}` : 'Guest_Learner');
+=======
+	// Identity comes only from the session; never trust a client-supplied userId.
+	const userId = locals.user?.id ? String(locals.user.id) : undefined;
+	const username = locals.user?.username || 'Guest_Learner';
+	const practiceMode: 'stage' | 'word' | undefined =
+		body.practiceMode === 'stage' || body.practiceMode === 'word' ? body.practiceMode : undefined;
+	const stageId = typeof body.stageId === 'string' && /^[a-zA-Z0-9_-]{2,64}$/.test(body.stageId)
+		? body.stageId
+		: undefined;
+	if (practiceMode === 'stage' && !stageId) {
+		throw error(400, 'Stage practice telemetry must include a valid stageId.');
+	}
+>>>>>>> Stashed changes
 
 	const telemetry: PronunciationAssessmentTelemetry = {
 		eventType: 'pronunciation_evaluation',
 		timestamp: body.timestamp || new Date().toISOString(),
 		userId,
 		username,
+		practiceMode,
+		stageId,
 		word: {
 			id: body.word.id || body.word.hanzi,
 			hanzi: body.word.hanzi,
@@ -204,6 +244,7 @@ export const POST = async ({ locals, request, url, getClientAddress }: RequestEv
 		learnerName: username
 	});
 
+<<<<<<< Updated upstream
 	// 3. Database Ingestion & Persistence
 	try {
 		// A. Record PDPA consent if first time or explicitly updated
@@ -212,6 +253,83 @@ export const POST = async ({ locals, request, url, getClientAddress }: RequestEv
 			clientIp = getClientAddress();
 		} catch {
 			clientIp = '127.0.0.1';
+=======
+	// Persist only for logged-in learners who granted research telemetry consent.
+	const consented = userId
+		? await getUserConsent(userId, 'pdpa_research_telemetry').catch(() => false)
+		: false;
+	if (userId && consented) {
+		try {
+			const phonemeDetails = telemetry.assessment.syllableResults.map((s) => ({
+				phoneme: s.hanzi,
+				score: s.score,
+				isMatch: s.isMatch,
+				targetTone: s.targetTone,
+				detectedTone: s.detectedTone
+			}));
+
+			await recordPronunciationEvaluation({
+				user_id: String(userId),
+				word_id: telemetry.word.hanzi,
+				pinyin: telemetry.word.pinyin,
+				practice_mode: practiceMode ?? 'unknown',
+				stage_id: stageId ?? null,
+				attempt_number: 1,
+				audio_duration_sec: Math.round((telemetry.assessment.acoustics.totalDurationMs / 1000) * 100) / 100,
+				scores: {
+					gop_overall: telemetry.assessment.overallScore,
+					per_overall: telemetry.assessment.isPassed ? 0 : 25,
+					tone_score: telemetry.assessment.rawScore,
+					phoneme_details: phonemeDetails
+				}
+			});
+
+			// 1. Record detailed phoneme breakdown into phoneme_evaluations table
+			const targetPhonemes = extractTargetPhonemes(telemetry.word.pinyin || '');
+			if (targetPhonemes.length > 0) {
+				const phonemeRecords = targetPhonemes.map((pt) => ({
+					userId: String(userId),
+					wordId: telemetry.word.hanzi,
+					pinyin: telemetry.word.pinyin,
+					phoneme: pt.phoneme,
+					phonemeType: pt.type,
+					gop: telemetry.assessment.overallScore,
+					status: telemetry.assessment.isPassed ? 'correct' : 'substitution',
+					target: pt.phoneme,
+					recognized: telemetry.assessment.isPassed ? pt.phoneme : (telemetry.assessment.recognizedWord || '?'),
+					practiceMode: (practiceMode ?? 'unknown') as 'stage' | 'word' | 'unknown',
+					stageId: stageId ?? undefined
+				}));
+				await recordPhonemeEvaluations(phonemeRecords);
+			}
+
+			// 2. Persist IEEE 9274.1.1 xAPI Statements into learning_events table
+			if (xapiStatements.assessmentStatement) {
+				await recordLearningEvent({
+					userId: String(userId),
+					eventType: 'pronounced',
+					wordId: telemetry.word.hanzi,
+					statementId: xapiStatements.assessmentStatement.id,
+					xapiStatement: xapiStatements.assessmentStatement,
+					practiceMode: practiceMode ?? 'unknown',
+					stageId: stageId ?? null
+				});
+			}
+
+			if (telemetry.behavior.listenedToExample && xapiStatements.listeningStatement) {
+				await recordLearningEvent({
+					userId: String(userId),
+					eventType: 'listened_to_example',
+					wordId: telemetry.word.hanzi,
+					statementId: xapiStatements.listeningStatement.id,
+					xapiStatement: xapiStatements.listeningStatement,
+					practiceMode: practiceMode ?? 'unknown',
+					stageId: stageId ?? null
+				});
+			}
+		} catch (dbErr) {
+			console.warn('⚠️ [ScoreIngest] DB recording fallback:', dbErr);
+>>>>>>> Stashed changes
 		}
 
 		await recordUserConsent({

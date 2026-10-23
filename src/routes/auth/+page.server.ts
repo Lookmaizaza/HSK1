@@ -6,13 +6,21 @@ import {
 	verifyPassword,
 	getProgress,
 	completeLesson,
-	addXp
+	addXp,
+	isUserAdmin
 } from '$lib/server/db';
+import { checkLoginProtection, handleLoginFailure, handleLoginSuccess } from '$lib/server/rateLimit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ locals, url }) => {
+export const load: PageServerLoad = (event) => {
+	const { locals, url } = event;
 	if (locals.user) throw redirect(303, '/');
-	return { mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login' };
+	const protection = checkLoginProtection(event, '');
+	return {
+		mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login',
+		isBlocked: protection.isBlocked,
+		remainingSeconds: protection.remainingSeconds
+	};
 };
 
 function setSessionCookie(
@@ -90,6 +98,7 @@ function checkRateLimit(key: string, maxAttempts = 5, windowMs = 60_000): { allo
 }
 
 export const actions: Actions = {
+<<<<<<< Updated upstream
 	register: async ({ request, cookies, getClientAddress }) => {
 		const clientIp = getClientAddress ? getClientAddress() : 'unknown';
 		const { allowed, waitSec } = checkRateLimit(`reg_${clientIp}`, 5, 120_000);
@@ -97,22 +106,47 @@ export const actions: Actions = {
 			return fail(429, { error: `คุณสร้างบัญชีถี่เกินไป กรุณารออีก ${waitSec} วินาทีแล้วลองใหม่` });
 		}
 
+=======
+	register: async (event) => {
+		const { request, cookies } = event;
+>>>>>>> Stashed changes
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
+
+		// Brute-force check on IP
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `มีการพยายามเข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับคำขอชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+				username,
+				isBlocked: true,
+				remainingSeconds: protection.remainingSeconds
+			});
+		}
 
 		if (username.length < 2) return fail(400, { error: 'Username must be at least 2 characters', username });
 		if (password.length < 6) return fail(400, { error: 'Password must be at least 6 characters', username });
 
 		try {
-			if (await findUserByUsername(username)) {
+			// Admin usernames must be seeded with scripts/database/create_admin.mjs.
+			// Never let a public sign-up claim a name that ADMIN_USERNAMES grants admin to.
+			if (isUserAdmin(username) || (await findUserByUsername(username))) {
 				return fail(400, { error: 'Username already taken', username });
 			}
 
 			const user = await createUser(username, password);
+			handleLoginSuccess(event, username);
 			await mergeLocalProgress(user.id, local);
 			const session = await createSession(user.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);
+			cookies.set('registration_consent', '1', {
+				path: '/',
+				httpOnly: true,
+				sameSite: 'lax',
+				secure: !import.meta.env.DEV,
+				maxAge: 600
+			});
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
 			return fail(500, {
@@ -125,11 +159,17 @@ export const actions: Actions = {
 		throw redirect(303, '/');
 	},
 
+<<<<<<< Updated upstream
 	login: async ({ request, cookies, getClientAddress }) => {
+=======
+	login: async (event) => {
+		const { request, cookies } = event;
+>>>>>>> Stashed changes
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
+<<<<<<< Updated upstream
 		const clientIp = getClientAddress ? getClientAddress() : 'unknown';
 		const rateKey = `login_${clientIp}_${username.toLowerCase()}`;
 		const { allowed, waitSec } = checkRateLimit(rateKey, 6, 60_000);
@@ -137,17 +177,44 @@ export const actions: Actions = {
 			return fail(429, {
 				error: `เข้าสู่ระบบผิดพลาดหลายครั้ง กรุณารออีก ${waitSec} วินาทีเพื่อความปลอดภัย`,
 				username
+=======
+		// 1. Check rate limit before performing DB queries or bcrypt check
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับการเข้าสู่ระบบชั่วคราวเป็นเวลา 2 นาทีเพื่อความปลอดภัย (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+				username,
+				isBlocked: true,
+				remainingSeconds: protection.remainingSeconds
+>>>>>>> Stashed changes
 			});
 		}
 
 		try {
 			const row = await findUserByUsername(username);
 			if (!row || !verifyPassword(password, row.password_hash)) {
-				return fail(400, { error: 'Invalid username or password', username });
+				const failure = await handleLoginFailure(event, username);
+				if (failure.isBlocked) {
+					return fail(429, {
+						error: `กรอกรหัสผ่านผิดติดต่อกันครบ 5 ครั้ง บัญชี/IP นี้ถูกระงับชั่วคราว 2 นาทีเพื่อความปลอดภัย (กรุณารออีก ${failure.remainingSeconds} วินาที)`,
+						username,
+						isBlocked: true,
+						remainingSeconds: failure.remainingSeconds
+					});
+				}
+				return fail(400, {
+					error: `ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (เหลือโอกาสลองอีก ${failure.attemptsRemaining} ครั้ง ก่อนถูกระงับชั่วคราว 2 นาที)`,
+					username
+				});
 			}
 
+<<<<<<< Updated upstream
 			// Clear rate limit on successful authentication
 			attemptStore.delete(rateKey);
+=======
+			// Clear rate limit tracking on success
+			handleLoginSuccess(event, username);
+>>>>>>> Stashed changes
 
 			await mergeLocalProgress(row.id, local);
 			const session = await createSession(row.id);

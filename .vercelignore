@@ -1,0 +1,23 @@
+# Never upload local secrets or the local SQLite database.
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# Local build / tooling output
+.vercel/
+.svelte-kit/
+build/
+node_modules/
+__pycache__/
+*.pyc
+*.npz
+
+# Local-only research and backend sources
+backend/
+docs/
+scripts/

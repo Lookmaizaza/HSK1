@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import AppHeader from '$lib/components/AppHeader.svelte';
 	import { progress } from '$lib/progress.svelte';
-	import { QUEST_STAGE_MAP, type QuestStage, type Challenge } from '$lib/data/questLevels';
+	import type { QuestStage, Challenge } from '$lib/data/questLevels';
 	import { 
 		RealtimePitchTracker, 
 		analyzeMultiSyllableToneContour, 
@@ -23,8 +22,9 @@
 	} from '$lib/speech';
 	import { sendPronunciationTelemetry } from '$lib/telemetry/client';
 
-	const stageId = $page.params.stage || '';
-	const stageData: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
+	let { data } = $props();
+	const stageData: QuestStage | undefined = data.stage;
+	const stageId = stageData?.id || '';
 
 	let currentIndex = $state(0);
 	let isRecording = $state(false);
@@ -47,17 +47,45 @@
 	let speechTranscript = '';
 	let speechCandidates: string[] = [];
 	let recognizedWord = $state<string>('');
+
+	const stageStartTime = Date.now();
+	let listenCount = 0;
+	let hintsUsed = 0;
+	let stageCompleted = false;
+
+	function sendStageTelemetry(eventType: 'view' | 'attempt' | 'pass' | 'fail' | 'hint' | 'listen', score = 0) {
+		if (!stageId || typeof window === 'undefined') return;
+		fetch('/api/v1/telemetry/stage-event', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				stageId,
+				eventType,
+				score,
+				timeSpentMs: Date.now() - stageStartTime,
+				retriesCount: stageMistakes,
+				listenCount,
+				hintsUsed
+			})
+		}).catch(() => {});
+	}
 	
 	onMount(() => {
 		if (!stageData) {
 			goto('/');
 		} else {
+<<<<<<< Updated upstream
 			playAudioIfListenSpeak();
+=======
+			sendStageTelemetry('view');
+			playAudioIfListenSpeak(stageData.challenges[0]);
+>>>>>>> Stashed changes
 		}
 	});
 
 	onDestroy(() => {
 		stopRecording();
+		if (!stageCompleted) sendStageTelemetry('fail');
 	});
 
 	const currentChallenge = $derived(stageData?.challenges[currentIndex]);
@@ -65,9 +93,19 @@
 
 	function toggleHint() {
 		showHint = !showHint;
+		if (showHint) {
+			hintsUsed++;
+			sendStageTelemetry('hint');
+		}
 	}
 
 	function playAudio() {
+<<<<<<< Updated upstream
+=======
+		clearAudioTimer();
+		listenCount++;
+		sendStageTelemetry('listen');
+>>>>>>> Stashed changes
 		if (currentChallenge) {
 			if (currentChallenge.type === 'sentence_build' && currentChallenge.sentenceHanzi) {
 				speak(currentChallenge.sentenceHanzi);
@@ -121,6 +159,16 @@
 	}
 
 	async function startRecording() {
+<<<<<<< Updated upstream
+=======
+		clearAudioTimer();
+		if (typeof window !== 'undefined' && window.speechSynthesis) {
+			try {
+				window.speechSynthesis.cancel();
+			} catch {}
+		}
+		sendStageTelemetry('attempt');
+>>>>>>> Stashed changes
 		feedbackType = 'none';
 		feedbackMessage = '';
 		sentenceCheckResult = null;
@@ -422,6 +470,8 @@
 
 	function triggerVictory() {
 		phase = 'victory';
+		stageCompleted = true;
+		sendStageTelemetry('pass', 100);
 		progress.addXp(25);
 		if (stageId) progress.completeLesson(stageId, 3);
 	}

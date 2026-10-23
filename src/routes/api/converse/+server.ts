@@ -5,7 +5,11 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { findScenario } from '$lib/data/scenarios';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 import type { RequestHandler } from './$types';
+
+// Vercel serverless default is 10s; reasoning models need more headroom.
+export const config = { maxDuration: 60 };
 
 type Turn = {
 	role: 'ai' | 'user';
@@ -132,7 +136,17 @@ async function callThaiLLM(messages: ReturnType<typeof buildMessages>, apiKey: s
 	return data?.choices?.[0]?.message?.content ?? '';
 }
 
-export const POST: RequestHandler = async ({ request, fetch }) => {
+export const POST: RequestHandler = async (event) => {
+	const { request, fetch, locals } = event;
+	const rate = consumeRateLimit(
+		`ai:converse:${locals.user ? `u${locals.user.id}` : extractClientIp(event)}`,
+		60,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many requests. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
 	const body = (await request.json()) as ConverseRequest;
 	const scenario = findScenario(body.scenarioId);
 	if (!scenario) throw error(404, 'Unknown scenario');
