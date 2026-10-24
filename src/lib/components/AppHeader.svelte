@@ -49,22 +49,48 @@
 
 			<!-- Desktop Nav Links -->
 			<nav class="hidden md:flex items-center gap-1 ml-4 border-l pl-4">
-				<a href="/" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-foreground">
-					หน้าแรก
+				<a
+					href="/"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 {page.url.pathname === '/'
+						? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black'
+						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+				>
+					<span class="size-1.5 rounded-full bg-emerald-500"></span>
+					สตูดิโอเทียบเสียง
 				</a>
-				<a href="/pitch" class="rounded-xl px-3 py-1.5 text-xs font-bold transition bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 flex items-center gap-1.5">
-					<span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-					ห้องฝึกออกเสียง
+				<a
+					href="/quest"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition {page.url.pathname.startsWith('/quest')
+						? 'bg-primary/10 text-primary font-black'
+						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+				>
+					เล่นเป็นด่าน
 				</a>
-				<a href="/talk" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground">
+				<a
+					href="/exam"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 flex items-center gap-1 {page.url.pathname.startsWith('/exam')
+						? 'ring-1 ring-amber-500/50 font-black'
+						: ''}"
+				>
+					<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+					ลองทำข้อสอบจริง
+				</a>
+				<a
+					href="/talk"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition {page.url.pathname.startsWith('/talk')
+						? 'bg-primary/10 text-primary font-black'
+						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+				>
 					สถานการณ์จำลอง
 				</a>
-				<a href="/analytics" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground">
-					รายงานผลการเรียนรู้
-				</a>
-				<a href="/assessment" class="rounded-xl px-3 py-1.5 text-xs font-bold transition hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1">
+				<a
+					href="/assessment"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1 {page.url.pathname.startsWith('/assessment')
+						? 'bg-primary/10 text-primary font-black'
+						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+				>
 					<Award class="size-3.5 text-amber-500" />
-					ประเมินทักษะการออกเสียง
+					ประเมินผล
 				</a>
 			</nav>
 		</div>
@@ -133,6 +159,53 @@
 				</Button>
 			{/if}
 		</div>
+	</div>
+
+	<!-- Mobile Nav Bar (md:hidden) -->
+	<div class="flex md:hidden items-center gap-1.5 overflow-x-auto px-4 pb-2.5 pt-1 border-t bg-background/50 scrollbar-none text-xs">
+		<a
+			href="/"
+			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 {page.url.pathname === '/'
+				? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black'
+				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+		>
+			<span class="size-1.5 rounded-full bg-emerald-500"></span>
+			สตูดิโอเทียบเสียง
+		</a>
+		<a
+			href="/quest"
+			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition {page.url.pathname.startsWith('/quest')
+				? 'bg-primary/10 text-primary font-black'
+				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+		>
+			เล่นเป็นด่าน
+		</a>
+		<a
+			href="/exam"
+			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1 {page.url.pathname.startsWith('/exam')
+				? 'ring-1 ring-amber-500/50 font-black'
+				: ''}"
+		>
+			<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+			ทำข้อสอบจริง
+		</a>
+		<a
+			href="/talk"
+			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition {page.url.pathname.startsWith('/talk')
+				? 'bg-primary/10 text-primary font-black'
+				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+		>
+			สถานการณ์จำลอง
+		</a>
+		<a
+			href="/assessment"
+			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 {page.url.pathname.startsWith('/assessment')
+				? 'bg-primary/10 text-primary font-black'
+				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+		>
+			<Award class="size-3 text-amber-500" />
+			ประเมินผล
+		</a>
 	</div>
 </header>
 

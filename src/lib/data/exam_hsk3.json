@@ -1,0 +1,1177 @@
+{
+  "id": "hsk3-31001",
+  "level": 3,
+  "code": "H31001",
+  "title": "ข้อสอบจริง HSK ระดับ 3 (ชุด H31001)",
+  "totalQuestions": 80,
+  "maxScore": 300,
+  "passScore": 180,
+  "durationMinutes": 85,
+  "sections": [
+    {
+      "id": "listening",
+      "name": "ส่วนที่ 1: การฟัง (听力)",
+      "totalQuestions": 40,
+      "parts": [
+        {
+          "part": 1,
+          "title": "ตอนที่ 1 (ข้อ 1-10): ฟังบทสนทนา แล้วเลือกสถานการณ์ A-F",
+          "instructions": "ฟังบทสนทนาระหว่างชายหญิง แล้วเลือกตัวเลือกที่ตรงกับสถานการณ์",
+          "questions": [
+            {
+              "id": 1,
+              "script": "女：你今天怎么总看手表？有什么急事吗？\n男：今天下午三点我有个会议，不能迟到。",
+              "pinyin": "Nǚ: Nǐ jīntiān zěnme zǒng kàn shǒubiǎo? Yǒu shénme jíshì ma?\nNán: Jīntiān xiàwǔ sān diǎn wǒ yǒu ge huìyì, bù néng chídào.",
+              "meaning": "ดูนาฬิกาข้อมือบ่อยๆ เพราะมีประชุมบ่าย 3 โมง",
+              "options": [
+                "A. กีฬา",
+                "B. ดูนาฬิกาข้อมือเตรียมเข้าประชุม (看手表/会议)",
+                "C. อ่านหนังสือ",
+                "D. ทานอาหาร",
+                "E. สนามบิน",
+                "F. ขี่จักรยาน"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "พูดถึงการดูนาฬิกาข้อมือ (看手表)"
+            },
+            {
+              "id": 2,
+              "script": "男：这个小狗真聪明，还会站起来呢！\n女：是啊，它特别听话，就像个懂事的小孩子。",
+              "pinyin": "Nán: Zhège xiǎogǒu zhēn cōngmíng, hái huì zhàn qǐlái ne!\nNǚ: Shì a, tā tèbié tīnghuà, jiù xiàng ge dǒngshì de xiǎoháizi.",
+              "meaning": "ชมลูกสุนัขว่าฉลาดและยืนสองขาได้",
+              "options": [
+                "A. กีฬา",
+                "B. ดูนาฬิกา",
+                "C. ลูกสุนัขแสนรู้ยืนสองขา (小狗站起来)",
+                "D. ทานอาหาร",
+                "E. สนามบิน",
+                "F. จักรยาน"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "พูดถึงลูกสุนัข (小狗)"
+            },
+            {
+              "id": 3,
+              "script": "女：您好，请问洗手间在哪儿？\n男：一直往前走，在拐角处右转就是。",
+              "pinyin": "Nǚ: Nín hǎo, qǐngwèn xǐshǒujiān zài nǎr?\nNán: Yìzhí wǎng qián zǒu, zài guǎijiǎochù yòuzhuǎn jiù shì.",
+              "meaning": "ถามทางไปห้องน้ำ เดินตรงไปแล้วเลี้ยวขวาตรงหัวมุม",
+              "options": [
+                "A. กีฬา",
+                "B. นาฬิกา",
+                "C. สุนัข",
+                "D. อาหาร",
+                "E. ถามทางไปห้องน้ำ (问洗手间)",
+                "F. จักรยาน"
+              ],
+              "answer": "E",
+              "type": "choice",
+              "explanation": "ถามทางไปห้องน้ำ (洗手间)"
+            },
+            {
+              "id": 4,
+              "script": "男：你骑自行车的技术越来越好了！\n女：当然了，我每天都骑车去上班。",
+              "pinyin": "Nán: Nǐ qí zìxíngchē de jìshù yuè lái yuè hǎo le!\nNǚ: Dāngrán le, wǒ měitiān dōu qí chē qù shàngbān.",
+              "meaning": "ชมว่าทักษะการปั่นจักรยานดีขึ้นเรื่อยๆ",
+              "options": [
+                "A. กีฬา",
+                "B. นาฬิกา",
+                "C. สุนัข",
+                "D. อาหาร",
+                "E. ห้องน้ำ",
+                "F. ขี่จักรยานไปทำงาน (骑自行车)"
+              ],
+              "answer": "F",
+              "type": "choice",
+              "explanation": "ขี่จักรยาน (骑自行车)"
+            },
+            {
+              "id": 5,
+              "script": "女：服务员，我们这桌还差两碗米饭。\n男：好的，马上就给您送来。",
+              "pinyin": "Nǚ: Fúwùyuán, wǒmen zhè zhuō hái chà liǎng wǎn mǐfàn.\nNán: Hǎo de, mǎshàng jiù gěi nín sòng lái.",
+              "meaning": "สั่งข้าวสวยกับพนักงานร้านอาหาร",
+              "options": [
+                "A. พนักงานเสิร์ฟร้านอาหาร (服务员/米饭)",
+                "B. นาฬิกา",
+                "C. สุนัข",
+                "D. จักรยาน",
+                "E. ห้องน้ำ",
+                "F. ประชุม"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "พนักงานเสิร์ฟข้าวสวยในร้านอาหาร"
+            },
+            {
+              "id": 6,
+              "script": "男：你这条裙子在哪儿买的？真好看。\n女：在网上买的，而且还很便宜呢。",
+              "pinyin": "Nán: Nǐ zhè tiáo qúnzi zài nǎr mǎi de? Zhēn hǎokàn.\nNǚ: Zài wǎngshàng mǎi de, érqiě hái hěn piányi ne.",
+              "meaning": "ชมกระโปรงสวย ซื้อทางออนไลน์",
+              "options": [
+                "A. สวนสาธารณะ",
+                "B. กระโปรงสวยซื้อออนไลน์ (裙子)",
+                "C. ร้องเพลง",
+                "D. ดื่มกาแฟ",
+                "E. เล่นหิมะ"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "พูดถึงกระโปรง (裙子)"
+            },
+            {
+              "id": 7,
+              "script": "女：累了吧？喝杯热咖啡休息一下吧。\n男：谢谢，今天工作确实挺多的。",
+              "pinyin": "Nǚ: Lèi le ba? Hē bēi rè kāfēi xiūxi yíxià ba.\nNán: Xièxie, jīntiān gōngzuò quèshí tǐng duō de.",
+              "meaning": "ชวนดื่มกาแฟร้อนพักผ่อนคลายเหนื่อย",
+              "options": [
+                "A. สวนสาธารณะ",
+                "B. กระโปรง",
+                "C. ดื่มกาแฟร้อนพักผ่อน (喝热咖啡)",
+                "D. เพลง",
+                "E. หิมะ"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "ดื่มกาแฟร้อน (喝热咖啡)"
+            },
+            {
+              "id": 8,
+              "script": "男：今天天气真好，去公园散散步吧。\n女：好啊，正好呼吸一下新鲜空气。",
+              "pinyin": "Nán: Jīntiān tiānqì zhēn hǎo, qù gōngyuán sànsàn bù ba.\nNǚ: Hǎo a, zhènghǎo hūxī yíxià xīnxian kōngqì.",
+              "meaning": "อากาศดีไปเดินเล่นที่สวนสาธารณะ",
+              "options": [
+                "A. เดินเล่นในสวนสาธารณะ (公园散步)",
+                "B. กระโปรง",
+                "C. ดื่มกาแฟ",
+                "D. หิมะ",
+                "E. ดนตรี"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "ไปเดินเล่นในสวน (公园散步)"
+            },
+            {
+              "id": 9,
+              "script": "女：下雪了！外面的房子都变白了。\n男：太美了，我们下去拍照吧！",
+              "pinyin": "Nǚ: Xià xuě le! Wàimiàn de fángzi dōu biàn bái le.\nNán: Tài měi le, wǒmen xiàqu pāizhào ba!",
+              "meaning": "หิมะตก สภาพแวดล้อมขาวโพลน ชวนลงไปถ่ายรูป",
+              "options": [
+                "A. สวน",
+                "B. กระโปรง",
+                "C. กาแฟ",
+                "D. หิมะตกถ่ายรูป (下雪拍照)",
+                "E. ร้องเพลง"
+              ],
+              "answer": "D",
+              "type": "choice",
+              "explanation": "หิมะตก (下雪)"
+            },
+            {
+              "id": 10,
+              "script": "男：她唱得真好听，声音特别甜。\n女：是啊，她从小就开始学唱歌了。",
+              "pinyin": "Nán: Tā chàng de zhēn hǎotīng, shēngyīn tèbié tián.\nNǚ: Shì a, tā cóngxiǎo jiù kāishǐ xué chànggē le.",
+              "meaning": "ชมว่าร้องเพลงเพราะ เสียงหวานมาก",
+              "options": [
+                "A. สวน",
+                "B. กระโปรง",
+                "C. กาแฟ",
+                "D. หิมะ",
+                "E. ร้องเพลงไพเราะ (学唱歌)"
+              ],
+              "answer": "E",
+              "type": "choice",
+              "explanation": "เรียนร้องเพลง ร้องเพลงเพราะ (学唱歌)"
+            }
+          ]
+        },
+        {
+          "part": 2,
+          "title": "ตอนที่ 2 (ข้อ 11-20): ฟังประโยคแล้วพิจารณาว่า ถูก (√) หรือ ผิด (×)",
+          "instructions": "ฟังข้อความแล้วตัดสินว่าประโยคสรุปตรงกับความเป็นจริงหรือไม่",
+          "questions": [
+            {
+              "id": 11,
+              "script": "为了准备这次考试，他每天都复习到很晚，今天早上起晚了，差一点儿就迟到了。\n★ 他今天考试迟到了。",
+              "pinyin": "Wèile zhǔnbèi zhè cì kǎoshì, tā měitiān dōu fùxí dào hěn wǎn, jīntiān zǎoshang qǐ wǎn le, chà yìdiǎnr jiù chídào le. ★ Tā jīntiān kǎoshì chídào le.",
+              "meaning": "เกือบจะสาย (差一点儿就迟到了) แปลว่ายังไม่สาย ★ เขาสอบสายในวันนี้",
+              "answer": "false",
+              "type": "true_false",
+              "explanation": "差一点儿迟到 แปลว่า เกือบจะสาย แต่ยังไม่สาย"
+            },
+            {
+              "id": 12,
+              "script": "每个人都有自己的兴趣和爱好，比如有人喜欢运动，有人喜欢安静地看书。\n★ 大家的爱好不一样。",
+              "pinyin": "Měi ge rén dōu yǒu zìjǐ de xìngqù hé àihào, bǐrú yǒurén xǐhuan yùndòng, yǒurén xǐhuan ānjìng de kànshū. ★ Dàjiā de àihào bù yíyàng.",
+              "meaning": "ทุกคนมีความชอบไม่เหมือนกัน ★ งานอดิเรกของทุกคนไม่เหมือนกัน",
+              "answer": "true",
+              "type": "true_false",
+              "explanation": "ทุกคนมีความชอบต่างกัน (大家的爱好不一样) ถูกต้อง"
+            },
+            {
+              "id": 13,
+              "script": "医生说我的感冒不是很严重，多喝热水，注意休息，两天就好了，不用吃药。\n★ 医生让他按时吃药。",
+              "pinyin": "Yīshēng shuō wǒ de gǎnmào bú shì hěn yánzhòng, duō hē rèshuǐ, zhùyì xiūxi, liǎng tiān jiù hǎo le, búyòng chī yào. ★ Yīshēng ràng tā ànshí chī yào.",
+              "meaning": "หมอบอกว่าไม่ต้องกินยา (不用吃药) ★ หมอให้เขากินยาตรงเวลา",
+              "answer": "false",
+              "type": "true_false",
+              "explanation": "ในบทพูดบอกว่า 不用吃药 (ไม่ต้องกินยา)"
+            },
+            {
+              "id": 14,
+              "script": "这条路最近在修，很多车辆都走不了，大家都选择坐地铁上下班。\n★ 坐地铁的人比以前多了。",
+              "pinyin": "Zhè tiáo lù zuìjìn zài xiū, hěn duō chēliàng dōu zǒubuliǎo, dàjiā dōu xuǎnzé zuò dìtiě shàng-xià bān. ★ Zuò dìtiě de rén bǐ yǐqián duō le.",
+              "meaning": "ถนนซ่อมคนเลยหันมาขึ้นรถไฟใต้ดิน ★ คนนั่งรถไฟใต้ดินเยอะกว่าเมื่อก่อน",
+              "answer": "true",
+              "type": "true_false",
+              "explanation": "คนหันมาขึ้นรถไฟใต้ดินกันหมด จึงมีคนขึ้นเยอะขึ้น ถูกต้อง"
+            },
+            {
+              "id": 15,
+              "script": "虽然工作很辛苦，但是每次看到客户满意的笑容，我都觉得一切都很值得。\n★ 他对自己的工作很满意。",
+              "pinyin": "Suīrán gōngzuò hěn xīnkǔ, dànshì měicì kàndào kèhù mǎnyì de xiàoróng, wǒ dōu juéde yíqiè dōu hěn zhíde. ★ Tā duì zìjǐ de gōngzuò hěn mǎnyì.",
+              "meaning": "แม้เหนื่อยแต่เห็นรอยยิ้มลูกค้าก็คุ้มค่า ★ เขาพึงพอใจกับงานของตนเอง",
+              "answer": "true",
+              "type": "true_false",
+              "explanation": "รู้สึกคุ้มค่าและรักในงาน (都很值得) ถูกต้อง"
+            },
+            {
+              "id": 16,
+              "script": "很多外国朋友来中国旅游时，最想做的事情就是去爬长城和吃北京烤鸭。\n★ 外国人不爱吃烤鸭。",
+              "pinyin": "Hěn duō wàiguó péngyou lái Zhōngguó lǚyóu shí, zuì xiǎng zuò de shìqing jiù shì qù pá Chángchéng hé chī Běijīng kǎoyā. ★ Wàiguórén bú ài chī kǎoyā.",
+              "meaning": "ชาวต่างชาติต่างอยากกินเป็ดปักกิ่ง ★ คนต่างชาติไม่ชอบกินเป็ดปักกิ่ง",
+              "answer": "false",
+              "type": "true_false",
+              "explanation": "ชาวต่างชาติชอบกินเป็ดปักกิ่งมาก ข้อความบอกไม่ชอบจึงผิด"
+            },
+            {
+              "id": 17,
+              "script": "今天超市有很多东西都在打折，苹果一斤只要三块钱，非常便宜。\n★ 今天的苹果很便宜。",
+              "pinyin": "Jīntiān chāoshì yǒu hěn duō dōngxi dōu zài dǎzhé, píngguǒ yì jīn zhǐ yào sān kuài qián, fēicháng piányi. ★ Jīntiān de píngguǒ hěn piányi.",
+              "meaning": "แอปเปิ้ลลดราคาถูกมาก ชั่งละ 3 หยวน ★ แอปเปิ้ลวันนี้ราคาถูกมาก",
+              "answer": "true",
+              "type": "true_false",
+              "explanation": "วันนี้แอปเปิ้ลถูกมาก (非常便宜) ถูกต้อง"
+            },
+            {
+              "id": 18,
+              "script": "我学汉语已经三年了，现在不仅能看懂中文报纸，还能用中文跟朋友聊天。\n★ 他的汉语水平提高了。",
+              "pinyin": "Wǒ xué Hànyǔ yǐjīng sān nián le, xiànzài bùjǐn néng kàndǒng Zhōngwén bàozhǐ, hái néng yòng Zhōngwén gēn péngyou liáotiān. ★ Tā de Hànyǔ shuǐpíng tígāo le.",
+              "meaning": "เรียนจีนมา 3 ปี อ่านหนังสือพิมพ์ได้คุยกับเพื่อนได้ ★ ระดับภาษาจีนของเขาพัฒนาขึ้น",
+              "answer": "true",
+              "type": "true_false",
+              "explanation": "ระดับภาษาจีนดีขึ้นอย่างมาก (水平提高了) ถูกต้อง"
+            },
+            {
+              "id": 19,
+              "script": "明天是星期六，爸爸妈妈说要带我去动物园看大熊猫，我兴奋得睡不着觉。\n★ 他今天去动物园了。",
+              "pinyin": "Míngtiān shì xīngqīliù, bàba māma shuō yào dài wǒ qù dòngwùyuán kàn dàxióngmāo, wǒ xīngfèn de shuìbùzháo jiào. ★ Tā jīntiān qù dòngwùyuán le.",
+              "meaning": "พรุ่งนี้จะพาไปสวนสัตว์ ★ วันนี้เขาไปสวนสัตว์มาแล้ว",
+              "answer": "false",
+              "type": "true_false",
+              "explanation": "จะไปวันพรุ่งนี้ (明天去) ไม่ใช่วันนี้"
+            },
+            {
+              "id": 20,
+              "script": "这家餐厅的环境很好，菜做得很地道，就是价格有点儿高，平时人不是很多。\n★ 这家餐厅菜很便宜。",
+              "pinyin": "Zhè jiā cāntīng de huánjìng hěn hǎo, cài zuò de hěn dìdào, jiùshì jiàgé yǒudiǎnr gāo, píngshí rén bú shì hěn duō. ★ Zhè jiā cāntīng cài hěn piányi.",
+              "meaning": "อาหารร้านนี้อร่อยแต่ราคาค่อนข้างสูง ★ ร้านนี้อาหารราคาถูกมาก",
+              "answer": "false",
+              "type": "true_false",
+              "explanation": "ราคาค่อนข้างสูง (价格有点儿高) ไม่ใช่ราคาถูก"
+            }
+          ]
+        },
+        {
+          "part": 3,
+          "title": "ตอนที่ 3 (ข้อ 21-30): ฟังบทสนทนาสั้นและคำถาม แล้วเลือกคำตอบ A, B, C",
+          "instructions": "ฟังบทสนทนาและเลือกคำตอบที่ถูกต้องที่สุด",
+          "questions": [
+            {
+              "id": 21,
+              "script": "男：小李，你那份报告写完了吗？\n女：快了，大概还需要半个小时。\n问：小李在做什么？",
+              "pinyin": "Nán: Xiǎo Lǐ, nǐ nà fèn bàogào xiěwán le ma?\nNǚ: Kuài le, dàgài hái xūyào bàn ge xiǎoshí.\nWèn: Xiǎo Lǐ zài zuò shénme?",
+              "meaning": "ถามเรื่องเขียนรายงาน เสี่ยวหลี่บอกอีกครึ่งชั่วโมงเสร็จ ถาม: เสี่ยวหลี่กำลังทำอะไร?",
+              "options": [
+                "A. 看电影 (ดูหนัง)",
+                "B. 写报告 (เขียนรายงาน)",
+                "C. 准备开会 (เตรียมประชุม)"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "กำลังเขียนรายงาน (写报告)"
+            },
+            {
+              "id": 22,
+              "script": "女：你今天脸色不太好，是不是生病了？\n男：昨晚赶项目没睡好，有点儿头疼。\n问：男的怎么了？",
+              "pinyin": "Nǚ: Nǐ jīntiān liǎnsè bú tài hǎo, shì bú shì shēngbìng le?\nNán: Zuówǎn gǎn xiàngmù méi shuì hǎo, yǒudiǎnr tóuténg.\nWèn: Nán de zěnme le?",
+              "meaning": "เมื่อคืนนอนไม่หลับ ปวดหัว ถาม: ผู้ชายเป็นอะไร?",
+              "options": [
+                "A. 肚子疼 (ปวดท้อง)",
+                "B. 感冒了 (เป็นหวัด)",
+                "C. 有点儿头疼 (ปวดหัว)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "ผู้ชายบอกว่า 有点儿头疼 (ปวดหัวนิดหน่อย)"
+            },
+            {
+              "id": 23,
+              "script": "男：请问这附近有银行吗？我想取点儿钱。\n女：出了大门向右拐，走两百米就有一家中国银行。\n问：男的要去哪儿？",
+              "pinyin": "Nán: Qǐngwèn zhè fùjìn yǒu yínháng ma? Wǒ xiǎng qǔ diǎnr qián.\nNǚ: Chū le dàmén xiàng yòu guǎi, zǒu liǎng bǎi mǐ jiù yǒu yì jiā Zhōngguó Yínháng.\nWèn: Nán de yào qù nǎr?",
+              "meaning": "ถามหาธนาคารเพื่อกดเงิน ถาม: ผู้ชายจะไปที่ไหน?",
+              "options": [
+                "A. 超市 (ซูเปอร์)",
+                "B. 饭店 (ร้านอาหาร)",
+                "C. 银行 (ธนาคาร)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "ต้องการไปธนาคาร (去银行)"
+            },
+            {
+              "id": 24,
+              "script": "女：周末我们一起去爬山吧？\n男：好啊，正好叫上小王和小张。\n问：他们打算周末做什么？",
+              "pinyin": "Nǚ: Zhōumò wǒmen yìqǐ qù páshān ba?\nNán: Hǎo a, zhènghǎo jiàoshang Xiǎo Wáng hé Xiǎo Zhāng.\nWèn: Tāmen dǎsuàn zhōumò zuò shénme?",
+              "meaning": "ชวนไปปีนเขาวันสุดสัปดาห์ ถาม: วันหยุดพวกเขาตั้งใจจะทำอะไร?",
+              "options": [
+                "A. 逛街 (เดินเล่น)",
+                "B. 游泳 (ว่ายน้ำ)",
+                "C. 爬山 (ปีนเขา)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "พวกเขาวางแผนไปปีนเขา (去爬山)"
+            },
+            {
+              "id": 25,
+              "script": "男：这件衬衫真合适你，颜色也很衬皮肤。\n女：是吗？那我就买这件了。\n问：女的决定买什么？",
+              "pinyin": "Nán: Zhè jiàn chènshān zhēn héshì nǐ, yánsè yě hěn chèn pífū.\nNǚ: Shì ma? Nà wǒ jiù mǎi zhè jiàn le.\nWèn: Nǚ de juédìng mǎi shénme?",
+              "meaning": "เสื้อเชิ้ตตัวนี้เหมาะกับคุณมาก ผู้หญิงตัดสินใจซื้อ ถาม: ผู้หญิงตัดสินใจซื้ออะไร?",
+              "options": [
+                "A. 裤子 (กางเกง)",
+                "B. 衬衫 (เสื้อเชิ้ต)",
+                "C. 帽子 (หมวก)"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "ตัดสินใจซื้อเสื้อเชิ้ต (衬衫)"
+            },
+            {
+              "id": 26,
+              "script": "女：我们几点出发去机场？\n男：飞机是下午四点的，两点从家走刚刚好。\n问：他们打算几点从家出发？",
+              "pinyin": "Nǚ: Wǒmen jǐ diǎn chūfā qù jīchǎng?\nNán: Fēijī shì xiàwǔ sì diǎn de, liǎng diǎn cóng jiā zǒu gānggāng hǎo.\nWèn: Tāmen dǎsuàn jǐ diǎn cóng jiā chūfā?",
+              "meaning": "เครื่องออก 4 โมงเย็น ออกจากบ้านบ่าย 2 โมงกำลังพอดี ถาม: พวกเขาจะออกจากบ้านกี่โมง?",
+              "options": [
+                "A. 1点",
+                "B. 4点",
+                "C. 2点 (บ่ายสอง)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "ออกจากบ้านบ่าย 2 โมง (两点)"
+            },
+            {
+              "id": 27,
+              "script": "男：你这只猫真可爱，叫什么名字啊？\n女：它叫小白，因为全身都是白色的毛。\n问：猫为什么叫小白？",
+              "pinyin": "Nán: Nǐ zhè zhī māo zhēn kě'ài, jiào shénme míngzi a?\nNǚ: Tā jiào Xiǎobái, yīnwèi quánshēn dōu shì báisè de máo.\nWèn: Māo wèishénme jiào Xiǎobái?",
+              "meaning": "แมวชื่อเสี่ยวไป๋เพราะขนทั้งตัวสีขาว ถาม: ทำไมแมวถึงชื่อเสี่ยวไป๋?",
+              "options": [
+                "A. 全身都是白色 (ตัวสีขาวทั้งตัว)",
+                "B. 跑得很快 (วิ่งเร็ว)",
+                "C. 喜欢吃鱼 (ชอบกินปลา)"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "เพราะขนสีขาวทั้งตัว (全身都是白色的)"
+            },
+            {
+              "id": 28,
+              "script": "女：师傅，去火车站大概需要多长时间？\n男：现在不堵车，二十分钟就能到。\n问：到火车站需要多长时间？",
+              "pinyin": "Nǚ: Shīfu, qù huǒchēzhàn dàgài xūyào duō cháng shíjiān?\nNán: Xiànzài bù dǔchē, èrshí fēnzhōng jiù néng dào.\nWèn: Dào huǒchēzhàn xūyào duō cháng shíjiān?",
+              "meaning": "ถามคนขับรถไปสถานีรถไฟใช้เวลา 20 นาที ถาม: ใช้เวลาเท่าไหร่?",
+              "options": [
+                "A. 20分钟 (20 นาที)",
+                "B. 30分钟",
+                "C. 40分钟"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "ใช้เวลา 20 นาที (二十分钟)"
+            },
+            {
+              "id": 29,
+              "script": "男：今晚你想吃点儿什么？我来做。\n女：我想吃西红柿炒鸡蛋，再加个青菜吧。\n问：女的今晚想吃什么？",
+              "pinyin": "Nán: Jīnwǎn nǐ xiǎng chī diǎnr shénme? Wǒ lái zuò.\nNǚ: Wǒ xiǎng chī xīhóngshì chǎo jīdàn, zài jiā ge qīngcài ba.\nWèn: Nǚ de jīnwǎn xiǎng chī shénme?",
+              "meaning": "อยากกินมะเขือเทศผัดไข่และผัก ถาม: คืนนี้ผู้หญิงอยากกินอะไร?",
+              "options": [
+                "A. 牛肉面 (บะหมี่เนื้อ)",
+                "B. 西红柿炒鸡蛋 (มะเขือเทศผัดไข่)",
+                "C. 烤鸭 (เป็ดปักกิ่ง)"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "西红柿炒鸡蛋 (มะเขือเทศผัดไข่)"
+            },
+            {
+              "id": 30,
+              "script": "女：明天可能会下雨，记得带伞啊。\n男：知道了，我已经把伞放包里了。\n问：男的把伞放在哪儿了？",
+              "pinyin": "Nǚ: Míngtiān kěnéng huì xià yǔ, jìde dài sǎn a.\nNán: Zhīdào le, wǒ yǐjīng bǎ sǎn fàng bāo lǐ le.\nWèn: Nán de bǎ sǎn fàng zài nǎr le?",
+              "meaning": "ผู้ชายใส่ร่มไว้ในกระเป๋าแล้ว ถาม: ผู้ชายเอาร่มใส่ไว้ที่ไหน?",
+              "options": [
+                "A. 桌子上 (บนโต๊ะ)",
+                "B. 车里 (ในรถ)",
+                "C. 包里 (ในกระเป๋า)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "放在包里 (ในกระเป๋า)"
+            }
+          ]
+        },
+        {
+          "part": 4,
+          "title": "ตอนที่ 4 (ข้อ 31-40): ฟังบทสนทนาขนาดยาวแล้วตอบคำถาม",
+          "instructions": "ฟังบทสนทนายาวและตอบคำถามข้อ 31-40",
+          "questions": [
+            {
+              "id": 31,
+              "script": "女：听说你要搬家了？\n男：是的，现在的房子离公司太远了，每天路上要花两个小时。\n女：新房子找在哪儿了？\n男：就在公司附近，走路上班只要十分钟。\n问：男的为什么搬家？",
+              "pinyin": "Nǚ: Tīngshuō nǐ yào bānjiā le?\nNán: Shì de, xiànzài de fángzi lí gōngsī tài yuǎn le, měitiān lùshàng yào huā liǎng ge xiǎoshí.\nNǚ: Xīn fángzi zhǎo zài nǎr le?\nNán: Jiù zài gōngsī fùjìn, zǒulù shàngbān zhǐ yào shí fēnzhōng.\nWèn: Nán de wèishénme bānjiā?",
+              "meaning": "ย้ายบ้านเพราะบ้านเดิมไกลจากบริษัทมาก เดินทาง 2 ชั่วโมง ถาม: ทำไมผู้ชายถึงย้ายบ้าน?",
+              "options": [
+                "A. 房租太贵 (ค่าเช่าแพง)",
+                "B. 离公司太远 (ไกลจากบริษัท)",
+                "C. 房子太小 (บ้านเล็ก)"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "เหตุผลคือ 离公司太远 (ไกลจากบริษัทเกินไป)"
+            },
+            {
+              "id": 32,
+              "script": "男：您好，我想买一本英汉词典。\n女：好的，三楼是外语书区，您可以坐电梯上去。\n男：谢谢，三楼有洗手间吗？\n女：有的，出电梯右边就是。\n问：外语书区在几楼？",
+              "pinyin": "Nán: Nín hǎo, wǒ xiǎng mǎi yì běn Yīng-Hàn cídiǎn.\nNǚ: Hǎo de, sān lóu shì wàiyǔ shūqū, nín kěyǐ zuò diàntī shàngqu.\nNán: Xièxie, sān lóu yǒu xǐshǒujiān ma?\nNǚ: Yǒu de, chū diàntī yòubian jiù shì.\nWèn: Wàiyǔ shūqū zài jǐ lóu?",
+              "meaning": "โซนหนังสือภาษาต่างประเทศอยู่ชั้น 3 ถาม: อยู่ชั้นไหน?",
+              "options": [
+                "A. 一楼",
+                "B. 三楼 (ชั้น 3)",
+                "C. 四楼"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "อยู่ชั้น 3 (三楼)"
+            },
+            {
+              "id": 33,
+              "script": "女：喂，张经理，明天上午的会议几点开始？\n男：九点半，在二号会议室。\n女：好的，需要我提前准备什么资料吗？\n男：把上个月的销售报表打印十份带来就行。\n问：会议几点开始？",
+              "pinyin": "Nǚ: Wéi, Zhāng jīnglǐ, míngtiān shàngwǔ de huìyì jǐ diǎn kāishǐ?\nNán: Jiǔ diǎn bàn, zài èr hào huìyìshì.\nNǚ: Hǎo de, xūyào wǒ tíqián zhǔnbèi shénme zīliào ma?\nNán: Bǎ shàng ge yuè de xiāoshòu bàobiǎo dǎyìn shí fèn dài lái jiù xíng.\nWèn: Huìyì jǐ diǎn kāishǐ?",
+              "meaning": "ประชุมเริ่มเวลา 9 โมงครึ่ง ถาม: ประชุมเริ่มกี่โมง?",
+              "options": [
+                "A. 9点",
+                "B. 9点半 (09:30)",
+                "C. 10点"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "เริ่มเวลา 9:30 (九点半)"
+            },
+            {
+              "id": 34,
+              "script": "男：这台电脑你用了几年了？\n女：快四年了，最近运行速度特别慢。\n男：现在的软件越来越大，四年前的配置确实该换了。\n女：是啊，我打算周末去电脑城看看新的。\n问：女的的电脑怎么样？",
+              "pinyin": "Nán: Zhè tái diànnǎo nǐ yòng le jǐ nián le?\nNǚ: Kuài sì nián le, zuìjìn yùnxíng sùdù tèbié màn.\nNán: Xiànzài de ruǎnjiàn yuè lái yuè dà, sì nián qián de pèizhì quèshí gāi huàn le.\nNǚ: Shì a, wǒ dǎsuàn zhōumò qù diànnǎochéng kànkan xīn de.\nWèn: Nǚ de de diànnǎo zěnmeyàng?",
+              "meaning": "คอมพิวเตอร์ใช้มา 4 ปี เครื่องช้ามาก ถาม: คอมพิวเตอร์ของเธอเป็นอย่างไร?",
+              "options": [
+                "A. 坏了不能开机 (พังเปิดไม่ติด)",
+                "B. 丢了 (หาย)",
+                "C. 运行速度很慢 (ทำงานช้ามาก)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "运行速度特别慢 (ความเร็วช้ามาก)"
+            },
+            {
+              "id": 35,
+              "script": "女：你今天怎么没开车来？\n男：车子送去保养了，明天才能取。\n女：那你今天是坐地铁来的？\n男：不是，今天天气好，我骑共享单车来的。\n问：男的今天怎么来的？",
+              "pinyin": "Nǚ: Nǐ jīntiān zěnme méi kāichē lái?\nNán: Chēzi sòng qù bǎoyǎng le, míngtiān cái néng qǔ.\nNǚ: Nà nǐ jīntiān shì zuò dìtiě lái de?\nNán: Bú shì, jīntiān tiānqì hǎo, wǒ qí gòngxiǎng dānchē lái de.\nWèn: Nán de jīntiān zěnme lái de?",
+              "meaning": "ปั่นจักรยานแชร์มา ถาม: วันนี้ผู้ชายเดินทางมาอย่างไร?",
+              "options": [
+                "A. 骑自行车 (ขี่จักรยาน)",
+                "B. 坐地铁 (นั่งรถไฟฟ้า)",
+                "C. 开车 (ขับรถ)"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "骑单车 (ขี่จักรยาน)"
+            },
+            {
+              "id": 36,
+              "script": "男：这只手表看起来很特别，在哪儿买的？\n女：是我去年去瑞士旅游时买的纪念品。\n男：一定很贵吧？\n女：价格还可以，主要是设计很有特色。\n问：手表是在哪儿买的？",
+              "pinyin": "Nán: Zhè zhī shǒubiǎo kàn qǐlái hěn tèbié, zài nǎr mǎi de?\nNǚ: Shì wǒ qùnián qù Ruìshì lǚyóu shí mǎi de jìniànpǐn.\nNán: Yídìng hěn guì ba?\nNǚ: Jiàgé hái kěyǐ, zhǔyào shì shèjì hěn yǒu tèsè.\nWèn: Shǒubiǎo shì zài nǎr mǎi de?",
+              "meaning": "ซื้อนาฬิกาเป็นของที่ระลึกที่สวิตเซอร์แลนด์ ถาม: ซื้อที่ไหน?",
+              "options": [
+                "A. 中国",
+                "B. 日本",
+                "C. 瑞士 (สวิตเซอร์แลนด์)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "去瑞士旅游时买的 (สวิตเซอร์แลนด์)"
+            },
+            {
+              "id": 37,
+              "script": "女：您好，请问这儿可以刷信用卡吗？\n男：可以的，或者微信、支付宝都可以。\n女：那我用微信支付吧，扫这个码吗？\n男：对，扫桌上的二维码就行。\n问：女的最后怎么付款？",
+              "pinyin": "Nǚ: Nín hǎo, qǐngwèn zhèr kěyǐ shuā xìnyòngkǎ ma?\nNán: Kěyǐ de, huòzhě Wēixìn, Zhīfùbǎo dōu kěyǐ.\nNǚ: Nà wǒ yòng Wēixìn zhīfù ba, sǎo zhège mǎ ma?\nNán: Duì, sǎo zhuō shàng de èrwéimǎ jiù xíng.\nWèn: Nǚ de zuìhòu zěnme fùkuǎn?",
+              "meaning": "ผู้หญิงเลือกจ่ายด้วยวีแชต (WeChat Pay) ถาม: จ่ายเงินด้วยวิธีใด?",
+              "options": [
+                "A. 微信支付 (WeChat Pay)",
+                "B. 现金 (เงินสด)",
+                "C. 信用卡 (บัตรเครดิต)"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "用微信支付 (จ่ายด้วย WeChat)"
+            },
+            {
+              "id": 38,
+              "script": "女：听说你要去国外读书？\n男：是，下周五的飞机。\n女：那祝你在新的一年里学习更上一层楼。\n男：谢谢您！\n问：女的希望男的怎么样？",
+              "pinyin": "Nǚ: Tīngshuō nǐ yào qù guówài dúshū?\nNán: Shì, xià zhōuwǔ de fēijī.\nNǚ: Nà zhù nǐ zài xīn de yì nián lǐ xuéxí gèng shàng yì céng lóu.\nNán: Xièxie nín!\nWèn: Nǚ de xīwàng nán de zěnmeyàng?",
+              "meaning": "อวยพรให้การเรียนก้าวหน้ายิ่งขึ้นไปอีกขั้น ถาม: ผู้หญิงหวังให้ผู้ชายเป็นอย่างไร?",
+              "options": [
+                "A. 早日回国 (กลับเร็วๆ)",
+                "B. 身体健康 (สุขภาพดี)",
+                "C. 学习进步 (การเรียนก้าวหน้า)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "学习更上一层楼 (การเรียนพัฒนาก้าวหน้ายิ่งขึ้น)"
+            },
+            {
+              "id": 39,
+              "script": "男：我的护照在你包里吗？\n女：没有啊，只有我的。你的放哪儿了？\n男：奇怪，我记得给你了。\n女：你看看，在你自己的衬衫里呢。\n问：护照是在哪儿找到的？",
+              "pinyin": "Nán: Wǒ de hùzhào zài nǐ bāo lǐ ma?\nNǚ: Méiyǒu a, zhǐyǒu wǒ de. Nǐ de fàng nǎr le?\nNán: Qíguài, wǒ jìde gěi nǐ le.\nNǚ: Nǐ kànkan, zài nǐ zìjǐ de chènshān lǐ ne.\nWèn: Hùzhào shì zài nǎr zhǎodào de?",
+              "meaning": "หาพาสปอร์ตเจอในกระเป๋าเสื้อเชิ้ตของตนเอง ถาม: เจอพาสปอร์ตที่ไหน?",
+              "options": [
+                "A. 衬衫里 (ในเสื้อเชิ้ต)",
+                "B. 女的的包里 (ในกระเป๋าผู้หญิง)",
+                "C. 桌子上 (บนโต๊ะ)"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "在你自己的衬衫里 (ในเสื้อเชิ้ตของตนเอง)"
+            },
+            {
+              "id": 40,
+              "script": "女：你在忙什么呢？刚才打你的手机你也不接。\n男：对不起，我刚洗了个澡，没听见，有什么事吗？\n女：我想问问你公司里的一些事情。\n男：你等一下，我去把电视的声音关小一些。\n问：男的刚才为什么没接电话？",
+              "pinyin": "Nǚ: Nǐ zài máng shénme ne? Gāngcái dǎ nǐ de shǒujī nǐ yě bù jiē.\nNán: Duìbuqǐ, wǒ gāng xǐ le ge zǎo, méi tīngjiàn, yǒu shénme shì ma?\nNǚ: Wǒ xiǎng wènwen nǐ gōngsī lǐ de yìxiē shìqing.\nNán: Nǐ děng yíxià, wǒ qù bǎ diànshì de shēngyīn guān xiǎo yìxiē.\nWèn: Nán de gāngcái wèishénme méi jiē diànhuà?",
+              "meaning": "เมื่อกี้กำลังอาบน้ำอยู่เลยไม่ได้ยินเสียงโทรศัพท์ ถาม: ทำไมเมื่อกี้ถึงไม่รับสาย?",
+              "options": [
+                "A. 在洗澡 (กำลังอาบน้ำอยู่)",
+                "B. 在看电视 (ดูทีวีอยู่)",
+                "C. 在开会 (กำลังประชุม)"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "刚洗了个澡，没听见 (เพิ่งอาบน้ำเลยไม่ได้ยิน)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reading",
+      "name": "ส่วนที่ 2: การอ่าน (阅读)",
+      "totalQuestions": 30,
+      "parts": [
+        {
+          "part": 1,
+          "title": "ตอนที่ 1 (ข้อ 41-50): จับคู่ประโยคที่มีความสัมพันธ์สอดคล้องกัน",
+          "instructions": "อ่านประโยค 41-50 แล้วจับคู่กับประโยค A-E ที่เข้ากัน",
+          "questions": [
+            {
+              "id": 41,
+              "sentence": "我的作业早就完成了。",
+              "pinyin": "Wǒ de zuòyè zǎojiù wánchéng le.",
+              "meaning": "การบ้านของฉันทำเสร็จตั้งนานแล้ว",
+              "options": [
+                "A. 搬家 (ย้ายบ้าน)",
+                "B. 面条 (บะหมี่)",
+                "C. 那你可以看会儿电视了 (งั้นเธอดูทีวีสักพักได้นะ)",
+                "D. 照顾小狗 (ดูแลหมา)",
+                "E. 不太清楚 (ไม่ค่อยแน่ใจ)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "ทำการบ้านเสร็จแล้ว สามารถดูทีวีได้"
+            },
+            {
+              "id": 42,
+              "sentence": "你先来个苹果，我去给你做碗面条儿。",
+              "pinyin": "Nǐ xiān lái ge píngguǒ, wǒ qù gěi nǐ zuò wǎn miàntiáor.",
+              "meaning": "เธอกินแอปเปิ้ลก่อนนะ เดี๋ยวฉันไปทำบะหมี่ให้สักชาม",
+              "options": [
+                "A. 搬家",
+                "B. 太好了，我正好饿了 (ดีจังเลย กำลังหิวพอดี)",
+                "C. 看电视",
+                "D. 照顾小狗",
+                "E. 不清楚"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "ทำบะหมี่ให้ทาน ตอบรับว่าหิวพอดี (正好饿了)"
+            },
+            {
+              "id": 43,
+              "sentence": "我终于有了自己的大房子了，明天就可以搬家了。",
+              "pinyin": "Wǒ zhōngyú yǒu le zìjǐ de dà fángzi le, míngtiān jiù kěyǐ bānjiā le.",
+              "meaning": "ในที่สุดฉันก็มีบ้านหลังใหญ่เป็นของตัวเอง พรุ่งนี้ย้ายบ้านได้แล้ว",
+              "options": [
+                "A. 祝贺你！到时候我去帮你 (ยินดีด้วยนะ! ถึงเวลานั้นฉันจะไปช่วย)",
+                "B. 肚子饿",
+                "C. 看电视",
+                "D. 照顾小狗",
+                "E. 不清楚"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "แสดงความยินดีเรื่องขึ้นบ้านใหม่ (祝贺你)"
+            },
+            {
+              "id": 44,
+              "sentence": "这几天我不在家，小狗就请你帮我照顾了。",
+              "pinyin": "Zhè jǐ tiān wǒ bú zài jiā, xiǎogǒu jiù qǐng nǐ bāng wǒ zhàogù le.",
+              "meaning": "สองสามวันนี้ฉันไม่อยู่บ้าน ฝากช่วยดูแลเจ้าตูบให้ด้วยนะ",
+              "options": [
+                "A. 祝贺你",
+                "B. 肚子饿",
+                "C. 看电视",
+                "D. 放心吧，交给我没问题 (วางใจเถอะ ยกให้ฉันดูแลไม่มีปัญหา)",
+                "E. 不清楚"
+              ],
+              "answer": "D",
+              "type": "choice",
+              "explanation": "ตอบรับการฝากดูแลสุนัข (放心吧)"
+            },
+            {
+              "id": 45,
+              "sentence": "这块手表真精致，多少钱买的？",
+              "pinyin": "Zhè kuài shǒubiǎo zhēn jīngzhì, duōshao qián mǎi de?",
+              "meaning": "นาฬิกาข้อมือเรือนนี้ประณีตมาก ซื้อมากี่บาทเหรอ?",
+              "options": [
+                "A. 祝贺你",
+                "B. 肚子饿",
+                "C. 看电视",
+                "D. 放心吧",
+                "E. 关门了",
+                "F. 姐姐给我买的，我也不太清楚 (พี่สาวซื้อให้ ฉันก็ไม่ค่อยทราบราคาเหมือนกัน)"
+              ],
+              "answer": "F",
+              "type": "choice",
+              "explanation": "พี่สาวซื้อให้จึงไม่ทราบราคา"
+            },
+            {
+              "id": 46,
+              "sentence": "这个小孩儿胖胖的，真可爱。",
+              "pinyin": "Zhège xiǎoháir pàngpàng de, zhēn kě'ài.",
+              "meaning": "เด็กคนนี้อ้วนจ้ำม่ำ น่ารักจริงๆ",
+              "options": [
+                "A. 关门了",
+                "B. 那是我叔叔的儿子，一岁多了 (นั่นลูกชายคุณอาฉัน อายุขวบกว่าแล้ว)",
+                "C. 绿茶",
+                "D. 同事玩",
+                "E. 没带伞"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "บอกว่าเป็นลูกชายของอา (叔叔的儿子)"
+            },
+            {
+              "id": 47,
+              "sentence": "我的几个同事周末想去北京玩儿，但他们都不会开车。",
+              "pinyin": "Wǒ de jǐ ge tóngshì zhōumò xiǎng qù Běijīng wánr, dàn tāmen dōu bú huì kāichē.",
+              "meaning": "เพื่อนร่วมงานอยากไปเที่ยวปักกิ่งแต่ไม่มีใครขับรถเป็น",
+              "options": [
+                "A. 关门了",
+                "B. 叔叔的儿子",
+                "C. 绿茶",
+                "D. 我哥是司机，我问问他看有没有时间 (พี่ชายฉันเป็นคนขับรถ เดี๋ยวลองถามดูให้ว่าว่างไหม)",
+                "E. 没带伞"
+              ],
+              "answer": "D",
+              "type": "choice",
+              "explanation": "แนะนำพี่ชายที่เป็นคนขับรถ (我哥是司机)"
+            },
+            {
+              "id": 48,
+              "sentence": "你怎么又生病了？",
+              "pinyin": "Nǐ zěnme yòu shēngbìng le?",
+              "meaning": "ทำไมเธอถึงป่วยอีกแล้วล่ะ?",
+              "options": [
+                "A. 关门了",
+                "B. 叔叔的儿子",
+                "C. 绿茶",
+                "D. 我哥是司机",
+                "E. 昨天的雨下得非常大，我没带伞 (เมื่อวานฝนตกหนักมาก ฉันไม่ได้เอาร่มไปเลยตากฝนป่วย)"
+              ],
+              "answer": "E",
+              "type": "choice",
+              "explanation": "อธิบายเหตุผลว่าตากฝนเพราะไม่ได้เอาร่มไป"
+            },
+            {
+              "id": 49,
+              "sentence": "银行马上就要关门了。",
+              "pinyin": "Yínháng mǎshàng jiù yào guānmén le.",
+              "meaning": "ธนาคารใกล้จะปิดทำการแล้วนะ",
+              "options": [
+                "A. 没关系，我明天去也可以 (ไม่เป็นไร ฉันไปวันพรุ่งนี้ก็ได้)",
+                "B. 叔叔的儿子",
+                "C. 绿茶",
+                "D. 我哥是司机",
+                "E. 没带伞"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "ไม่เป็นไรไปวันพรุ่งนี้แทน (没关系，我明天去也可以)"
+            },
+            {
+              "id": 50,
+              "sentence": "把菜单儿给我，我们喝杯绿茶吧？",
+              "pinyin": "Bǎ càidānr gěi wǒ, wǒmen hē bēi lǜchá ba?",
+              "meaning": "เอาเมนูส่งมาให้ฉันหน่อย พวกเราดื่มชาเขียวกันสักแก้วไหม?",
+              "options": [
+                "A. 没关系",
+                "B. 叔叔的儿子",
+                "C. 好的，我也有些渴了 (ได้สิ ฉันก็เริ่มกระหายน้ำแล้วเหมือนกัน)",
+                "D. 我哥是司机",
+                "E. 没带伞"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "ตอบรับดื่มชาเพราะกระหายน้ำ (我也有些渴了)"
+            }
+          ]
+        },
+        {
+          "part": 2,
+          "title": "ตอนที่ 2 (ข้อ 51-60): เลือกคำศัพท์เติมลงในช่องว่าง",
+          "instructions": "เลือกคำศัพท์จากตัวเลือกเติมลงในประโยคให้ถูกต้องตามไวยากรณ์",
+          "questions": [
+            {
+              "id": 51,
+              "sentence": "电影马上就要开始了，（  ）手机关了吧。",
+              "pinyin": "Diànyǐng mǎshàng jiù yào kāishǐ le, ( ) shǒujī guān le ba.",
+              "meaning": "หนังกำลังจะเริ่มแล้ว ปิดมือถือเสียเถอะ (โครงสร้าง 把)",
+              "options": [
+                "A. 其实",
+                "B. 感冒",
+                "C. 附近",
+                "D. 舒服",
+                "E. 声音",
+                "F. 把"
+              ],
+              "answer": "F",
+              "type": "choice",
+              "explanation": "ไวยากรณ์ประโยค 把: 把手机关了 (ปิดมือถือ)"
+            },
+            {
+              "id": 52,
+              "sentence": "他很高，这张桌子太低，坐着很不（  ）。",
+              "pinyin": "Tā hěn gāo, zhè zhāng zhuōzi tài dī, zuòzhe hěn bù ( ).",
+              "meaning": "เขาตัวสูง โต๊ะตัวนี้เตี้ยเกินไป นั่งแล้วไม่สบายตัวเลย",
+              "options": [
+                "A. 其实",
+                "B. 感冒",
+                "C. 附近",
+                "D. 舒服 (สบาย)",
+                "E. 声音",
+                "F. 把"
+              ],
+              "answer": "D",
+              "type": "choice",
+              "explanation": "不舒服 (ไม่สบายตัว)"
+            },
+            {
+              "id": 53,
+              "sentence": "您可以选择火车站（  ）的宾馆，住那儿会更方便。",
+              "pinyin": "Nín kěyǐ xuǎnzé huǒchēzhàn ( ) de bīnguǎn, zhù nàr huì gèng fāngbiàn.",
+              "meaning": "คุณสามารถเลือกโรงแรมใกล้ๆ สถานีรถไฟ พักที่นั่นจะสะดวกกว่า",
+              "options": [
+                "A. 其实",
+                "B. 感冒",
+                "C. 附近 (บริเวณใกล้เคียง)",
+                "D. 舒服",
+                "E. 声音",
+                "F. 把"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "火车站附近 (ใกล้ๆ สถานีรถไฟ)"
+            },
+            {
+              "id": 54,
+              "sentence": "天气冷，你多穿点儿衣服，小心（  ）。",
+              "pinyin": "Tiānqì lěng, nǐ duō chuān diǎnr yīfu, xiǎoxīn ( ).",
+              "meaning": "อากาศหนาว เธอใส่เสื้อผ้าหนาๆ หน่อย ระวังเป็นหวัดนะ",
+              "options": [
+                "A. 其实",
+                "B. 感冒 (เป็นหวัด)",
+                "C. 附近",
+                "D. 舒服",
+                "E. 声音",
+                "F. 把"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "小心感冒 (ระวังเป็นหวัด)"
+            },
+            {
+              "id": 55,
+              "sentence": "对一个女人来说，漂亮、聪明都很重要，但（  ）更重要的是快乐。",
+              "pinyin": "Duì yí ge nǚrén láishuō, piàoliang, cōngmíng dōu hěn zhòngyào, dàn ( ) gèng zhòngyào de shì kuàilè.",
+              "meaning": "แต่จริงๆ แล้วสิ่งที่สำคัญยิ่งกว่าคือความสุข",
+              "options": [
+                "A. 其实 (จริงๆ แล้ว)",
+                "B. 感冒",
+                "C. 附近",
+                "D. 舒服",
+                "E. 声音",
+                "F. 把"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "其实 (อันที่จริง/จริงๆ แล้ว)"
+            },
+            {
+              "id": 56,
+              "sentence": "A：请问，现在是十一点吗？\nB：现在十一点十五了，您的表慢了一（  ）。",
+              "pinyin": "A: Qǐngwèn, xiànzài shì shíyī diǎn ma?\nB: Xiànzài shíyī diǎn shíwǔ le, nín de biǎo màn le yì ( ).",
+              "meaning": "ตอนนี้ 11:15 น. แล้ว นาฬิกาของคุณเดินช้าไป 15 นาที (1 เค่อ)",
+              "options": [
+                "A. 刻 (15 นาที)",
+                "B. 一直",
+                "C. 节",
+                "D. 爱好",
+                "E. 被",
+                "F. 打扫"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "一刻 = 15 นาที (慢了一刻)"
+            },
+            {
+              "id": 57,
+              "sentence": "A：最近怎么（  ）没看见他？\nB：他去旅游了，可能这个周末才能回来。",
+              "pinyin": "A: Zuìjìn zěnme ( ) méi kànjiàn tā?\nB: Tā qù lǚyóu le, kěnéng zhège zhōumò cái néng huílái.",
+              "meaning": "ช่วงนี้ทำไมถึงไม่เห็นเขาเลยตลอดเวลา?",
+              "options": [
+                "A. 刻",
+                "B. 一直 (ตลอดมา)",
+                "C. 节",
+                "D. 爱好",
+                "E. 被",
+                "F. 打扫"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "一直没看见 (ไม่เห็นหน้าเลยมาตลอด)"
+            },
+            {
+              "id": 58,
+              "sentence": "A：牛奶呢？\nB：一定是（  ）猫喝了。",
+              "pinyin": "A: Niúnǎi ne?\nB: Yídìng shì ( ) māo hē le.",
+              "meaning": "นมล่ะ? ต้องถูกแมวกินไปแน่ๆ เลย (โครงสร้างประโยค 被)",
+              "options": [
+                "A. 刻",
+                "B. 一直",
+                "C. 节",
+                "D. 爱好",
+                "E. 被 (ถูก/โดน)",
+                "F. 打扫"
+              ],
+              "answer": "E",
+              "type": "choice",
+              "explanation": "ไวยากรณ์ประโยคถูกกระทำ: 被猫喝了"
+            },
+            {
+              "id": 59,
+              "sentence": "A：你家的厨房真干净！\nB：当然了，为了欢迎你，我已经（  ）了两个多小时了。",
+              "pinyin": "A: Nǐ jiā de chúfáng zhēn gānjìng!\nB: Dāngrán le, wèile huānyíng nǐ, wǒ yǐjīng ( ) le liǎng ge duō xiǎoshí le.",
+              "meaning": "ห้องครัวบ้านเธอสะอาดมาก! แน่นอนสิเพื่อต้อนรับเธอ ฉันทำความสะอาดไปกว่า 2 ชั่วโมงแล้ว",
+              "options": [
+                "A. 刻",
+                "B. 一直",
+                "C. 节",
+                "D. 爱好",
+                "E. 被",
+                "F. 打扫 (ทำความสะอาด)"
+              ],
+              "answer": "F",
+              "type": "choice",
+              "explanation": "打扫了两个多小时 (ทำความสะอาดไปสองชั่วโมงกว่า)"
+            },
+            {
+              "id": 60,
+              "sentence": "A：买这么多鲜花，今天是谁的生日啊？\nB：今天是9月10日，教师（  ）！这是为老师准备的。",
+              "pinyin": "A: Mǎi zhème duō xiānhuā, jīntiān shì shéi de shēngrì a?\nB: Jīntiān shì jiǔ yuè shí rì, Jiàoshī ( )! Zhè shì wèi lǎoshī zhǔnbèi de.",
+              "meaning": "วันนี้ 10 กันยายน วันครูแห่งชาติ! เตรียมไว้ให้คุณครู",
+              "options": [
+                "A. 刻",
+                "B. 一直",
+                "C. 节 (เทศกาล/วันสำคัญ)",
+                "D. 爱好",
+                "E. 被",
+                "F. 打扫"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "教师节 (วันครูแห่งชาติ)"
+            }
+          ]
+        },
+        {
+          "part": 3,
+          "title": "ตอนที่ 3 (ข้อ 61-70): อ่านบทความสั้นแล้วตอบคำถาม",
+          "instructions": "อ่านข้อความและเลือกคำตอบที่ถูกต้องที่สุดตามเนื้อเรื่อง",
+          "questions": [
+            {
+              "id": 61,
+              "passage": "您是来参加今天会议的吗？您来早了一点儿，现在才八点半。您先进来坐吧。\n★ 会议还没开始。",
+              "pinyin": "Nín shì lái cānjiā jīntiān huìyì de ma? Nín lái zǎo le yìdiǎnr, xiànzài cái bā diǎn bàn. Nín xiān jìnlái zuò ba. ★ Huìyì hái méi kāishǐ.",
+              "question": "★ 根据这段话，可以知道什么？",
+              "options": [
+                "A. 会议还没开始 (การประชุมยังไม่เริ่ม)",
+                "B. 会议已经结束了 (ประชุมจบแล้ว)",
+                "C. 会议在九点半 (ประชุม 9:30)"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "คุณมาเช้าไปหน่อย เพิ่งจะแปดโมงครึ่ง แปลว่าการประชุมยังไม่เริ่ม (会议还没开始)"
+            },
+            {
+              "id": 62,
+              "passage": "我喜欢黑色的皮鞋，虽然贵了点儿，但是穿着很舒服，而且质量很好，穿两三年都没问题。\n★ 他觉得那双皮鞋：",
+              "pinyin": "Wǒ xǐhuan hēisè de píxié, suīrán guì le diǎnr, dànshì chuānzhe hěn shūfu, érqiě zhìliàng hěn hǎo, chuān liǎng sān nián dōu méi wèntí. ★ Tā juéde nà shuāng píxié:",
+              "question": "★ 他觉得那双皮鞋：",
+              "options": [
+                "A. 质量很好 (คุณภาพดีมาก)",
+                "B. 特别便宜 (ถูกมาก)",
+                "C. 颜色不好看 (สีไม่สวย)"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "ระบุชัดเจนว่า 质量很好 (คุณภาพดีมาก)"
+            },
+            {
+              "id": 63,
+              "passage": "每天晚上睡觉前，听一段轻音乐，或者看几页书，都有助于提高睡眠质量。\n★ 睡觉前听轻音乐可以：",
+              "pinyin": "Měitiān wǎnshang shuìjiào qián, tīng yí duàn qīngyīnyuè, huòzhě kàn jǐ yè shū, dōu yǒuzhùyú tígāo shuìmián zhìliàng. ★ Shuìjiào qián tīng qīngyīnyuè kěyǐ:",
+              "question": "★ 睡觉前听轻音乐可以：",
+              "options": [
+                "A. 学会唱歌",
+                "B. 认识更多汉字",
+                "C. 睡得更好 (นอนหลับได้ดีขึ้น)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "提高睡眠质量 แปลว่า ช่วยให้หลับได้ดีขึ้น (睡得更好)"
+            },
+            {
+              "id": 64,
+              "passage": "现在许多年轻人喜欢在网上购物，因为不仅方便省时，而且往往能买到更便宜的东西。\n★ 年轻人喜欢网上购物是因为：",
+              "pinyin": "Xiànzài xǔduō niánqīngrén xǐhuan zài wǎngshàng gòuwù, yīnwèi bùjǐn fāngbiàn shěngshí, érqiě wǎngwǎng néng mǎidào gèng piányi de dōngxi. ★ Niánqīngrén xǐhuan wǎngshàng gòuwù shì yīnwèi:",
+              "question": "★ 年轻人喜欢网上购物是因为：",
+              "options": [
+                "A. 东西特别贵",
+                "B. 又方便又便宜 (ทั้งสะดวกและถูกกว่า)",
+                "C. 可以认识新朋友"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "方便省时 และ 往往能买到更便宜的东西"
+            },
+            {
+              "id": 65,
+              "passage": "我去年春节去过一次上海，今年再去的时候，发现那里的变化非常大。经过那条街道时，我几乎不认识了。\n★ 根据这段话，可以知道：",
+              "pinyin": "Wǒ qùnián Chūnjié qùguo yí cì Shànghǎi, jīnnián zài qù de shíhou, fāxiàn nàlǐ de biànhuà fēicháng dà. Jīngguò nà tiáo jiēdào shí, wǒ jīhū bú rènshi le. ★ Gēnjù zhè duàn huà, kěyǐ zhīdào:",
+              "question": "★ 根据这段话，可以知道：",
+              "options": [
+                "A. 现在是春节",
+                "B. 上海变化很大 (เซี่ยงไฮ้เปลี่ยนแปลงไปมาก)",
+                "C. 上海人很热情"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "那里的变化非常大 (เซี่ยงไฮ้เปลี่ยนแปลงไปเยอะมาก)"
+            },
+            {
+              "id": 66,
+              "passage": "世界真的很小，我昨天才发现，你给小张介绍的男朋友是我妻子以前的同事。\n★ 小张的男朋友是我妻子：",
+              "pinyin": "Shìjiè zhēn de hěn xiǎo, wǒ zuótiān cái fāxiàn, nǐ gěi Xiǎo Zhāng jièshào de nánpéngyou shì wǒ qīzi yǐqián de tóngshì. ★ Xiǎo Zhāng de nánpéngyou shì wǒ qīzi:",
+              "question": "★ 小张的男朋友是我妻子：",
+              "options": [
+                "A. 以前的同事 (อดีตเพื่อนร่วมงาน)",
+                "B. 以前的丈夫",
+                "C. 以前的男朋友"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "是我妻子以前的同事 (อดีตเพื่อนร่วมงานของภรรยา)"
+            },
+            {
+              "id": 67,
+              "passage": "下班后，在路上遇到一个老同学。好久没见面，我们就在公司旁边那个咖啡馆里坐了坐，一边喝咖啡一边说了些过去的事，所以回来晚了。\n★ 根据这段话，可以知道：",
+              "pinyin": "Xiàbān hòu, zài lùshang yùdào yí ge lǎo tóngxué. Hǎojiǔ méi jiànmiàn, wǒmen jiù zài gōngsī pángbiān nàge kāfēiguǎn lǐ zuòle zuò, yìbiān hē kāfēi yìbiān shuōle xiē guòqu de shì, suǒyǐ huílái wǎn le. ★ Gēnjù zhè duàn huà, kěyǐ zhīdào:",
+              "question": "★ 根据这段话，可以知道：",
+              "options": [
+                "A. 他回到家了 (เขากลับถึงบ้านแล้วและอธิบายว่าทำไมกลับช้า)",
+                "B. 他正在喝咖啡",
+                "C. 咖啡馆在公园旁边"
+              ],
+              "answer": "A",
+              "type": "choice",
+              "explanation": "บอกว่า 所以回来晚了 (ก็เลยกลับมาถึงบ้านช้า)"
+            },
+            {
+              "id": 68,
+              "passage": "小刘是一位小学老师，教三年级的数学，他虽然很年轻，但是课讲得很好，同学们都很喜欢他。\n★ 学生为什么喜欢刘老师？",
+              "pinyin": "Xiǎo Liú shì yí wèi xiǎoxué lǎoshī, jiāo sān niánjí de shùxué, tā suīrán hěn niánqīng, dànshì kè jiǎng de hěn hǎo, tóngxuémen dōu hěn xǐhuan tā. ★ Xuésheng wèishénme xǐhuan Liú lǎoshī?",
+              "question": "★ 学生为什么喜欢刘老师？",
+              "options": [
+                "A. 很年轻",
+                "B. 课讲得好 (สอนบทเรียนได้ดีมาก)",
+                "C. 对学生要求高"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "课讲得很好 (สอนหนังสือได้ดีมาก)"
+            },
+            {
+              "id": 69,
+              "passage": "今天12号了，晚上陈阿姨要来家里，家里有菜，有鱼，还有些羊肉，但是没有水果了，你去买些香蕉、葡萄吧，再买个西瓜？\n★ 家里需要买什么？",
+              "pinyin": "Jīntiān shí'èr hào le, wǎnshang Chén āyí yào lái jiā lǐ, jiā lǐ yǒu cài, yǒu yú, hái yǒu xiē yángròu, dànshì méiyǒu shuǐguǒ le, nǐ qù mǎi xiē xiāngjiāo, pútáo ba, zài mǎi ge xīguā? ★ Jiā lǐ xūyào mǎi shénme?",
+              "question": "★ 家里需要买什么？",
+              "options": [
+                "A. 鸡蛋",
+                "B. 水果 (ผลไม้)",
+                "C. 果汁"
+              ],
+              "answer": "B",
+              "type": "choice",
+              "explanation": "没有水果了，你去买些香蕉、葡萄... (ขาดผลไม้)"
+            },
+            {
+              "id": 70,
+              "passage": "有人问我长得像谁，这个问题不太好回答。家里人一般觉得我的鼻子和耳朵像我爸爸，眼睛像我妈妈。\n★ 关于他，下面哪个是对的？",
+              "pinyin": "Yǒurén wèn wǒ zhǎng de xiàng shéi, zhège wèntí bú tài hǎo huídá. Jiā lǐ rén yībān juéde wǒ de bízi hé ěrduo xiàng wǒ bàba, yǎnjing xiàng wǒ māma. ★ Guānyú tā, xiàmiàn nǎge shì duì de?",
+              "question": "★ 关于他，下面哪个是对的？",
+              "options": [
+                "A. 头发很长",
+                "B. 不像妈妈",
+                "C. 鼻子像爸爸 (จมูกเหมือนคุณพ่อ)"
+              ],
+              "answer": "C",
+              "type": "choice",
+              "explanation": "鼻子和耳朵像我爸爸 (จมูกและหูเหมือนพ่อ)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "writing",
+      "name": "ส่วนที่ 3: การเขียน (书写)",
+      "totalQuestions": 10,
+      "parts": [
+        {
+          "part": 1,
+          "title": "ตอนที่ 1 (ข้อ 71-75): เรียงคำศัพท์ให้เป็นประโยคที่ถูกต้อง",
+          "instructions": "เรียงกลุ่มคำศัพท์ที่กำหนดให้เป็นประโยคภาษาจีนที่ถูกต้องตามไวยากรณ์",
+          "questions": [
+            {
+              "id": 71,
+              "prompt": "弟弟  笑了  高兴地",
+              "answer": "弟弟高兴地笑了。",
+              "type": "sentence_order",
+              "explanation": "ประธาน (弟弟) + คำวิเศษณ์ขยายกริยา (高兴地) + ภาคแสดง (笑了)"
+            },
+            {
+              "id": 72,
+              "prompt": "简单  上午的考试  比较",
+              "answer": "上午的考试比较简单。",
+              "type": "sentence_order",
+              "explanation": "ประธาน (上午的考试) + คำวิเศษณ์ (比较) + คุณศัพท์ (简单)"
+            },
+            {
+              "id": 73,
+              "prompt": "越来越好  变得  这个城市的环境  了",
+              "answer": "这个城市的环境变得越来越好了。",
+              "type": "sentence_order",
+              "explanation": "ประธาน (这个城市的环境) + กริยา (变得) + ส่วนเสริม (越来越好了)"
+            },
+            {
+              "id": 74,
+              "prompt": "送给他  那位  医生  一个礼物",
+              "answer": "那位医生送给他一个礼物。",
+              "type": "sentence_order",
+              "explanation": "ประธาน (那位医生) + กริยาสองกรรม (送给) + กรรมรอง (他) + กรรมตรง (一个礼物)"
+            },
+            {
+              "id": 75,
+              "prompt": "其他班的成绩  有  也  很大  提高",
+              "answer": "其他班的成绩也有很大提高。",
+              "type": "sentence_order",
+              "explanation": "ประธาน (其他班的成绩) + คำช่วยกริยา (也有) + กรรมขยาย (很大提高)"
+            }
+          ]
+        },
+        {
+          "part": 2,
+          "title": "ตอนที่ 2 (ข้อ 76-80): เติมตัวอักษรจีนจากพินอินที่กำหนด",
+          "instructions": "พิมพ์ตัวอักษรจีนให้ถูกต้องตรงตามพินอินและบริบทประโยค",
+          "questions": [
+            {
+              "id": 76,
+              "pinyin": "chū",
+              "sentence": "医院离这儿很远，我们坐（  ）租车去吧。",
+              "answer": "出",
+              "type": "fill_character",
+              "explanation": "出租车 (chūzūchē) แปลว่า รถแท็กซี่ ตัวอักษรคือ '出'"
+            },
+            {
+              "id": 77,
+              "pinyin": "yuán",
+              "sentence": "一（  ）是10角，一角是10分。",
+              "answer": "元",
+              "type": "fill_character",
+              "explanation": "一元 (yì yuán) แปลว่า 1 หยวน ตัวอักษรคือ '元'"
+            },
+            {
+              "id": 78,
+              "pinyin": "jiào",
+              "sentence": "我不认识他，你知道他姓什么、（  ）什么吗？",
+              "answer": "叫",
+              "type": "fill_character",
+              "explanation": "叫什么 (jiào shénme) แปลว่า ชื่ออะไร ตัวอักษรคือ '叫'"
+            },
+            {
+              "id": 79,
+              "pinyin": "Zhōng",
+              "sentence": "（  ）间穿红裙子的一定是他妹妹。",
+              "answer": "中",
+              "type": "fill_character",
+              "explanation": "中间 (zhōngjiān) แปลว่า ตรงกลาง ตัวอักษรคือ '中'"
+            },
+            {
+              "id": 80,
+              "pinyin": "mǐ",
+              "sentence": "他跑得真快，一百（  ）只用了十一秒。",
+              "answer": "米",
+              "type": "fill_character",
+              "explanation": "一百米 (yì bǎi mǐ) แปลว่า 100 เมตร ตัวอักษรคือ '米'"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

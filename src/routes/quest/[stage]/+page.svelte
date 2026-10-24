@@ -486,8 +486,8 @@
 				{/if}
 			</div>
 
-			<a href="/" class="w-full rounded-2xl bg-primary py-4 text-center font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90">
-				กลับไปหน้าแผนที่
+			<a href="/quest" class="w-full rounded-2xl bg-primary py-4 text-center font-bold text-primary-foreground shadow-lg transition hover:bg-primary/90">
+				กลับไปหน้าแผนที่ด่าน
 			</a>
 		</div>
 	{:else if phase === 'flashcard'}
@@ -517,7 +517,7 @@
 	{:else}
 		<!-- Challenge Phase -->
 		<div class="mb-8 flex items-center gap-4">
-			<a href="/" class="p-2 text-muted-foreground hover:text-foreground">
+			<a href="/quest" class="p-2 text-muted-foreground hover:text-foreground" aria-label="ออกไปยังแผนที่ด่าน">
 				<X class="size-6" />
 			</a>
 			<div class="h-4 flex-1 overflow-hidden rounded-full bg-muted">
