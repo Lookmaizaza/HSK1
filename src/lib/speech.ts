@@ -63,27 +63,74 @@ export function listen(): Promise<RecognitionResult> & { stop: () => void } {
 		let interimTranscript = '';
 		let bestConfidence = 0;
 		let settled = false;
+		let autoStopTimer: ReturnType<typeof setTimeout> | null = null;
+		let maxDurationTimer: ReturnType<typeof setTimeout> | null = null;
+
+		const clearTimers = () => {
+			if (autoStopTimer) {
+				clearTimeout(autoStopTimer);
+				autoStopTimer = null;
+			}
+			if (maxDurationTimer) {
+				clearTimeout(maxDurationTimer);
+				maxDurationTimer = null;
+			}
+		};
+
+		const triggerAutoStop = (delayMs: number) => {
+			if (autoStopTimer) clearTimeout(autoStopTimer);
+			autoStopTimer = setTimeout(() => {
+				if (!settled && r) {
+					try {
+						r.stop();
+					} catch {}
+				}
+			}, delayMs);
+		};
+
+		// 8 seconds maximum recording time safety
+		maxDurationTimer = setTimeout(() => {
+			if (!settled && r) {
+				try {
+					r.stop();
+				} catch {}
+			}
+		}, 8000);
 
 		r.onresult = (event) => {
 			interimTranscript = '';
+			let hasFinalThisBatch = false;
+
 			for (let i = event.resultIndex; i < event.results.length; i++) {
 				const res = event.results[i];
 				const alt = res[0];
 				if (!alt) continue;
 				if (res.isFinal) {
 					finalTranscript += alt.transcript;
+					hasFinalThisBatch = true;
 					if (alt.confidence > bestConfidence) bestConfidence = alt.confidence;
 				} else {
 					interimTranscript += alt.transcript;
 				}
 			}
+
+			// Automatically stop when the user finishes speaking (End of word / sentence)
+			if (hasFinalThisBatch && finalTranscript.trim().length > 0) {
+				triggerAutoStop(350); // Fast stop on final speech segment
+			} else if (interimTranscript.trim().length > 0) {
+				triggerAutoStop(700); // 700ms pause after interim speech indicates finish
+			}
 		};
+
 		r.onerror = (event) => {
+			clearTimers();
 			if (settled) return;
 			settled = true;
 			reject(new Error(event.error || 'recognition_error'));
 		};
+
 		r.onend = () => {
+			clearTimers();
 			if (settled) return;
 			const transcript = (finalTranscript || interimTranscript).trim();
 			settled = true;
@@ -94,6 +141,7 @@ export function listen(): Promise<RecognitionResult> & { stop: () => void } {
 		try {
 			r.start();
 		} catch (e) {
+			clearTimers();
 			if (!settled) {
 				settled = true;
 				reject(e);

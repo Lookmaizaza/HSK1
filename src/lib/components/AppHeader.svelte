@@ -39,56 +39,85 @@
 					<ArrowLeft class="size-5" />
 				</Button>
 			{/if}
-			<a href="/" class="flex items-center gap-2 font-extrabold tracking-tight">
-				<span class="flex size-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-xl text-white shadow-md shadow-emerald-500/20">語</span>
-				<div class="leading-none">
-					<span class="text-lg font-black tracking-tight">ปากจีน</span>
-					<span class="hidden sm:inline-block ml-1.5 text-[10px] font-bold tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">ฝึกออกเสียงภาษาจีน</span>
+			<a href="/" class="flex items-center gap-2.5 font-extrabold tracking-tight group">
+				<div class="relative size-10 group-hover:scale-110 transition flex items-center justify-center shrink-0">
+					<img src="/mascot_avatar.png" alt="น้องช้างน้อย ปากจีน" class="size-full object-contain filter drop-shadow-sm" />
+				</div>
+				<div class="leading-tight">
+					<div class="flex items-center gap-1.5">
+						<span class="text-lg font-black tracking-tight text-foreground">ปากจีน</span>
+						<span class="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded-md border border-sky-500/20">ช้างน้อย 🐘</span>
+					</div>
+					<span class="text-[10px] font-medium text-muted-foreground">ห้องเรียนภาษาจีน HSK</span>
 				</div>
 			</a>
 
-			<!-- Desktop Nav Links -->
+			<!-- Desktop Nav Links (Clean active states only when selected) -->
 			<nav class="hidden md:flex items-center gap-1 ml-4 border-l pl-4">
 				<a
 					href="/"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 {page.url.pathname === '/'
-						? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black'
-						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname === '/'
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					<span class="size-1.5 rounded-full bg-emerald-500"></span>
-					สตูดิโอเทียบเสียง
+					{#if page.url.pathname === '/'}
+						<span class="size-1.5 rounded-full bg-rose-500"></span>
+					{/if}
+					หน้าแรก
+				</a>
+				<a
+					href="/flashcard"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/flashcard')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
+				>
+					{#if page.url.pathname.startsWith('/flashcard')}
+						<span class="size-1.5 rounded-full bg-rose-500"></span>
+					{/if}
+					ฝึกชุดคำศัพท์
 				</a>
 				<a
 					href="/quest"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition {page.url.pathname.startsWith('/quest')
-						? 'bg-primary/10 text-primary font-black'
-						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/quest')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
+					{#if page.url.pathname.startsWith('/quest')}
+						<span class="size-1.5 rounded-full bg-rose-500"></span>
+					{/if}
 					เล่นเป็นด่าน
 				</a>
 				<a
 					href="/exam"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 flex items-center gap-1 {page.url.pathname.startsWith('/exam')
-						? 'ring-1 ring-amber-500/50 font-black'
-						: ''}"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/exam')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+					{#if page.url.pathname.startsWith('/exam')}
+						<span class="size-1.5 rounded-full bg-rose-500"></span>
+					{/if}
 					ลองทำข้อสอบจริง
 				</a>
 				<a
 					href="/talk"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition {page.url.pathname.startsWith('/talk')
-						? 'bg-primary/10 text-primary font-black'
-						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/talk')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
+					{#if page.url.pathname.startsWith('/talk')}
+						<span class="size-1.5 rounded-full bg-rose-500"></span>
+					{/if}
 					สถานการณ์จำลอง
 				</a>
 				<a
 					href="/assessment"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-bold transition flex items-center gap-1 {page.url.pathname.startsWith('/assessment')
-						? 'bg-primary/10 text-primary font-black'
-						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/assessment')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
+					{#if page.url.pathname.startsWith('/assessment')}
+						<span class="size-1.5 rounded-full bg-rose-500"></span>
+					{/if}
 					<Award class="size-3.5 text-amber-500" />
 					ประเมินผล
 				</a>
@@ -171,6 +200,15 @@
 		>
 			<span class="size-1.5 rounded-full bg-emerald-500"></span>
 			สตูดิโอเทียบเสียง
+		</a>
+		<a
+			href="/flashcard"
+			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 {page.url.pathname.startsWith('/flashcard')
+				? 'ring-1 ring-rose-500/50 font-black'
+				: ''}"
+		>
+			<span class="size-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+			ฝึกชุดคำศัพท์
 		</a>
 		<a
 			href="/quest"

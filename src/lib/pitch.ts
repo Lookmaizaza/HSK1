@@ -808,9 +808,25 @@ export class RealtimePitchTracker {
 			}
 
 			this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+
+			// Acoustic Noise Suppression Filter Chain:
+			// 1. Highpass (80 Hz): Strips low-frequency AC rumble, desk vibrations, microphone handling thumps
+			const highpassFilter = this.audioContext.createBiquadFilter();
+			highpassFilter.type = 'highpass';
+			highpassFilter.frequency.value = 80;
+
+			// 2. Lowpass (1200 Hz): Strips high-frequency hiss, keyboard typing clatter, electronic noise
+			const lowpassFilter = this.audioContext.createBiquadFilter();
+			lowpassFilter.type = 'lowpass';
+			lowpassFilter.frequency.value = 1200;
+
 			this.analyserNode = this.audioContext.createAnalyser();
 			this.analyserNode.fftSize = 2048;
-			this.sourceNode.connect(this.analyserNode);
+
+			// Connect audio pipeline: Source -> Highpass -> Lowpass -> Analyser
+			this.sourceNode.connect(highpassFilter);
+			highpassFilter.connect(lowpassFilter);
+			lowpassFilter.connect(this.analyserNode);
 
 			this.buffer = new Float32Array(this.analyserNode.fftSize);
 			this.isRunning = true;
@@ -834,12 +850,17 @@ export class RealtimePitchTracker {
 		const now = performance.now();
 		const timeMs = Math.round(now - this.startTime);
 
+		// Voice Activity Gate: Reject non-human speech sounds (outside 75-480Hz or low harmonic periodicity)
+		const isHumanVoice = result.f0 >= 75 && result.f0 <= 480 && result.clarity >= 0.32 && result.volume >= 0.007;
+		const cleanF0 = isHumanVoice ? result.f0 : 0;
+		const cleanChao = isHumanVoice ? hzToChao(cleanF0) : 0;
+
 		const point: PitchPoint = {
 			timeMs,
-			f0: result.f0,
+			f0: cleanF0,
 			volume: result.volume,
-			clarity: result.clarity,
-			chaoLevel: hzToChao(result.f0)
+			clarity: isHumanVoice ? result.clarity : 0,
+			chaoLevel: cleanChao
 		};
 
 		this.recordedPoints.push(point);

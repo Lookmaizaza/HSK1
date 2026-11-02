@@ -478,8 +478,8 @@
 				hasVoicedSpeech = true;
 			}
 
-			if (hasVoicedSpeech && all.length >= 15) {
-				const recent = all.slice(-10);
+			if (hasVoicedSpeech && all.length >= 10) {
+				const recent = all.slice(-8);
 				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
 
 				if (isSilent) {
@@ -488,7 +488,7 @@
 							if (isRecording) {
 								stopRecording();
 							}
-						}, 380);
+						}, 280);
 					}
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
@@ -510,7 +510,7 @@
 			if (!r) { resolve(); return; }
 			r.onend = () => resolve();
 			r.onerror = () => resolve();
-			setTimeout(resolve, 600);
+			setTimeout(resolve, 80);
 			try { r.stop(); } catch { resolve(); }
 		});
 	}
@@ -721,124 +721,98 @@
 
 <AppHeader />
 
-<main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-6">
-	<!-- 1. HERO BANNER (เส้นคลื่นขยับๆ เป็นพื้นหลังแบนเนอร์ จัดเรียงเนื้อหาเต็มสวยงาม) -->
-	<section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 border border-emerald-500/30 p-6 sm:p-8 md:p-10 text-white shadow-2xl mb-8">
-		<!-- Radiant ambient glow blobs -->
-		<div class="pointer-events-none absolute -left-20 -top-20 size-96 rounded-full bg-emerald-500/15 blur-3xl"></div>
-		<div class="pointer-events-none absolute -right-20 -bottom-20 size-96 rounded-full bg-cyan-500/15 blur-3xl"></div>
+<main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-4">
+	<!-- 1. HERO BANNER (ธีมคลีน แดง-ขาว-ทอง พร้อมมาสคอตช้างน้อยสีฟ้า ไร้กรอบ) -->
+	<section class="relative overflow-hidden rounded-3xl bg-card border border-rose-200/60 dark:border-rose-950 p-6 sm:p-8 md:p-10 shadow-lg shadow-rose-500/5 mb-8">
+		<!-- Radiant soft ambient glow -->
+		<div class="pointer-events-none absolute -left-20 -top-20 size-80 rounded-full bg-rose-500/10 blur-3xl"></div>
+		<div class="pointer-events-none absolute -right-20 -bottom-20 size-80 rounded-full bg-amber-500/10 blur-3xl"></div>
 
-		<!-- Animated Background Flowing Waves (เส้นคลื่นขยับๆ เป็นพื้นหลังแบนเนอร์) -->
-		<div class="pointer-events-none absolute inset-0 overflow-hidden opacity-40">
-			<!-- Wave 1: Flowing smooth emerald wave across full banner -->
-			<svg class="absolute -bottom-10 left-0 w-[200%] h-48 animate-wave-move-1" viewBox="0 0 1000 120" preserveAspectRatio="none" fill="none">
-				<path
-					d="M 0 60 Q 125 15 250 60 T 500 60 T 750 60 T 1000 60 L 1000 120 L 0 120 Z"
-					fill="url(#bannerWaveGrad1)"
-				/>
-				<path
-					d="M 0 60 Q 125 15 250 60 T 500 60 T 750 60 T 1000 60"
-					stroke="#10b981"
-					stroke-width="2.5"
-				/>
-				<defs>
-					<linearGradient id="bannerWaveGrad1" x1="0" y1="0" x2="0" y2="1">
-						<stop offset="0%" stop-color="#10b981" stop-opacity="0.3" />
-						<stop offset="100%" stop-color="#10b981" stop-opacity="0" />
-					</linearGradient>
-				</defs>
-			</svg>
+		<div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+			<!-- Left Column: Headline & Action CTAs -->
+			<div class="lg:col-span-7 flex flex-col justify-center text-left">
+				<div class="flex flex-wrap items-center gap-2 mb-4">
+					<span class="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 px-3.5 py-1 text-xs sm:text-sm font-bold text-sky-600 dark:text-sky-400">
+						🐘 ห้องเรียนช้างน้อย ปากจีน
+					</span>
+					<span class="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+						📚 คลังคำศัพท์และบทเรียน HSK 1–3
+					</span>
+				</div>
 
-			<!-- Wave 2: Counter-rhythm cyan wave -->
-			<svg class="absolute -bottom-6 left-0 w-[200%] h-44 animate-wave-move-2 opacity-85" viewBox="0 0 1000 120" preserveAspectRatio="none" fill="none">
-				<path
-					d="M 0 65 Q 125 110 250 65 T 500 65 T 750 65 T 1000 65 L 1000 120 L 0 120 Z"
-					fill="url(#bannerWaveGrad2)"
-				/>
-				<path
-					d="M 0 65 Q 125 110 250 65 T 500 65 T 750 65 T 1000 65"
-					stroke="#06b6d4"
-					stroke-width="2"
-				/>
-				<defs>
-					<linearGradient id="bannerWaveGrad2" x1="0" y1="0" x2="0" y2="1">
-						<stop offset="0%" stop-color="#06b6d4" stop-opacity="0.25" />
-						<stop offset="100%" stop-color="#06b6d4" stop-opacity="0" />
-					</linearGradient>
-				</defs>
-			</svg>
+				<h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-[3.2rem] font-black tracking-tight text-foreground leading-tight">
+					ห้องเรียนช้างน้อย<br />
+					<span class="bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 bg-clip-text text-transparent">
+						เรียนภาษาจีนออนไลน์
+					</span>
+				</h1>
 
-			<!-- Wave 3: Floating subtle harmonic wave -->
-			<svg class="absolute top-1/4 left-0 w-[200%] h-24 animate-wave-move-1 opacity-35" viewBox="0 0 1000 60" fill="none" style="animation-duration: 16s;">
-				<path
-					d="M 0 30 Q 125 5 250 30 T 500 30 T 750 30 T 1000 30"
-					stroke="#34d399"
-					stroke-width="1.5"
-					stroke-dasharray="8 6"
-				/>
-			</svg>
-		</div>
+				<p class="mt-4 text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
+					เริ่มต้นเรียนรู้ภาษาจีนตั้งแต่พื้นฐานจนนำไปใช้งานได้จริง ฝึกออกเสียงผันวรรณยุกต์เทียบเสียงเจ้าของภาษา คัดลำดับขีดอักษรจีน และคลังคำศัพท์ HSK 1–3 ครบวงจร
+				</p>
 
-		<!-- Banner Content (ข้อความเด่น ชัดเจน สวยงาม ตัวอักษรใหญ่ขึ้น เต็มพื้นที่) -->
-		<div class="relative z-10 w-full py-2 sm:py-4">
-			<div class="flex flex-wrap items-center gap-2.5 mb-5">
-				<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-4 py-1.5 text-xs sm:text-sm font-black text-emerald-300 shadow-sm backdrop-blur">
-					<span class="flex size-2 rounded-full bg-emerald-400 animate-ping"></span>
-					<AudioLines class="size-4 text-emerald-400" />
-					สตูดิโอฝึกออกเสียงภาษาจีน
-				</span>
-				<span class="rounded-full bg-sky-500/20 px-3.5 py-1.5 text-xs sm:text-sm font-bold text-sky-300 border border-sky-500/30">
-					เทียบระดับเสียงกับเจ้าของภาษา 4 วรรณยุกต์
-				</span>
-				<span class="rounded-full bg-amber-500/20 px-3.5 py-1.5 text-xs sm:text-sm font-bold text-amber-300 border border-amber-500/30">
-					คลังคำศัพท์และข้อสอบจริง HSK 1-3
-				</span>
+				<!-- Action Buttons -->
+				<div class="mt-7 flex flex-wrap items-center gap-3">
+					<a
+						href="/flashcard"
+						class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 px-7 py-3.5 text-sm sm:text-base font-black text-white transition hover:scale-105 active:scale-95 shadow-xl shadow-rose-600/25 cursor-pointer"
+					>
+						<BookOpen class="size-5" />
+						<span>ฝึกคำศัพท์และคัดลายมือ</span>
+					</a>
+
+					<button
+						type="button"
+						onclick={scrollToStudio}
+						class="inline-flex items-center gap-2 rounded-2xl bg-white dark:bg-card border-2 border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/20 px-5 py-3 text-sm sm:text-base font-bold text-rose-600 dark:text-rose-400 transition active:scale-95 shadow-sm cursor-pointer"
+					>
+						<Mic class="size-5" />
+						<span>สตูดิโอเทียบเสียงวรรณยุกต์</span>
+					</button>
+
+					<a
+						href="/exam"
+						class="inline-flex items-center gap-1.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-4 py-3 text-sm font-bold text-amber-700 dark:text-amber-400 transition active:scale-95"
+					>
+						<FileText class="size-4" />
+						<span>ข้อสอบจริง HSK</span>
+					</a>
+				</div>
 			</div>
 
-			<h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-[2.85rem] font-black tracking-tight leading-snug sm:whitespace-nowrap">
-				เรียนรู้ภาษาจีนผ่านการฝึกออกเสียงและ<span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 bg-clip-text text-transparent">ผันวรรณยุกต์ให้ถูกต้อง</span>
-			</h1>
+			<!-- Right Column: Frameless Blue Elephant Mascot (เอาแค่ตัวช้างสีฟ้าและคำไว้เลย ไม่มีกรอบ) -->
+			<div class="lg:col-span-5 flex flex-col items-center justify-center text-center py-2">
+				<div class="flex flex-col items-center group">
+					<!-- Mascot Image: Frameless standing Blue Elephant with natural subtle shadow -->
+					<div class="relative size-60 sm:size-72 transition duration-300 group-hover:scale-105">
+						<img
+							src="/mascot.png"
+							alt="น้องช้างน้อย ปากจีน"
+							class="size-full object-contain filter drop-shadow-[0_16px_28px_rgba(56,189,248,0.22)]"
+						/>
+					</div>
 
-			<p class="mt-4 text-sm sm:text-base lg:text-[1.05rem] text-slate-200/90 leading-relaxed w-full max-w-none">
-				<span class="block lg:whitespace-nowrap">ฝึกออกเสียงภาษาจีนโดยมีกราฟแสดงระดับเสียงพูดของคุณเปรียบเทียบกับเสียงมาตรฐานของเจ้าของภาษา ช่วยให้ผันเสียงได้ถูกต้อง ฟังชัด และพูดได้อย่างมั่นใจ</span>
-				<span class="block text-slate-300/90 mt-1">ครอบคลุมคลังคำศัพท์ HSK 1, 2, 3 และโหมดลองทำข้อสอบจริง</span>
-			</p>
+					<!-- Clean Text beneath the Mascot (No border card) -->
+					<div class="mt-2 text-center">
+						<h3 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+							ห้องเรียนช้างน้อย <span class="text-rose-600">ปากจีน</span>
+						</h3>
+						<p class="text-xs text-muted-foreground mt-0.5">ฝึกฟัง พูด อ่าน เขียน HSK ครบในที่เดียว</p>
 
-			<!-- Quick Mode Action CTAs -->
-			<div class="mt-8 flex flex-wrap items-center gap-3.5">
-				<button
-					type="button"
-					onclick={scrollToStudio}
-					class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-6 py-3 text-sm sm:text-base font-extrabold text-white transition hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/25 cursor-pointer"
-				>
-					<Mic class="size-5" />
-					<span>ฝึกออกเสียงคำศัพท์</span>
-				</button>
-
-				<a
-					href="/quest"
-					class="inline-flex items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 px-5 py-3 text-sm sm:text-base font-bold text-white transition active:scale-95 shadow-sm"
-				>
-					<Gamepad2 class="size-5 text-emerald-400" />
-					<span>เล่นเป็นด่าน (Quest Map)</span>
-				</a>
-
-				<a
-					href="/exam"
-					class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-5 py-3 text-sm sm:text-base font-bold text-white transition hover:scale-105 active:scale-95 shadow-md shadow-amber-500/25"
-				>
-					<FileText class="size-5" />
-					<span>ลองทำข้อสอบจริง HSK 1-3</span>
-					<span class="rounded-full bg-black/25 text-[10px] font-black px-2 py-0.5">ข้อสอบทางการ</span>
-				</a>
-
-				<a
-					href="/talk"
-					class="inline-flex items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 px-5 py-3 text-sm sm:text-base font-bold text-white transition active:scale-95 shadow-sm"
-				>
-					<MessageCircle class="size-5 text-purple-400" />
-					<span>สถานการณ์จำลอง (Talk)</span>
-				</a>
+						<!-- Simple pill badges underneath -->
+						<div class="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
+							<span class="rounded-full bg-rose-500/10 px-3 py-1 font-bold text-rose-600">
+								1,000+ คำศัพท์
+							</span>
+							<span class="rounded-full bg-amber-500/10 px-3 py-1 font-bold text-amber-700">
+								ลำดับขีดอักษรจีน
+							</span>
+							<span class="rounded-full bg-sky-500/10 px-3 py-1 font-bold text-sky-700">
+								ผัน 4 วรรณยุกต์
+							</span>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -887,10 +861,10 @@
 						</div>
 
 						<!-- Pitch Contour Mini Curve -->
-						<div class="relative size-18 rounded-2xl bg-slate-950/80 border border-slate-800 p-2 flex items-center justify-center shrink-0">
+						<div class="relative size-18 rounded-2xl bg-card border border-border/80 shadow-xs p-2 flex items-center justify-center shrink-0">
 							<svg viewBox="0 0 100 80" class="w-full h-full">
-								<line x1="10" y1="20" x2="90" y2="20" stroke="rgba(148, 163, 184, 0.2)" stroke-dasharray="2 2" stroke-width="1" />
-								<line x1="10" y1="50" x2="90" y2="50" stroke="rgba(148, 163, 184, 0.15)" stroke-dasharray="2 2" stroke-width="1" />
+								<line x1="10" y1="20" x2="90" y2="20" stroke="rgba(148, 163, 184, 0.25)" stroke-dasharray="2 2" stroke-width="1" />
+								<line x1="10" y1="50" x2="90" y2="50" stroke="rgba(148, 163, 184, 0.2)" stroke-dasharray="2 2" stroke-width="1" />
 								<path
 									d={t.curveSvg}
 									fill="none"
@@ -929,7 +903,7 @@
 						<button
 							type="button"
 							onclick={() => selectToneDrill(t.tone)}
-							class="flex items-center justify-center gap-1 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 px-3 py-2 text-xs font-bold transition active:scale-95 shadow-xs cursor-pointer"
+							class="flex items-center justify-center gap-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-xs font-bold transition active:scale-95 shadow-xs cursor-pointer"
 							title="ฝึกออกเสียงคำนี้ในสตูดิโอ"
 						>
 							<Mic class="size-3.5" />

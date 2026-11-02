@@ -118,9 +118,32 @@
 			};
 		}
 
+		let hasVoiced = false;
+		let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
+
 		tracker.onPitchUpdate = (point, all) => {
 			pitchPoints = [...all];
 			currentVolume = point.volume;
+
+			if (point.volume > 0.015 && point.f0 > 0 && point.clarity > 0.28) {
+				hasVoiced = true;
+			}
+
+			// Auto-stop when voice ends
+			if (hasVoiced && all.length >= 8) {
+				const recent = all.slice(-6);
+				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.22);
+				if (isSilent) {
+					if (!silenceTimeout) {
+						silenceTimeout = setTimeout(() => {
+							if (isRecording) stopRecording();
+						}, 280);
+					}
+				} else if (silenceTimeout) {
+					clearTimeout(silenceTimeout);
+					silenceTimeout = null;
+				}
+			}
 		};
 
 		const ok = await tracker.start();

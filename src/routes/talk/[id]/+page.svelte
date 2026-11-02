@@ -263,9 +263,14 @@
 				class="flex h-16 w-full max-w-md items-center justify-center gap-2 rounded-2xl bg-primary font-bold uppercase tracking-wide text-primary-foreground shadow-[0_4px_0_oklch(0.45_0.18_145)] transition active:translate-y-0.5 active:shadow-[0_1px_0_oklch(0.45_0.18_145)] disabled:cursor-not-allowed disabled:opacity-50"
 			>
 				{#if status === 'listening'}
-					<Mic class="size-6 animate-pulse" /> Tap when done
+					<Mic class="size-6 animate-pulse text-red-400" />
+					<span>กำลังฟัง... (พูดจบส่งอัตโนมัติ หรือแตะเพื่อส่ง)</span>
+				{:else if status === 'aiThinking' || status === 'gradingReply'}
+					<Loader2 class="size-6 animate-spin" />
+					<span>กำลังประมวลผลคำตอบ...</span>
 				{:else}
-					<Mic class="size-6" /> Tap to reply in Chinese
+					<Mic class="size-6" />
+					<span>แตะเพื่อพูดตอบกลับภาษาจีน</span>
 				{/if}
 			</button>
 		</div>

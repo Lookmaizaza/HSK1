@@ -67,41 +67,44 @@
 <AppHeader showBack={true} backHref="/" />
 
 <main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-6">
-	<!-- Top Navigation Breadcrumb / Hero -->
-	<section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950 border border-indigo-500/25 p-6 sm:p-8 text-white shadow-xl mb-8">
+	<!-- Top Navigation Breadcrumb / Hero (Light Clean Theme) -->
+	<section class="relative overflow-hidden rounded-3xl bg-card border border-rose-200/60 dark:border-rose-950 p-6 sm:p-8 text-foreground shadow-sm mb-8">
+		<div class="pointer-events-none absolute -left-16 -top-16 size-64 rounded-full bg-rose-500/5 blur-2xl"></div>
+		<div class="pointer-events-none absolute -right-16 -bottom-16 size-64 rounded-full bg-amber-500/5 blur-2xl"></div>
+
 		<div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 			<div>
 				<div class="flex items-center gap-2 mb-2">
-					<a href="/" class="inline-flex items-center gap-1 text-xs font-bold text-indigo-300 hover:text-white transition">
-						<ArrowLeft class="size-3.5" /> หน้าฝึกออกเสียง
+					<a href="/" class="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground transition">
+						<ArrowLeft class="size-3.5" /> หน้าแรก
 					</a>
-					<span class="text-xs text-white/40">•</span>
-					<span class="inline-flex items-center gap-1 rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-bold text-indigo-300 border border-indigo-500/30">
-						🎮 แผนที่ผจญภัยตามด่าน
+					<span class="text-xs text-muted-foreground/40">•</span>
+					<span class="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-0.5 text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
+						🎮 แผนที่ผจญภัยคำศัพท์
 					</span>
 				</div>
-				<h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
-					เล่นเป็นด่านคำศัพท์ <span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-300 bg-clip-text text-transparent">HSK 1-3</span>
+				<h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground">
+					เล่นเป็นด่านคำศัพท์ <span class="text-rose-600">HSK 1–3</span>
 				</h1>
-				<p class="mt-2 text-sm text-slate-300 max-w-2xl">
+				<p class="mt-2 text-sm text-muted-foreground max-w-2xl">
 					ท้าทายตนเองผ่านการออกเสียงสะสมดาวทีละด่าน ฝึกทั้งการฟัง การพูดออกเสียง และประโยคตามหมวดหมู่ชีวิตจริง
 				</p>
 			</div>
 
 			<div class="flex items-center gap-3 shrink-0">
 				<a
-					href="/"
-					class="inline-flex items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 px-4 py-2.5 text-xs sm:text-sm font-bold text-white transition active:scale-95 shadow-sm"
+					href="/flashcard"
+					class="inline-flex items-center gap-2 rounded-2xl bg-white dark:bg-card hover:bg-rose-50 border border-rose-200 dark:border-rose-900/60 px-4 py-2.5 text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 transition active:scale-95 shadow-xs"
 				>
-					<Mic class="size-4 text-emerald-400" />
-					<span>ฝึกออกเสียงคำศัพท์</span>
+					<BookOpen class="size-4" />
+					<span>ชุดคำศัพท์ HSK</span>
 				</a>
 				<a
 					href="/exam"
-					class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white transition hover:scale-105 active:scale-95 shadow-md shadow-amber-500/20"
+					class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white transition active:scale-95 shadow-md shadow-amber-500/20"
 				>
 					<FileText class="size-4" />
-					<span>ลองทำข้อสอบจริง</span>
+					<span>ข้อสอบจริง HSK</span>
 				</a>
 			</div>
 		</div>

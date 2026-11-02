@@ -202,7 +202,7 @@
 				const recent = all.slice(-6);
 				const isSilent = recent.every((p) => p.volume < 0.008 || p.f0 <= 0 || p.clarity < 0.20);
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 350);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 260);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;

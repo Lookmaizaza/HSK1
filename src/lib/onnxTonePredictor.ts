@@ -144,9 +144,10 @@ function softmax(logits: number[]): number[] {
 
 /**
  * Preprocesses recorded pitch points into [1, 2, 50] Float32Array tensor.
+ * Applies human voice isolation gate (filters out noise, coughs, rumble, and hiss).
  */
 function preprocessPitchPoints(points: PitchPoint[]): Float32Array | null {
-	const voiced = points.filter((p) => p.f0 > 0 && p.clarity > 0.35);
+	const voiced = points.filter((p) => p.f0 >= 75 && p.f0 <= 480 && p.clarity >= 0.35 && p.volume >= 0.007);
 	if (voiced.length < 4) return null;
 
 	const tensorData = new Float32Array(1 * 2 * NUM_TIME_STEPS);

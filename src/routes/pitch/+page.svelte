@@ -403,7 +403,7 @@
 							if (isRecording) {
 								stopRecording();
 							}
-						}, 380);
+						}, 280);
 					}
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
@@ -418,20 +418,14 @@
 		}
 	}
 
-	// BUG-02 FIX: speechRecognizer.stop() is asynchronous — it sends a stop signal to
-	// the browser but onend fires 100-500ms later. Without awaiting, speechCandidates
-	// would be empty when matchChineseWord() runs, causing false negatives.
-	// This helper wraps the stop sequence in a Promise that resolves only after onend.
 	function waitForRecognizerEnd(): Promise<void> {
 		if (!speechRecognizer) return Promise.resolve();
 		return new Promise<void>((resolve) => {
 			const r = speechRecognizer;
 			if (!r) { resolve(); return; }
-			// Override handlers to capture the final onend
 			r.onend = () => resolve();
-			r.onerror = () => resolve(); // error also means recognition ended
-			// Safety: if onend never fires (browser bug), resolve after 600ms
-			setTimeout(resolve, 600);
+			r.onerror = () => resolve();
+			setTimeout(resolve, 80);
 			try { r.stop(); } catch { resolve(); }
 		});
 	}

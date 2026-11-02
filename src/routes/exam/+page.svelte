@@ -281,37 +281,40 @@
 	<!-- 1. LOBBY STATE (เลือกระดับ & โหมดการสอบ) -->
 	{#if examState === 'lobby'}
 		<div class="space-y-8 animate-in fade-in duration-300">
-			<!-- Hero Banner -->
-			<section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 border border-amber-500/30 p-6 sm:p-10 text-white shadow-2xl">
+			<!-- Hero Banner (Clean Light Theme) -->
+			<section class="relative overflow-hidden rounded-3xl bg-card border border-amber-200/60 dark:border-amber-950 p-6 sm:p-10 text-foreground shadow-sm">
+				<div class="pointer-events-none absolute -left-16 -top-16 size-64 rounded-full bg-amber-500/5 blur-2xl"></div>
+				<div class="pointer-events-none absolute -right-16 -bottom-16 size-64 rounded-full bg-rose-500/5 blur-2xl"></div>
+
 				<div class="relative z-10 max-w-3xl">
 					<div class="flex flex-wrap items-center gap-2 mb-3">
-						<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-300 border border-amber-500/40">
+						<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 border border-amber-500/20">
 							<FileText class="size-3.5" /> ข้อสอบมาตรฐาน HSK ฉบับจริง
 						</span>
-						<span class="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 border border-white/15">
+						<span class="rounded-full bg-muted/60 px-3 py-1 text-xs font-semibold text-muted-foreground border border-border/60">
 							อ้างอิงชุด H10901 • H20901 • H31001
 						</span>
 					</div>
 
-					<h1 class="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
-						ลองทำข้อสอบจริง <span class="bg-gradient-to-r from-amber-400 via-orange-300 to-yellow-200 bg-clip-text text-transparent">HSK 1 - 3</span>
+					<h1 class="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground leading-tight">
+						ลองทำข้อสอบจริง <span class="text-amber-600">HSK 1–3</span>
 					</h1>
 
-					<p class="mt-3 text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
+					<p class="mt-3 text-sm sm:text-base text-muted-foreground leading-relaxed max-w-2xl">
 						ฝึกฝนกับชุดข้อสอบจริงที่ใช้วัดระดับความรู้ภาษาจีนระดับสากล มีระบบเสียงการฟังต้นแบบของแท้ พร้อมระบบคิดคะแนนและเฉลยละเอียดภาษาไทยครบทุกข้อ
 					</p>
 
 					<div class="mt-6 flex flex-wrap items-center gap-3">
 						<a
 							href="#exam-selector"
-							class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-amber-500/30 transition hover:shadow-xl hover:scale-105 active:scale-95"
+							class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-amber-500/20 transition active:scale-95"
 						>
 							<Play class="size-4 fill-white" />
 							<span>เลือกระดับและเริ่มทำข้อสอบ</span>
 						</a>
 						<a
 							href="/quest"
-							class="inline-flex items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 px-5 py-3 text-sm font-bold text-white transition active:scale-95"
+							class="inline-flex items-center gap-2 rounded-2xl bg-white dark:bg-card hover:bg-muted/60 border border-border px-5 py-3 text-sm font-bold text-foreground transition active:scale-95 shadow-xs"
 						>
 							<BookOpen class="size-4" />
 							<span>ดูแผนที่ด่านคำศัพท์</span>
