@@ -645,7 +645,7 @@
 	});
 </script>
 
-<AppHeader showBack backHref="/" />
+<AppHeader />
 
 <main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-4">
 	<!-- Hero / Learning Studio Banner -->

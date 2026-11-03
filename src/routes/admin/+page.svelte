@@ -42,7 +42,7 @@
 	}
 </script>
 
-<AppHeader showBack backHref="/" />
+<AppHeader />
 
 {#if data.needsLogin}
 	<main class="mx-auto flex min-h-[calc(100svh-64px)] max-w-md items-center px-4 pb-12 pt-6">

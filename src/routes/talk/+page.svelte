@@ -4,7 +4,7 @@
 	import { Sparkles, MessagesSquare, ChevronRight } from '@lucide/svelte';
 </script>
 
-<AppHeader showBack backHref="/" />
+<AppHeader />
 
 <main class="mx-auto max-w-2xl px-4 pb-24 pt-6">
 	<div class="mb-6">

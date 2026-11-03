@@ -275,7 +275,7 @@
 	<title>จำลองสอบจริง HSK 1-3 — ระบบทดลองทำข้อสอบมาตรฐานสากล</title>
 </svelte:head>
 
-<AppHeader showBack={true} backHref="/" />
+<AppHeader />
 
 <main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-6">
 	<!-- 1. LOBBY STATE (เลือกระดับ & โหมดการสอบ) -->

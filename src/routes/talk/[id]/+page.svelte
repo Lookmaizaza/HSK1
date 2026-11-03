@@ -158,7 +158,7 @@
 	const avgScore = $derived(userTurns ? Math.round(totalScore / userTurns) : 0);
 </script>
 
-<AppHeader showBack backHref="/talk" />
+<AppHeader />
 
 <main class="mx-auto flex h-[calc(100svh-64px)] max-w-2xl flex-col px-4 pb-3 pt-4">
 	<!-- Scenario header -->

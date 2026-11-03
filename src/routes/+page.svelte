@@ -723,14 +723,14 @@
 
 <main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-4">
 	<!-- 1. HERO BANNER (ธีมคลีน แดง-ขาว-ทอง พร้อมมาสคอตช้างน้อยสีฟ้า ไร้กรอบ) -->
-	<section class="relative overflow-hidden rounded-3xl bg-card border border-rose-200/60 dark:border-rose-950 p-6 sm:p-8 md:p-10 shadow-lg shadow-rose-500/5 mb-8">
+	<section class="relative overflow-hidden rounded-3xl bg-card border border-rose-200/60 dark:border-rose-950 p-6 sm:p-8 md:px-6 md:py-10 xl:p-10 shadow-lg shadow-rose-500/5 mb-8">
 		<!-- Radiant soft ambient glow -->
 		<div class="pointer-events-none absolute -left-20 -top-20 size-80 rounded-full bg-rose-500/10 blur-3xl"></div>
 		<div class="pointer-events-none absolute -right-20 -bottom-20 size-80 rounded-full bg-amber-500/10 blur-3xl"></div>
 
-		<div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+		<div class="relative z-10 grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-center">
 			<!-- Left Column: Headline & Action CTAs -->
-			<div class="lg:col-span-7 flex flex-col justify-center text-left">
+			<div class="xl:col-span-8 flex min-w-0 flex-col justify-center text-left">
 				<div class="flex flex-wrap items-center gap-2 mb-4">
 					<span class="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 px-3.5 py-1 text-xs sm:text-sm font-bold text-sky-600 dark:text-sky-400">
 						🐘 ห้องเรียนช้างน้อย ปากจีน
@@ -747,8 +747,9 @@
 					</span>
 				</h1>
 
-				<p class="mt-4 text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
-					เริ่มต้นเรียนรู้ภาษาจีนตั้งแต่พื้นฐานจนนำไปใช้งานได้จริง ฝึกออกเสียงผันวรรณยุกต์เทียบเสียงเจ้าของภาษา คัดลำดับขีดอักษรจีน และคลังคำศัพท์ HSK 1–3 ครบวงจร
+				<p class="mt-4 w-full text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed">
+					เริ่มต้นเรียนรู้ภาษาจีนตั้งแต่พื้นฐานจนนำไปใช้งานได้จริง ฝึกออกเสียงผันวรรณยุกต์<br />
+					เทียบเสียงเจ้าของภาษา คัดลำดับขีดอักษรจีน และคลังคำศัพท์ HSK 1–3 ครบวงจร
 				</p>
 
 				<!-- Action Buttons -->
@@ -781,7 +782,7 @@
 			</div>
 
 			<!-- Right Column: Frameless Blue Elephant Mascot (เอาแค่ตัวช้างสีฟ้าและคำไว้เลย ไม่มีกรอบ) -->
-			<div class="lg:col-span-5 flex flex-col items-center justify-center text-center py-2">
+			<div class="xl:col-span-4 flex min-w-0 flex-col items-center justify-center text-center py-2">
 				<div class="flex flex-col items-center group">
 					<!-- Mascot Image: Frameless standing Blue Elephant with natural subtle shadow -->
 					<div class="relative size-60 sm:size-72 transition duration-300 group-hover:scale-105">
@@ -918,14 +919,11 @@
 	<!-- 3. PRONUNCIATION PRACTICE STUDIO (ห้องฝึกออกเสียงคำศัพท์) -->
 	<section id="practice-studio" class="scroll-mt-20">
 		<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
-			<div>
+			<div class="min-w-0 flex-1">
 				<h2 class="text-xl sm:text-2xl font-black text-foreground flex items-center gap-2">
 					<Sparkles class="size-5 text-emerald-500" />
 					<span>ห้องฝึกออกเสียงคำศัพท์ภาษาจีน</span>
 				</h2>
-				<p class="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:text-lg">
-					เลือกคำศัพท์เพื่อดูพินอินและคำแปล เปิดไมโครโฟน แล้วพูดออกเสียงเพื่อเทียบกราฟระดับเสียงกับเจ้าของภาษา
-				</p>
 			</div>
 
 			<div class="flex items-center gap-2 shrink-0">
@@ -951,6 +949,9 @@
 				</button>
 			</div>
 		</div>
+		<p class="mb-5 text-sm leading-relaxed text-muted-foreground sm:text-base lg:whitespace-nowrap">
+			เลือกคำศัพท์เพื่อดูพินอินและคำแปล เปิดไมโครโฟน แล้วพูดออกเสียงเพื่อเทียบกราฟระดับเสียงกับเจ้าของภาษา
+		</p>
 
 	<!-- 3. MAIN WIDESCREEN 2-COLUMN STUDIO -->
 	<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -1196,17 +1197,19 @@
 				<div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
 					<!-- Word Info -->
 					<div class="md:col-span-7 flex items-start gap-4 sm:gap-5">
-						<button
-							type="button"
-							onclick={playAudio}
-							class="group relative flex size-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25 transition active:scale-95 hover:shadow-lg hover:scale-105 mt-1 cursor-pointer"
-							title="กดฟังเสียงต้นแบบเจ้าของภาษา"
-						>
-							<Volume2 class="size-8 transition-transform group-hover:scale-110" />
-							<span class="absolute -bottom-2 rounded-full px-2 py-0.5 text-[9px] font-bold text-white shadow transition-all {listenCount > 0 ? 'bg-emerald-600' : 'bg-slate-900'}">
+						<div class="mt-1 flex w-16 shrink-0 flex-col items-center gap-1">
+							<button
+								type="button"
+								onclick={playAudio}
+								class="group flex size-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25 transition active:scale-95 hover:shadow-lg hover:scale-105 cursor-pointer"
+								title="กดฟังเสียงต้นแบบเจ้าของภาษา"
+							>
+								<Volume2 class="size-8 transition-transform group-hover:scale-110" />
+							</button>
+							<span class="whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-bold leading-none text-white shadow {listenCount > 0 ? 'bg-emerald-600' : 'bg-slate-900'}">
 								{listenCount > 0 ? `ฟังแล้ว ${listenCount} ครั้ง` : 'กดฟังเสียง'}
 							</span>
-						</button>
+						</div>
 
 						<div class="min-w-0 flex-1">
 							<div class="flex flex-wrap items-baseline gap-3">

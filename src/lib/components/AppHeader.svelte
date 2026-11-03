@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield, BarChart2, Award, AlertCircle } from '@lucide/svelte';
+	import { Flame, Heart, Zap, Settings as SettingsIcon, LogIn, LogOut, User, Shield, BarChart2, Award, AlertCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { progress } from '$lib/progress.svelte';
 	import { apiKey } from '$lib/apiKey.svelte';
@@ -9,8 +9,6 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { page } from '$app/state';
-
-	let { showBack = false, backHref = '/' }: { showBack?: boolean; backHref?: string } = $props();
 
 	let settingsOpen = $state(false);
 	let keyDraft = $state('');
@@ -32,98 +30,81 @@
 </script>
 
 <header class="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
-	<div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-3">
-		<div class="flex items-center gap-3">
-			{#if showBack}
-				<Button variant="ghost" size="icon" href={backHref}>
-					<ArrowLeft class="size-5" />
-				</Button>
-			{/if}
-			<a href="/" class="flex items-center gap-2.5 font-extrabold tracking-tight group">
-				<div class="relative size-10 group-hover:scale-110 transition flex items-center justify-center shrink-0">
+	<div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
+		<div class="flex min-w-0 items-center gap-2 sm:gap-3">
+			<a href="/" class="group flex shrink-0 items-center gap-1.5 font-extrabold tracking-tight sm:gap-2.5">
+				<div class="relative size-9 shrink-0 flex items-center justify-center transition group-hover:scale-110 sm:size-10">
 					<img src="/mascot_avatar.png" alt="น้องช้างน้อย ปากจีน" class="size-full object-contain filter drop-shadow-sm" />
 				</div>
-				<div class="leading-tight">
-					<div class="flex items-center gap-1.5">
-						<span class="text-lg font-black tracking-tight text-foreground">ปากจีน</span>
-						<span class="text-xs font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded-md border border-sky-500/20">ช้างน้อย 🐘</span>
+				<div class="min-w-0 leading-tight">
+					<div class="flex items-center gap-1.5 whitespace-nowrap">
+						<span class="text-base font-black tracking-tight text-foreground sm:text-lg">ปากจีน</span>
+						<span class="hidden rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-xs font-bold text-sky-600 dark:text-sky-400 sm:inline-flex">ช้างน้อย 🐘</span>
 					</div>
-					<span class="text-xs font-medium text-muted-foreground">ห้องเรียนภาษาจีน HSK</span>
+					<span class="hidden text-xs font-medium text-muted-foreground sm:block">ห้องเรียนภาษาจีน HSK</span>
 				</div>
 			</a>
 
 			<!-- Desktop Nav Links (Clean active states only when selected) -->
-			<nav class="hidden xl:flex items-center gap-1 ml-4 border-l pl-4">
+			<nav class="hidden 2xl:flex items-center gap-1 ml-4 border-l pl-4">
 				<a
 					href="/"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname === '/'
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname === '/'
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					{#if page.url.pathname === '/'}
-						<span class="size-1.5 rounded-full bg-rose-500"></span>
-					{/if}
+					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname === '/' ? 'opacity-100' : 'opacity-0'}"></span>
 					หน้าแรก
 				</a>
 				<a
 					href="/flashcard"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/flashcard')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/flashcard')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					{#if page.url.pathname.startsWith('/flashcard')}
-						<span class="size-1.5 rounded-full bg-rose-500"></span>
-					{/if}
+					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/flashcard') ? 'opacity-100' : 'opacity-0'}"></span>
 					ฝึกชุดคำศัพท์
 				</a>
 				<a
 					href="/quest"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/quest')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/quest')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					{#if page.url.pathname.startsWith('/quest')}
-						<span class="size-1.5 rounded-full bg-rose-500"></span>
-					{/if}
+					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/quest') ? 'opacity-100' : 'opacity-0'}"></span>
 					เล่นเป็นด่าน
 				</a>
 				<a
 					href="/exam"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/exam')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/exam')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					{#if page.url.pathname.startsWith('/exam')}
-						<span class="size-1.5 rounded-full bg-rose-500"></span>
-					{/if}
+					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/exam') ? 'opacity-100' : 'opacity-0'}"></span>
 					ลองทำข้อสอบจริง
 				</a>
 				<a
 					href="/talk"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/talk')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/talk')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					{#if page.url.pathname.startsWith('/talk')}
-						<span class="size-1.5 rounded-full bg-rose-500"></span>
-					{/if}
+					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/talk') ? 'opacity-100' : 'opacity-0'}"></span>
 					สถานการณ์จำลอง
 				</a>
 				<a
 					href="/assessment"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/assessment')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
+					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/assessment')
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
-					{#if page.url.pathname.startsWith('/assessment')}
-						<span class="size-1.5 rounded-full bg-rose-500"></span>
-					{/if}
+					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/assessment') ? 'opacity-100' : 'opacity-0'}"></span>
 					<Award class="size-3.5 text-amber-500" />
 					ประเมินผล
 				</a>
 			</nav>
 		</div>
-		<div class="flex items-center gap-3 text-sm font-semibold">
+		<div class="flex shrink-0 items-center gap-1.5 text-xs font-semibold sm:gap-3 sm:text-sm">
 			<span class="flex items-center gap-1 text-orange-500">
 				<Flame class="size-4 fill-orange-500" />
 				{progress.streak}
@@ -183,7 +164,10 @@
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			{:else}
-				<Button variant="outline" size="sm" href="/auth">
+				<Button variant="outline" size="icon" href="/auth" class="size-9 sm:hidden" aria-label="Log in">
+					<LogIn class="size-4" />
+				</Button>
+				<Button variant="outline" size="sm" href="/auth" class="hidden sm:inline-flex">
 					<LogIn class="size-4" /> Log in
 				</Button>
 			{/if}
@@ -191,7 +175,7 @@
 	</div>
 
 	<!-- Compact scrollable navigation for mobile and tablet widths -->
-	<div class="flex xl:hidden items-center gap-1.5 overflow-x-auto px-4 pb-2.5 pt-1 border-t bg-background/50 scrollbar-none text-sm">
+	<div class="flex 2xl:hidden h-11 items-center gap-1.5 overflow-x-auto border-t bg-background/50 px-3 scrollbar-none text-sm sm:px-4">
 		<a
 			href="/"
 			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 {page.url.pathname === '/'
@@ -213,7 +197,7 @@
 		<a
 			href="/quest"
 			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition {page.url.pathname.startsWith('/quest')
-				? 'bg-primary/10 text-primary font-black'
+				? 'bg-primary/10 text-primary'
 				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 		>
 			เล่นเป็นด่าน
@@ -230,7 +214,7 @@
 		<a
 			href="/talk"
 			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition {page.url.pathname.startsWith('/talk')
-				? 'bg-primary/10 text-primary font-black'
+				? 'bg-primary/10 text-primary'
 				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 		>
 			สถานการณ์จำลอง
@@ -238,7 +222,7 @@
 		<a
 			href="/assessment"
 			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 {page.url.pathname.startsWith('/assessment')
-				? 'bg-primary/10 text-primary font-black'
+				? 'bg-primary/10 text-primary'
 				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 		>
 			<Award class="size-3 text-amber-500" />
