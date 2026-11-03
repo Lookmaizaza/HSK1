@@ -827,7 +827,7 @@
 						ฝึกผัน 4 วรรณยุกต์พื้นฐาน (mā, má, mǎ, mà)
 					</h2>
 				</div>
-				<p class="text-xs sm:text-sm text-muted-foreground mt-0.5">
+				<p class="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:text-lg">
 					กดฟังเสียงต้นแบบเจ้าของภาษา และสังเกตทิศทางของระดับเสียง เพื่อเตรียมพร้อมก่อนเริ่มฝึกออกเสียง
 				</p>
 			</div>
@@ -855,7 +855,7 @@
 								<span class="text-4xl font-black text-foreground">{t.hanzi}</span>
 								<span class="text-2xl font-bold font-mono {t.textColor}">{t.pinyin}</span>
 							</div>
-							<div class="text-xs text-muted-foreground mt-0.5 font-medium">
+							<div class="mt-1 text-sm font-medium text-muted-foreground sm:text-base">
 								{t.meaning}
 							</div>
 						</div>
@@ -884,7 +884,7 @@
 					</div>
 
 					<!-- Description -->
-					<p class="text-xs text-foreground/80 leading-relaxed my-3 line-clamp-2">
+					<p class="my-3 line-clamp-2 text-sm leading-relaxed text-foreground/80 sm:text-base">
 						{t.desc}
 					</p>
 
@@ -923,8 +923,8 @@
 					<Sparkles class="size-5 text-emerald-500" />
 					<span>ห้องฝึกออกเสียงคำศัพท์ภาษาจีน</span>
 				</h2>
-				<p class="text-xs sm:text-sm text-muted-foreground mt-0.5">
-					เลือกคำศัพท์ เปิดไมโครโฟน แล้วพูดออกเสียงเพื่อเทียบกราฟระดับเสียงกับเจ้าของภาษา
+				<p class="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:text-lg">
+					เลือกคำศัพท์เพื่อดูพินอินและคำแปล เปิดไมโครโฟน แล้วพูดออกเสียงเพื่อเทียบกราฟระดับเสียงกับเจ้าของภาษา
 				</p>
 			</div>
 

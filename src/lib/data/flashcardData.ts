@@ -1,5 +1,5 @@
 import { HSK1_VOCAB_PRESETS, HSK2_VOCAB_PRESETS, HSK3_VOCAB_PRESETS } from '$lib/vocabLoader';
-import type { TonePreset } from '$lib/pitch';
+import type { SyllableInfo, TonePreset } from '$lib/pitch';
 import { browser } from '$app/environment';
 
 export type FlashcardWord = {
@@ -10,6 +10,7 @@ export type FlashcardWord = {
 	english?: string;
 	tone: number;
 	tonePattern?: string;
+	syllables?: SyllableInfo[];
 	level: 1 | 2 | 3;
 	setIndex: number;
 	partOfSpeech: string;
@@ -128,6 +129,7 @@ function buildFlashcardWords(presets: TonePreset[], level: 1 | 2 | 3): Flashcard
 			english: preset.english,
 			tone: preset.tone,
 			tonePattern: preset.tonePattern,
+			syllables: preset.syllables,
 			level,
 			setIndex: Math.floor(index / 20) + 1,
 			partOfSpeech: pos,

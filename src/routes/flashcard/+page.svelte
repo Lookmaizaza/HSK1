@@ -34,9 +34,20 @@
 		type FlashcardSet,
 		type FlashcardWord
 	} from '$lib/data/flashcardData';
-	import { speak, listen, isSpeechRecognitionSupported, quickSimilarity } from '$lib/speech';
-	import { RealtimePitchTracker, type PitchPoint } from '$lib/pitch';
-	import { initToneNeuralNetwork, predictToneNeuralNetwork, type ONNXTonePrediction } from '$lib/onnxTonePredictor';
+	import {
+		speak,
+		createRecognizer,
+		isSpeechRecognitionSupported,
+		matchChineseWord
+	} from '$lib/speech';
+	import {
+		RealtimePitchTracker,
+		analyzeMultiSyllableToneContour,
+		type PitchPoint,
+		type SyllableInfo,
+		type SyllableToneResult
+	} from '$lib/pitch';
+	import { initToneNeuralNetwork, predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
 	import { onMount, tick } from 'svelte';
 
 	// Screen view states: 'levelSelect' | 'setSelect' | 'study' | 'summary'
@@ -62,6 +73,7 @@
 	let detectedAITone = $state<number | null>(null);
 	let aiToneConfidence = $state<number | null>(null);
 	let isToneMatched = $state<boolean | null>(null);
+	let syllableResults = $state<SyllableToneResult[]>([]);
 
 	// Writing practice modal
 	let writingModalOpen = $state(false);
@@ -158,6 +170,10 @@
 			voiceScore = null;
 			voiceFeedback = null;
 			voiceHeard = null;
+			detectedAITone = null;
+			aiToneConfidence = null;
+			isToneMatched = null;
+			syllableResults = [];
 			tick().then(() => {
 				initStrokePreviews();
 			});
@@ -187,8 +203,10 @@
 		speak(text);
 	}
 
-	// Voice practice with trained ONNX model & Auto-stop
-	let activeVoiceListener: ReturnType<typeof listen> | null = null;
+	// Voice practice uses the same ASR + per-syllable tone analysis as quest challenges.
+	let speechRecognizer: ReturnType<typeof createRecognizer> = null;
+	let speechTranscript = '';
+	let speechCandidates: string[] = [];
 	let activePitchTracker: RealtimePitchTracker | null = null;
 	let silenceDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -199,15 +217,17 @@
 			return;
 		}
 
-		isListening = true;
+		isListening = false;
 		voiceScore = null;
 		voiceFeedback = null;
 		voiceHeard = null;
 		detectedAITone = null;
 		aiToneConfidence = null;
 		isToneMatched = null;
+		syllableResults = [];
+		speechTranscript = '';
+		speechCandidates = [];
 
-		// 1. Start Realtime Pitch Tracker for ONNX inference
 		activePitchTracker = new RealtimePitchTracker();
 		let hasVoicedSpeech = false;
 
@@ -235,75 +255,123 @@
 			}
 		};
 
-		await activePitchTracker.start();
+		const started = await activePitchTracker.start();
+		if (!started) {
+			activePitchTracker = null;
+			voiceFeedback = 'เปิดไมโครโฟนไม่ได้ กรุณาอนุญาตให้ใช้งานแล้วลองอีกครั้ง';
+			return;
+		}
+		isListening = true;
 
-		// 2. Start Speech Recognizer concurrently
-		try {
-			activeVoiceListener = listen();
-			const result = await activeVoiceListener;
-			await stopVoicePractice(result.transcript.trim());
-		} catch {
-			if (isListening) {
-				await stopVoicePractice();
+		if (isSpeechRecognitionSupported()) {
+			try {
+				speechRecognizer = createRecognizer();
+				if (speechRecognizer) {
+					speechRecognizer.onresult = (event) => {
+						let interim = '';
+						for (let i = event.resultIndex; i < event.results.length; i++) {
+							const result = event.results[i];
+							if (!result) continue;
+						for (let alternative = 0; alternative < result.length; alternative++) {
+							const candidate = result[alternative]?.transcript?.trim();
+							if (candidate && !speechCandidates.includes(candidate)) {
+								speechCandidates.push(candidate);
+							}
+						}
+						const best = result[0];
+						if (!best) continue;
+						if (result.isFinal) speechTranscript += best.transcript;
+						else interim += best.transcript;
+					}
+						const heard = (speechTranscript || interim).trim();
+						if (heard && !speechCandidates.includes(heard)) speechCandidates.push(heard);
+					};
+					speechRecognizer.onerror = () => {};
+					speechRecognizer.onend = () => {};
+					speechRecognizer.start();
+				}
+			} catch {
+				speechRecognizer = null;
 			}
 		}
 	}
 
-	async function stopVoicePractice(transcriptFromEvent?: string) {
+	async function stopVoicePractice() {
 		if (silenceDebounce) {
 			clearTimeout(silenceDebounce);
 			silenceDebounce = null;
 		}
-		if (!isListening) return;
+		if (!isListening || !currentWord || !activePitchTracker) return;
 		isListening = false;
 
-		if (activeVoiceListener) {
-			activeVoiceListener.stop();
-			activeVoiceListener = null;
+		if (speechRecognizer) {
+			try {
+				speechRecognizer.stop();
+			} catch {}
+			speechRecognizer = null;
 		}
 
-		let recordedPoints: PitchPoint[] = [];
-		if (activePitchTracker) {
-			recordedPoints = activePitchTracker.stop();
-			activePitchTracker = null;
+		const recordedPoints: PitchPoint[] = activePitchTracker.stop();
+		activePitchTracker = null;
+		const candidatePool = [speechTranscript, ...speechCandidates].filter((candidate) => Boolean(candidate.trim()));
+		const voicedFrames = recordedPoints.filter(
+			(point) => point.f0 >= 65 && point.f0 <= 550 && point.clarity > 0.18 && point.volume > 0.005
+		);
+		const maxVolume = Math.max(...recordedPoints.map((point) => point.volume || 0), 0);
+		const isRealHumanVoice = voicedFrames.length >= 2 && maxVolume >= 0.007;
+
+		if (!isRealHumanVoice && candidatePool.length === 0) {
+			voiceFeedback = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
+			return;
 		}
 
-		const heardText = (transcriptFromEvent ?? voiceHeard ?? '').trim();
-		voiceHeard = heardText || null;
+		try {
+			const syllables: SyllableInfo[] = currentWord.syllables?.length
+				? currentWord.syllables
+				: [{
+					hanzi: currentWord.hanzi,
+					pinyin: currentWord.pinyin,
+					baseTone: currentWord.tone as SyllableInfo['baseTone'],
+					surfaceTone: currentWord.tone as SyllableInfo['surfaceTone']
+				}];
+			const analysis = await analyzeMultiSyllableToneContour(
+				recordedPoints,
+				syllables,
+				predictToneNeuralNetwork
+			);
+			const match = matchChineseWord(currentWord.hanzi, candidatePool, currentWord.pinyin);
+			let isWordCorrect = match.isMatch;
+			let finalHeard = match.isMatch ? currentWord.hanzi : (match.bestMatch || speechTranscript);
+			const isSingleSyllable = Array.from(currentWord.hanzi).length <= 1 || syllables.length <= 1;
+			if (!isWordCorrect && candidatePool.length === 0 && isRealHumanVoice && isSingleSyllable) {
+				if (syllables[0].surfaceTone === 5 || analysis.isAllMatch || analysis.overallScore >= 45) {
+					isWordCorrect = true;
+					finalHeard = currentWord.hanzi;
+				}
+			}
 
-		// 3. Run our trained ONNX Neural Network (mandarin_tone_cnn.onnx)
-		let aiPred: ONNXTonePrediction | null = null;
-		if (recordedPoints.length >= 4) {
-			aiPred = await predictToneNeuralNetwork(recordedPoints);
-		}
-
-		if (aiPred && aiPred.detectedTone) {
-			detectedAITone = Number(aiPred.detectedTone);
-			aiToneConfidence = Math.round(aiPred.confidence * 100);
-			isToneMatched = (aiPred.detectedTone === currentWord.tone);
-		}
-
-		// Evaluate comprehensive score
-		const textSimilarity = heardText ? quickSimilarity(currentWord.hanzi, heardText) : 0;
-		const toneScore = isToneMatched ? 100 : (detectedAITone ? 45 : 60);
-
-		let compositeScore = textSimilarity > 0 
-			? Math.round(textSimilarity * 0.55 + toneScore * 0.45)
-			: (isToneMatched ? 88 : (detectedAITone ? 50 : 0));
-
-		voiceScore = compositeScore;
-
-		// Feedback message
-		if (isToneMatched && (textSimilarity >= 75 || heardText === currentWord.hanzi)) {
-			voiceFeedback = `ยอดเยี่ยมมาก! AI ตรวจพบวรรณยุกต์เสียงที่ ${detectedAITone} (${aiToneConfidence}%) ถูกต้องเป๊ะ สำเนียงชัดเจน`;
-		} else if (isToneMatched) {
-			voiceFeedback = `ดีมาก! วรรณยุกต์เสียงที่ ${detectedAITone} ตรงตามเป้าหมาย (ความมั่นใจ AI ${aiToneConfidence}%)`;
-		} else if (detectedAITone) {
-			voiceFeedback = `ตรวจพบวรรณยุกต์เสียงที่ ${detectedAITone} (เป้าหมายคือเสียงที่ ${currentWord.tone}) — ลองปรับระดับเสียงแล้วพูดใหม่อีกครั้ง`;
-		} else if (textSimilarity >= 60) {
-			voiceFeedback = 'ออกเสียงได้ใกล้เคียง ลองฟังตัวอย่างซ้ำอีกรอบ';
-		} else {
-			voiceFeedback = 'ยังไม่ชัดเจน ลองกดปุ่มลำโพงฟังตัวอย่างแล้วเปล่งเสียงใหม่อีกครั้ง';
+			const isToneReasonable = analysis.isAllMatch || analysis.overallScore >= 55;
+			const isPassed = isWordCorrect && isToneReasonable;
+			const finalScore = isPassed ? Math.max(analysis.overallScore, 75) : Math.min(analysis.overallScore, 50);
+			voiceScore = Math.round(finalScore);
+			voiceHeard = finalHeard || candidatePool[0] || null;
+			syllableResults = analysis.syllableResults;
+			const firstSyllable = analysis.syllableResults[0];
+			detectedAITone = firstSyllable?.detectedTone ?? null;
+			aiToneConfidence = firstSyllable?.aiConfidence != null
+				? Math.round(firstSyllable.aiConfidence * 100)
+				: null;
+			isToneMatched = isToneReasonable;
+			voiceFeedback = isPassed
+				? analysis.isAllMatch
+					? 'ยอดเยี่ยม! อ่านคำศัพท์และออกเสียงวรรณยุกต์ถูกต้อง'
+					: `อ่านคำว่า "${currentWord.hanzi}" ถูกต้อง แต่ยังมีวรรณยุกต์บางพยางค์ที่ควรฝึกเพิ่ม`
+				: isWordCorrect
+					? 'อ่านคำศัพท์ได้ แต่เสียงวรรณยุกต์ยังไม่ตรง ลองฟังตัวอย่างแล้วพูดใหม่'
+					: `ยังตรวจไม่พบคำว่า "${currentWord.hanzi}"${finalHeard ? ` (ได้ยิน: "${finalHeard}")` : ''} ลองพูดใหม่อีกครั้ง`;
+		} catch (error) {
+			console.error('Error during flashcard pronunciation evaluation:', error);
+			voiceFeedback = 'ยังตรวจเสียงไม่ได้ ลองพูดอีกครั้งนะ';
 		}
 	}
 
@@ -721,16 +789,16 @@
 						</div>
 					</div>
 
-					<!-- Voice Pronunciation Practice (ฝึกออกเสียงด้วยโมเดล AI ที่เทรน) -->
+					<!-- Voice pronunciation practice -->
 					<div class="w-full bg-white dark:bg-card border border-rose-200/80 rounded-2xl p-4 mb-6 text-center shadow-xs">
 						<div class="flex items-center justify-between mb-2">
 							<div class="flex items-center gap-1.5 text-xs font-bold text-foreground">
 								<Sparkles class="size-3.5 text-rose-500" />
-								<span>ตรวจการออกเสียง & วรรณยุกต์ (AI Model)</span>
+								<span>ฝึกอ่านและออกเสียง</span>
 							</div>
 							{#if voiceScore !== null}
 								<span class="text-xs font-black px-2 py-0.5 rounded-full {voiceScore >= 80 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}">
-									คะแนนรวม: {voiceScore}%
+									ผลการฝึก: {voiceScore}%
 								</span>
 							{/if}
 						</div>
@@ -757,13 +825,31 @@
 									<div class="flex items-center justify-center gap-2">
 										<span class="text-[11px] font-bold text-muted-foreground">เป้าหมาย: เสียงที่ {currentWord.tone}</span>
 										<span class="text-[11px] font-bold px-2 py-0.5 rounded-md border {isToneMatched ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300'}">
-											{isToneMatched ? '✓' : '✗'} AI ตรวจพบเสียงที่ {detectedAITone} ({aiToneConfidence}%)
+											{isToneMatched ? 'เสียงใกล้เคียงเป้าหมาย' : `ลองฝึกเสียง ${currentWord.tone} อีกครั้ง`}
 										</span>
 									</div>
 								{/if}
 
 								{#if voiceHeard}
 									<p class="text-[11px] text-muted-foreground">ได้ยินว่า: <strong class="text-foreground">"{voiceHeard}"</strong></p>
+								{/if}
+
+								{#if syllableResults.length > 0}
+									<div class="mt-2 space-y-2 text-left">
+										{#each syllableResults as syllable}
+											<div class="rounded-lg border p-2 {syllable.isMatch ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}">
+												<div class="flex flex-wrap items-center justify-between gap-1 font-bold">
+													<span>{syllable.syllableIndex + 1}. {syllable.hanzi} <span class="font-normal text-muted-foreground">({syllable.pinyin})</span></span>
+													<span class={syllable.isMatch ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-300'}>
+														{syllable.isMatch ? 'ออกเสียงได้ตรงแล้ว' : `เสียงเป้าหมาย ${syllable.targetTone} · ลองฝึกอีกครั้ง`} · {Math.round(syllable.score)}%
+													</span>
+												</div>
+													<p class="mt-1 text-[11px] text-muted-foreground">
+														{syllable.isMatch ? 'ฟังเสียงตัวอย่างและฝึกซ้ำเพื่อให้มั่นใจยิ่งขึ้น' : `ลองฟังเสียงตัวอย่าง แล้วออกเสียง ${syllable.hanzi} อีกครั้ง`}
+													</p>
+											</div>
+										{/each}
+									</div>
 								{/if}
 
 								{#if voiceFeedback}

@@ -394,9 +394,9 @@
 						if (syllables.length === 1) {
 							const detectedTone = res.syllableResults?.[0]?.detectedTone || 1;
 							const targetTone = syllables[0]?.surfaceTone || currentChallenge.word.tone;
-							feedbackMessage = `วรรณยุกต์ยังไม่ตรง (พบเสียง ${detectedTone} แต่คำนี้เสียง ${targetTone}) ลองใหม่`;
+							feedbackMessage = `เสียงยังไม่ตรงกับคำนี้ ลองฝึกเสียง ${targetTone} อีกครั้ง (เมื่อกี้ใกล้เคียงเสียง ${detectedTone})`;
 						} else {
-							feedbackMessage = 'วรรณยุกต์ยังไม่ตรง ลองใหม่อีกครั้ง';
+							feedbackMessage = 'เสียงยังไม่ตรงกับคำนี้ ลองฟังตัวอย่างแล้วพูดอีกครั้ง';
 						}
 					} else {
 						feedbackMessage = `ยังไม่ถูกต้อง (ได้ยิน: "${finalHeard || '-'}") ลองใหม่`;
@@ -433,7 +433,7 @@
 		} catch (err) {
 			console.error('Error during pronunciation evaluation:', err);
 			feedbackType = 'error';
-			feedbackMessage = 'เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง';
+			feedbackMessage = 'ยังตรวจเสียงไม่ได้ ลองพูดอีกครั้งนะ';
 		}
 	}
 
@@ -461,7 +461,7 @@
 
 <AppHeader />
 
-<main class="mx-auto max-w-md px-4 pb-12 pt-6">
+<main class="mx-auto w-full max-w-7xl px-4 pb-12 pt-5 sm:px-6 sm:pt-6 lg:px-10">
 	{#if !stageData}
 		<div class="text-center py-20">Loading...</div>
 	{:else if phase === 'victory'}
@@ -516,7 +516,7 @@
 		</div>
 	{:else}
 		<!-- Challenge Phase -->
-		<div class="mb-8 flex items-center gap-4">
+		<div class="mx-auto mb-6 flex w-full max-w-6xl items-center gap-4 sm:mb-8">
 			<a href="/quest" class="p-2 text-muted-foreground hover:text-foreground" aria-label="ออกไปยังแผนที่ด่าน">
 				<X class="size-6" />
 			</a>
@@ -526,56 +526,56 @@
 		</div>
 
 		{#if currentChallenge}
-			<div class="flex flex-col items-center justify-center py-4 mb-4">
-				<div class="flex w-full justify-between items-center mb-6 px-2">
-					<div class="text-muted-foreground font-bold text-sm bg-muted px-3 py-1 rounded-full">
+			<div class="mx-auto mb-4 flex w-full max-w-6xl flex-col items-center justify-center py-3 sm:mb-6 sm:py-5">
+				<div class="mb-4 flex w-full items-center justify-between gap-3 px-1 sm:mb-6 sm:px-2">
+					<div class="rounded-full bg-muted px-3 py-1.5 text-xs font-bold text-muted-foreground sm:px-4 sm:text-sm lg:text-base">
 						{#if currentChallenge.type === 'listen_speak'}🎧 ฟังแล้วพูดตาม
 						{:else if currentChallenge.type === 'speak'}🗣️ ออกเสียงคำศัพท์
 						{:else if currentChallenge.type === 'translate'}🇹🇭 เลือกคำแปลที่ถูกต้อง
 						{:else if currentChallenge.type === 'sentence_build'}📝 อ่านประโยคนี้
 						{/if}
 					</div>
-					<button onclick={playAudio} class="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition">
-						<Volume2 class="size-6" />
+					<button onclick={playAudio} aria-label="ฟังเสียงตัวอย่าง" class="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition hover:bg-primary hover:text-white sm:size-12">
+						<Volume2 class="size-5 sm:size-6" />
 					</button>
 				</div>
 				
 				<!-- Main Challenge Display -->
 				{#if currentChallenge.type === 'sentence_build'}
-					<button onclick={toggleHint} class="group relative rounded-3xl bg-card border shadow-sm px-6 py-10 text-center transition hover:border-primary w-full">
+					<button onclick={toggleHint} class="group relative w-full rounded-3xl border bg-card px-4 py-8 text-center shadow-sm transition hover:border-primary sm:px-8 sm:py-12 lg:px-16 lg:py-16">
 						{#if sentenceCheckResult && sentenceCheckResult.charResults.length > 0}
 							<div class="flex flex-wrap items-center justify-center gap-2 mb-4">
 								{#each sentenceCheckResult.charResults as c}
 									<span 
-										class="text-4xl sm:text-5xl font-black px-2.5 py-1.5 rounded-2xl transition-all shadow-sm {c.isCorrect ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-500/40' : 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border-2 border-rose-500/40 underline decoration-rose-500 decoration-wavy'}"
+										class="rounded-xl px-2 py-1 text-3xl font-black shadow-sm transition-all sm:rounded-2xl sm:px-2.5 sm:py-1.5 sm:text-5xl lg:text-6xl {c.isCorrect ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-500/40' : 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border-2 border-rose-500/40 underline decoration-rose-500 decoration-wavy'}"
 										title={c.isCorrect ? 'ออกเสียงถูกต้อง' : 'คำนี้ยังออกเสียงไม่ชัดเจนหรืออ่านข้าม'}
 									>
 										{c.char}
 									</span>
 								{/each}
 							</div>
-							<div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold mb-3 {sentenceCheckResult.isAllCorrect ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}">
+							<div class="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold sm:text-sm lg:text-base {sentenceCheckResult.isAllCorrect ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}">
 								<span>อ่านถูกต้อง {sentenceCheckResult.correctCharsCount} จาก {sentenceCheckResult.totalChars} คำ ({sentenceCheckResult.accuracy}%)</span>
 							</div>
 						{:else}
-							<h2 class="text-4xl sm:text-5xl font-black mb-4 text-foreground tracking-wide">{currentChallenge.sentenceHanzi}</h2>
+							<h2 class="mb-4 text-3xl font-black tracking-wide text-foreground sm:text-5xl lg:text-6xl">{currentChallenge.sentenceHanzi}</h2>
 						{/if}
 
 						{#if showHint}
-							<div class="text-xl font-semibold text-muted-foreground mb-2 animate-in fade-in">{currentChallenge.sentencePinyin}</div>
-							<div class="text-sm text-muted-foreground animate-in fade-in">{currentChallenge.sentenceThai}</div>
+							<div class="mb-2 text-lg font-semibold text-muted-foreground animate-in fade-in sm:text-2xl lg:text-3xl">{currentChallenge.sentencePinyin}</div>
+							<div class="text-sm text-muted-foreground animate-in fade-in sm:text-base lg:text-xl">{currentChallenge.sentenceThai}</div>
 						{:else}
-							<div class="text-xs text-primary/70 font-bold mt-4 animate-pulse">แตะเพื่อดูพินอินและคำแปล</div>
+							<div class="mt-4 text-xs font-bold text-primary/70 animate-pulse sm:text-sm lg:text-base">แตะเพื่อดูพินอินและคำแปล</div>
 						{/if}
 					</button>
 				{:else}
-					<button onclick={toggleHint} class="group relative rounded-3xl bg-card border shadow-sm px-10 py-12 text-center transition hover:border-primary w-full">
-						<h2 class="text-6xl font-black mb-4 text-foreground">{currentChallenge.word.hanzi}</h2>
+					<button onclick={toggleHint} class="group relative w-full rounded-3xl border bg-card px-4 py-8 text-center shadow-sm transition hover:border-primary sm:px-8 sm:py-12 lg:px-16 lg:py-16">
+						<h2 class="mb-4 text-6xl font-black text-foreground sm:text-8xl lg:text-9xl">{currentChallenge.word.hanzi}</h2>
 						{#if showHint}
-							<div class="text-2xl font-semibold text-muted-foreground mb-2 animate-in fade-in">{currentChallenge.word.pinyin}</div>
-							<div class="text-sm text-muted-foreground animate-in fade-in">{currentChallenge.word.thai}</div>
+							<div class="mb-2 text-xl font-semibold text-muted-foreground animate-in fade-in sm:text-3xl lg:text-4xl">{currentChallenge.word.pinyin}</div>
+							<div class="text-sm text-muted-foreground animate-in fade-in sm:text-base lg:text-xl">{currentChallenge.word.thai}</div>
 						{:else}
-							<div class="text-xs text-primary/70 font-bold mt-4 animate-pulse">แตะเพื่อดูพินอินและคำแปล</div>
+							<div class="mt-4 text-xs font-bold text-primary/70 animate-pulse sm:text-sm lg:text-base">แตะเพื่อดูพินอินและคำแปล</div>
 						{/if}
 					</button>
 				{/if}
@@ -583,12 +583,12 @@
 			
 			<!-- Input Area based on Challenge Type -->
 			{#if currentChallenge.type === 'translate'}
-				<div class="grid grid-cols-2 gap-3 mt-4">
+				<div class="mx-auto mt-4 grid w-full max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:gap-6">
 					{#each currentChallenge.choices || [] as choice, idx}
 						<button 
 							onclick={() => handleTranslateChoice(idx)}
 							disabled={feedbackType !== 'none'}
-							class="p-4 rounded-2xl border-2 font-bold text-sm text-center transition
+							class="rounded-2xl border-2 p-4 text-center text-base font-bold transition active:scale-[0.99] sm:p-5 sm:text-lg lg:p-6 lg:text-xl
 							hover:bg-muted active:scale-95 disabled:opacity-50"
 						>
 							{choice}
@@ -597,34 +597,35 @@
 				</div>
 			{:else}
 				<!-- Recording Input -->
-				<div class="flex justify-center mt-6">
+				<div class="mt-6 flex justify-center sm:mt-8">
 					<button
 						onclick={toggleRecording}
 						disabled={feedbackType !== 'none'}
-						class="relative flex size-24 items-center justify-center rounded-full shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:grayscale
+						aria-label={isRecording ? 'หยุดบันทึกเสียง' : 'เริ่มบันทึกเสียง'}
+						class="relative flex size-24 items-center justify-center rounded-full shadow-2xl transition-colors duration-200 disabled:opacity-50 disabled:grayscale sm:size-28 lg:size-32
 						{isRecording ? 'bg-rose-500 scale-110 shadow-rose-500/50' : 'bg-primary hover:scale-105'}"
 					>
 						{#if isRecording}
 							<div class="absolute inset-0 rounded-full bg-rose-400 animate-ping opacity-75"></div>
 							<div class="w-8 h-8 rounded bg-white"></div>
 						{:else}
-							<Mic class="size-10 text-primary-foreground" />
+							<Mic class="size-10 text-primary-foreground sm:size-12 lg:size-14" />
 						{/if}
 					</button>
 				</div>
 			{/if}
 
 			<!-- Feedback Area -->
-			<div class="h-20 flex items-center justify-center text-center px-4 mt-6">
+			<div class="mx-auto mt-5 flex min-h-20 w-full max-w-6xl items-center justify-center px-2 py-2 text-center sm:mt-6 sm:px-4">
 				{#if feedbackType === 'success'}
 					<div class="flex flex-col items-center text-green-600 animate-in bounce-in">
-						<CheckCircle2 class="size-8 mb-1" />
-						<span class="text-sm font-bold">{feedbackMessage}</span>
+						<CheckCircle2 class="mb-1 size-8 sm:size-9" />
+						<span class="text-sm font-bold sm:text-base lg:text-lg">{feedbackMessage}</span>
 					</div>
 				{:else if feedbackType === 'error'}
 					<div class="flex flex-col items-center text-rose-500 animate-in shake">
-						<AlertCircle class="size-8 mb-1" />
-						<span class="text-sm font-bold">{feedbackMessage}</span>
+						<AlertCircle class="mb-1 size-8 sm:size-9" />
+						<span class="text-sm font-bold sm:text-base lg:text-lg">{feedbackMessage}</span>
 					</div>
 				{/if}
 			</div>

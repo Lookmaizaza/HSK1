@@ -46,17 +46,17 @@
 				<div class="leading-tight">
 					<div class="flex items-center gap-1.5">
 						<span class="text-lg font-black tracking-tight text-foreground">ปากจีน</span>
-						<span class="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded-md border border-sky-500/20">ช้างน้อย 🐘</span>
+						<span class="text-xs font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded-md border border-sky-500/20">ช้างน้อย 🐘</span>
 					</div>
-					<span class="text-[10px] font-medium text-muted-foreground">ห้องเรียนภาษาจีน HSK</span>
+					<span class="text-xs font-medium text-muted-foreground">ห้องเรียนภาษาจีน HSK</span>
 				</div>
 			</a>
 
 			<!-- Desktop Nav Links (Clean active states only when selected) -->
-			<nav class="hidden md:flex items-center gap-1 ml-4 border-l pl-4">
+			<nav class="hidden xl:flex items-center gap-1 ml-4 border-l pl-4">
 				<a
 					href="/"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname === '/'
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname === '/'
 						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
@@ -67,7 +67,7 @@
 				</a>
 				<a
 					href="/flashcard"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/flashcard')
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/flashcard')
 						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
@@ -78,7 +78,7 @@
 				</a>
 				<a
 					href="/quest"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/quest')
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/quest')
 						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
@@ -89,7 +89,7 @@
 				</a>
 				<a
 					href="/exam"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/exam')
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/exam')
 						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
@@ -100,7 +100,7 @@
 				</a>
 				<a
 					href="/talk"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/talk')
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/talk')
 						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
@@ -111,7 +111,7 @@
 				</a>
 				<a
 					href="/assessment"
-					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 {page.url.pathname.startsWith('/assessment')
+					class="rounded-xl px-2.5 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 lg:text-sm {page.url.pathname.startsWith('/assessment')
 						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
@@ -190,8 +190,8 @@
 		</div>
 	</div>
 
-	<!-- Mobile Nav Bar (md:hidden) -->
-	<div class="flex md:hidden items-center gap-1.5 overflow-x-auto px-4 pb-2.5 pt-1 border-t bg-background/50 scrollbar-none text-xs">
+	<!-- Compact scrollable navigation for mobile and tablet widths -->
+	<div class="flex xl:hidden items-center gap-1.5 overflow-x-auto px-4 pb-2.5 pt-1 border-t bg-background/50 scrollbar-none text-sm">
 		<a
 			href="/"
 			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 {page.url.pathname === '/'
