@@ -166,8 +166,28 @@ CREATE TABLE IF NOT EXISTS assessment_summaries (
 	completed_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS hanzi_writing_attempts (
+	attempt_id TEXT PRIMARY KEY,
+	user_id TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	pinyin TEXT NOT NULL,
+	character TEXT NOT NULL,
+	character_index INTEGER NOT NULL,
+	attempt_number INTEGER NOT NULL,
+	stroke_count INTEGER NOT NULL,
+	correct_strokes INTEGER NOT NULL,
+	mistake_count INTEGER NOT NULL,
+	sequence_correct INTEGER NOT NULL,
+	score INTEGER NOT NULL,
+	max_score INTEGER NOT NULL,
+	writing_details TEXT NOT NULL DEFAULT '{}',
+	created_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_assessment_user_type ON assessment_records(user_id, test_type);
 CREATE INDEX IF NOT EXISTS idx_assessment_summary_user ON assessment_summaries(user_id, test_type);
+CREATE INDEX IF NOT EXISTS idx_hanzi_writing_user_created ON hanzi_writing_attempts(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_hanzi_writing_word ON hanzi_writing_attempts(word_id);
 `;
 
 let initPromise: Promise<void> | null = null;
@@ -177,6 +197,12 @@ function init(): Promise<void> {
 	if (!initPromise) {
 		initPromise = (async () => {
 			await client.executeMultiple(SCHEMA);
+			const writingColumns = await client.execute('PRAGMA table_info(hanzi_writing_attempts)');
+			if (!writingColumns.rows.some((column) => String(column.name) === 'writing_details')) {
+				await client.execute(
+					"ALTER TABLE hanzi_writing_attempts ADD COLUMN writing_details TEXT NOT NULL DEFAULT '{}'"
+				);
+			}
 			// Migrate any legacy encoded word_ids (e.g. hsk1_1_%E7%88%B1 -> 爱)
 			try {
 				const legacyRows = await client.execute(
@@ -656,6 +682,65 @@ export async function recordPronunciationEvaluation(payload: {
 			Number(payload.scores.per_overall ?? 0),
 			Number(payload.scores.tone_score ?? 0),
 			JSON.stringify(payload.scores.phoneme_details ?? []),
+			Date.now()
+		]
+	});
+}
+
+export type HanziWritingAttemptRecord = {
+	attemptId: string;
+	userId: string;
+	wordId: string;
+	pinyin: string;
+	character: string;
+	characterIndex: number;
+	attemptNumber: number;
+	strokeCount: number;
+	correctStrokes: number;
+	mistakeCount: number;
+	sequenceCorrect: boolean;
+	score: number;
+	maxScore: number;
+	writingDetails: {
+		durationMs: number;
+		strokeResults: Array<{
+			strokeNumber: number;
+			mistakeCount: number;
+			completedCorrectly: boolean;
+		}>;
+		mistakeEvents: Array<{
+			strokeNumber: number;
+			mistakesOnStroke: number;
+			totalMistakes: number;
+			elapsedMs: number;
+		}>;
+	};
+};
+
+export async function recordHanziWritingAttempt(attempt: HanziWritingAttemptRecord): Promise<void> {
+	const client = getDb();
+	if (!client) throw new Error('Database is not configured for writing analytics.');
+	await init();
+	await client.execute({
+		sql: `INSERT OR IGNORE INTO hanzi_writing_attempts
+		      (attempt_id, user_id, word_id, pinyin, character, character_index, attempt_number, stroke_count,
+		       correct_strokes, mistake_count, sequence_correct, score, max_score, writing_details, created_at)
+		      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		args: [
+			attempt.attemptId,
+			attempt.userId,
+			attempt.wordId,
+			attempt.pinyin,
+			attempt.character,
+			attempt.characterIndex,
+			attempt.attemptNumber,
+			attempt.strokeCount,
+			attempt.correctStrokes,
+			attempt.mistakeCount,
+			attempt.sequenceCorrect ? 1 : 0,
+			attempt.score,
+			attempt.maxScore,
+			JSON.stringify(attempt.writingDetails),
 			Date.now()
 		]
 	});
@@ -1527,7 +1612,4 @@ export async function getUserAssessmentStatus(userId: string): Promise<{
 		summaries
 	};
 }
-
-
-
 

@@ -771,9 +771,7 @@
 											<line x1="90" y1="0" x2="0" y2="90" stroke-dasharray="2,2" />
 										</svg>
 										<!-- HanziWriter Mini Preview container -->
-										<div bind:this={charContainers[i]} class="absolute inset-0 flex items-center justify-center">
-											<span class="text-5xl font-kai text-rose-600 select-none">{char}</span>
-										</div>
+										<div bind:this={charContainers[i]} class="absolute inset-0"></div>
 									</div>
 
 									<!-- Replay button -->
