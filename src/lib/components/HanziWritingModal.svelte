@@ -386,6 +386,14 @@
 		if (pendingAttempts.length === 0) isOpen = false;
 	}
 
+	function closePractice() {
+		writerGeneration += 1;
+		if (isQuizActive) writerInstance?.cancelQuiz();
+		isQuizActive = false;
+		isAnimating = false;
+		isOpen = false;
+	}
+
 	function toggleOutline() {
 		if (isQuizActive) return;
 		showOutlineGuide = !showOutlineGuide;
@@ -402,9 +410,9 @@
 			
 			<!-- Close button -->
 			<button
-				onclick={finishPractice}
-				disabled={isQuizActive || isSaving}
-				class="absolute top-4 right-4 p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition"
+				onclick={closePractice}
+				aria-label="ปิดหน้าฝึกเขียน"
+				class="absolute top-4 right-4 z-30 p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition"
 			>
 				<X class="size-6" />
 			</button>
