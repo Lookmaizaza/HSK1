@@ -178,53 +178,56 @@
 	<div class="flex 2xl:hidden h-11 items-center gap-1.5 overflow-x-auto border-t bg-background/50 px-3 scrollbar-none text-sm sm:px-4">
 		<a
 			href="/"
-			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 {page.url.pathname === '/'
-				? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-black'
-				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname === '/'
+				? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
+				: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 		>
-			<span class="size-1.5 rounded-full bg-emerald-500"></span>
+			<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname === '/' ? 'opacity-100' : 'opacity-0'}"></span>
 			สตูดิโอเทียบเสียง
 		</a>
 		<a
 			href="/flashcard"
-			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 bg-rose-500/10 text-rose-600 dark:text-rose-400 {page.url.pathname.startsWith('/flashcard')
-				? 'ring-1 ring-rose-500/50 font-black'
-				: ''}"
+			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/flashcard')
+				? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
+				: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 		>
-			<span class="size-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+			<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/flashcard') ? 'opacity-100' : 'opacity-0'}"></span>
 			ฝึกชุดคำศัพท์
 		</a>
 		<a
 			href="/quest"
-			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition {page.url.pathname.startsWith('/quest')
-				? 'bg-primary/10 text-primary'
-				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/quest')
+				? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
+				: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 		>
+			<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/quest') ? 'opacity-100' : 'opacity-0'}"></span>
 			เล่นเป็นด่าน
 		</a>
 		<a
 			href="/exam"
-			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1 {page.url.pathname.startsWith('/exam')
-				? 'ring-1 ring-amber-500/50 font-black'
-				: ''}"
+			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/exam')
+				? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
+				: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 		>
-			<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+			<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/exam') ? 'opacity-100' : 'opacity-0'}"></span>
 			ทำข้อสอบจริง
 		</a>
 		<a
 			href="/talk"
-			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition {page.url.pathname.startsWith('/talk')
-				? 'bg-primary/10 text-primary'
-				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/talk')
+				? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
+				: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 		>
+			<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/talk') ? 'opacity-100' : 'opacity-0'}"></span>
 			สถานการณ์จำลอง
 		</a>
 		<a
 			href="/assessment"
-			class="whitespace-nowrap rounded-xl px-2.5 py-1 font-bold transition flex items-center gap-1 {page.url.pathname.startsWith('/assessment')
-				? 'bg-primary/10 text-primary'
-				: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/assessment')
+				? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
+				: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 		>
+			<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/assessment') ? 'opacity-100' : 'opacity-0'}"></span>
 			<Award class="size-3 text-amber-500" />
 			ประเมินผล
 		</a>
