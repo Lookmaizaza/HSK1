@@ -4,7 +4,10 @@ import {
 	getMistakeStats,
 	getDiagnosticAnalytics,
 	getLearningEvents,
-	getPronunciationEvaluations
+	getPronunciationEvaluations,
+	getUserAssessmentStatus,
+	syncPretestToEvaluations,
+	getTeacherInterventions
 } from '$lib/server/db';
 import { generateRemedialVocab, type RemedialCard } from '$lib/analytics/remedialEngine';
 import {
@@ -72,19 +75,28 @@ export type HskLevelSummary = {
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const currentUserId = locals.user?.id ? String(locals.user.id) : 'usr_uuid_local';
+	
+	const assessmentStatus = locals.user
+		? await getUserAssessmentStatus(String(locals.user.id))
+		: { hasPre: false, hasMid: false, hasPost: false, summaries: {} };
+
+	if (locals.user && assessmentStatus.hasPre && !locals.user.isAdmin && !locals.user.isImpersonated) {
+		await syncPretestToEvaluations(String(locals.user.id)).catch(() => {});
+	}
 	// Support querying both the user account and local/guest fallbacks
 	const queryUserIds = Array.from(
 		new Set([currentUserId, '1', 'usr_uuid_local', 'usr_uuid_guest'].filter(Boolean))
 	);
 
 	// Fetch historical diagnostic data & evaluations (up to 1,000 recent evaluations for full coverage analysis)
-	const [diagnosticData, topMistakes, recentMistakes, mistakeStats, learningEvents, evaluations] = await Promise.all([
+	const [diagnosticData, topMistakes, recentMistakes, mistakeStats, learningEvents, evaluations, teacherInterventions] = await Promise.all([
 		getDiagnosticAnalytics(queryUserIds),
 		locals.user ? getTopMistakes(locals.user.id, 15) : Promise.resolve([]),
 		locals.user ? getUserMistakes(locals.user.id, 20) : Promise.resolve([]),
 		locals.user ? getMistakeStats(locals.user.id) : Promise.resolve({ totalMistakes: 0, uniqueWords: 0, toneErrors: {} }),
 		getLearningEvents(queryUserIds, undefined, 100),
-		getPronunciationEvaluations(queryUserIds, 1000)
+		getPronunciationEvaluations(queryUserIds, 1000),
+		locals.user ? getTeacherInterventions(String(locals.user.id)) : Promise.resolve([])
 	]);
 
 	// Build map of word evaluation statistics
@@ -267,6 +279,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		user: locals.user || null,
+		hasPre: Boolean(assessmentStatus.hasPre),
+		teacherInterventions: teacherInterventions || [],
 		diagnostic: diagnosticData,
 		levels,
 		vocabOverview: {

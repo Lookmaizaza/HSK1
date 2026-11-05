@@ -22,6 +22,10 @@ declare global {
 				isImpersonated?: boolean;
 				realAdminUsername?: string;
 			} | null;
+<<<<<<< Updated upstream
+=======
+			showConsent?: boolean;
+>>>>>>> Stashed changes
 		}
 	}
 }

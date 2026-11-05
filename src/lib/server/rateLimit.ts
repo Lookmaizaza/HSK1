@@ -29,6 +29,14 @@ if (typeof setInterval !== 'undefined') {
 				attemptStore.delete(key);
 			}
 		}
+<<<<<<< Updated upstream
+=======
+		for (const [key, record] of requestWindows.entries()) {
+			if (now - record.windowStart > 60 * 60 * 1000) {
+				requestWindows.delete(key);
+			}
+		}
+>>>>>>> Stashed changes
 	}, 5 * 60 * 1000).unref?.();
 }
 
@@ -138,6 +146,41 @@ export function resetRateLimit(key: string): void {
 	attemptStore.delete(key);
 }
 
+<<<<<<< Updated upstream
+=======
+interface RequestWindow {
+	count: number;
+	windowStart: number;
+}
+
+const requestWindows = new Map<string, RequestWindow>();
+
+/** Fixed-window limiter for expensive endpoints (AI calls, telemetry ingestion). */
+export function consumeRateLimit(
+	key: string,
+	maxRequests: number,
+	windowMs: number
+): { allowed: boolean; remainingSeconds: number } {
+	const now = Date.now();
+	let record = requestWindows.get(key);
+
+	if (!record || now - record.windowStart > windowMs) {
+		record = { count: 0, windowStart: now };
+		requestWindows.set(key, record);
+	}
+
+	if (record.count >= maxRequests) {
+		return {
+			allowed: false,
+			remainingSeconds: Math.ceil((record.windowStart + windowMs - now) / 1000)
+		};
+	}
+
+	record.count += 1;
+	return { allowed: true, remainingSeconds: 0 };
+}
+
+>>>>>>> Stashed changes
 /**
  * Comprehensive Login Brute-force Checker for RequestEvent
  * Checks both IP and username thresholds

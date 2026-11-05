@@ -6,14 +6,24 @@ import {
 	verifyPassword,
 	getProgress,
 	completeLesson,
-	addXp
+	addXp,
+	isUserAdmin
 } from '$lib/server/db';
 import { checkLoginProtection, handleLoginFailure, handleLoginSuccess } from '$lib/server/rateLimit';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = (event) => {
 	const { locals, url } = event;
+<<<<<<< Updated upstream
 	if (locals.user) throw redirect(303, '/');
+=======
+	if (locals.user) {
+		if (locals.user.isAdmin) {
+			throw redirect(303, '/admin');
+		}
+		throw redirect(303, '/');
+	}
+>>>>>>> Stashed changes
 	const protection = checkLoginProtection(event, '');
 	return {
 		mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login',
@@ -42,7 +52,6 @@ function readForm(data: FormData) {
 	return { username, password };
 }
 
-// One-time merge of any localStorage progress the client posts during sign-up/login.
 type MergePayload = {
 	xp?: number;
 	completed?: Record<string, number>;
@@ -74,23 +83,43 @@ export const actions: Actions = {
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
+<<<<<<< Updated upstream
 		// Brute-force check on IP
 		const protection = checkLoginProtection(event, username);
 		if (protection.isBlocked) {
 			return fail(429, {
 				error: `มีการพยายามเข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับคำขอชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+=======
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+>>>>>>> Stashed changes
 				username,
 				isBlocked: true,
 				remainingSeconds: protection.remainingSeconds
 			});
 		}
 
+<<<<<<< Updated upstream
 		if (username.length < 2) return fail(400, { error: 'Username must be at least 2 characters', username });
 		if (password.length < 6) return fail(400, { error: 'Password must be at least 6 characters', username });
+=======
+		if (username.length < 2) return fail(400, { error: 'ชื่อผู้ใช้ต้องมีอย่างน้อย 2 ตัวอักษร', username });
+		if (password.length < 6) return fail(400, { error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', username });
+
+		// Strict guard: Admin accounts cannot register via public auth page
+		if (isUserAdmin(username)) {
+			return fail(400, {
+				error: 'ชื่อผู้ใช้นี้สงวนไว้สำหรับผู้ดูแลระบบ กรุณาเข้าสู่ระบบที่หน้าผู้ดูแลระบบ (/admin)',
+				username
+			});
+		}
+>>>>>>> Stashed changes
 
 		try {
 			if (await findUserByUsername(username)) {
-				return fail(400, { error: 'Username already taken', username });
+				return fail(400, { error: 'ชื่อผู้ใช้นี้มีผู้ใช้งานแล้ว', username });
 			}
 
 			const user = await createUser(username, password);
@@ -102,7 +131,7 @@ export const actions: Actions = {
 			const msg = e instanceof Error ? e.message : String(e);
 			return fail(500, {
 				error: msg.includes('Database not available')
-					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า (ต้องใส่ TURSO_DATABASE_URL ใน Vercel)'
+					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่พร้อมใช้งาน'
 					: `เกิดข้อผิดพลาด: ${msg}`,
 				username
 			});
@@ -116,17 +145,35 @@ export const actions: Actions = {
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
+<<<<<<< Updated upstream
 		// 1. Check rate limit before performing DB queries or bcrypt check
 		const protection = checkLoginProtection(event, username);
 		if (protection.isBlocked) {
 			return fail(429, {
 				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับการเข้าสู่ระบบชั่วคราวเป็นเวลา 2 นาทีเพื่อความปลอดภัย (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+=======
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+>>>>>>> Stashed changes
 				username,
 				isBlocked: true,
 				remainingSeconds: protection.remainingSeconds
 			});
 		}
 
+<<<<<<< Updated upstream
+=======
+		// Strict guard: Admin accounts must not log in via learner auth page
+		if (isUserAdmin(username)) {
+			return fail(403, {
+				error: `บัญชี "${username}" เป็นบัญชีผู้ดูแลระบบ กรุณาเข้าสู่ระบบที่หน้าจัดการผู้ดูแล (/admin)`,
+				username
+			});
+		}
+
+>>>>>>> Stashed changes
 		try {
 			const row = await findUserByUsername(username);
 			if (!row || !verifyPassword(password, row.password_hash)) {
@@ -145,9 +192,13 @@ export const actions: Actions = {
 				});
 			}
 
+<<<<<<< Updated upstream
 			// Clear rate limit tracking on success
 			handleLoginSuccess(event, username);
 
+=======
+			handleLoginSuccess(event, username);
+>>>>>>> Stashed changes
 			await mergeLocalProgress(row.id, local);
 			const session = await createSession(row.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);
@@ -155,7 +206,7 @@ export const actions: Actions = {
 			const msg = e instanceof Error ? e.message : String(e);
 			return fail(500, {
 				error: msg.includes('Database not available')
-					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า (ต้องใส่ TURSO_DATABASE_URL ใน Vercel)'
+					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่พร้อมใช้งาน'
 					: `เกิดข้อผิดพลาด: ${msg}`,
 				username
 			});

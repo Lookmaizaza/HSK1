@@ -14,10 +14,27 @@ import {
 	recordAuditLog,
 	getAuditLogs,
 	getPronunciationPhonemeErrorStats,
+<<<<<<< Updated upstream
 	getDiagnosticAnalytics,
 	getAdvancedLearningAnalytics
 } from '$lib/server/db';
 import { ALL_QUEST_STAGES } from '$lib/data/questLevels';
+=======
+	getParticipationTrend,
+	getPracticeBreakdown,
+	getDiagnosticAnalytics,
+	getAdvancedLearningAnalytics,
+	isUserAdmin,
+	getSystemSetting,
+	setSystemSetting,
+	createTeacherIntervention,
+	updateTeacherIntervention,
+	getAllTeacherInterventions,
+	checkAndUpdateInterventionStatus,
+	getSkillsAnalyticsSummary
+} from '$lib/server/db';
+import { ALL_QUEST_STAGES, parseQuestChallenges } from '$lib/data/questLevels';
+>>>>>>> Stashed changes
 import { TRACKS, units } from '$lib/data/lessons';
 import { generateRemedialVocab } from '$lib/analytics/remedialEngine';
 import { HSK1_VOCAB_PRESETS } from '$lib/vocabLoader';
@@ -45,7 +62,15 @@ export const load: PageServerLoad = async (event) => {
 		? Number(url.searchParams.get('userId'))
 		: null;
 
+<<<<<<< Updated upstream
 	const [
+=======
+	await checkAndUpdateInterventionStatus().catch(() => 0);
+
+	const [
+		skillsAnalytics,
+		teacherInterventions,
+>>>>>>> Stashed changes
 		users,
 		completions,
 		researchStats,
@@ -53,9 +78,22 @@ export const load: PageServerLoad = async (event) => {
 		stageOverrides,
 		auditLogs,
 		classPhonemeStats,
+<<<<<<< Updated upstream
 		selectedUserDetail,
 		advancedAnalytics
 	] = await Promise.all([
+=======
+		participationTrend,
+		practiceBreakdown,
+		selectedUserDetail,
+		questAnalytics,
+		pitchAnalytics,
+		listeningPolicy,
+		pitchSensitivity
+	] = await Promise.all([
+		getSkillsAnalyticsSummary(),
+		getAllTeacherInterventions(),
+>>>>>>> Stashed changes
 		listAllUsersWithProgress(),
 		listAllCompletions(),
 		getResearchExportStats(),
@@ -63,6 +101,7 @@ export const load: PageServerLoad = async (event) => {
 		getStageOverrides(),
 		getAuditLogs(40),
 		getPronunciationPhonemeErrorStats(),
+<<<<<<< Updated upstream
 		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
 		getAdvancedLearningAnalytics()
 	]);
@@ -74,12 +113,39 @@ export const load: PageServerLoad = async (event) => {
 			units.filter((u) => u.track === t.id).reduce((sum, u) => sum + u.lessons.length, 0)
 		])
 	) as Record<string, number>;
+=======
+		getParticipationTrend(),
+		getPracticeBreakdown(),
+		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
+		getAdvancedLearningAnalytics('stage'),
+		getAdvancedLearningAnalytics('word'),
+		getSystemSetting('listening_policy', 'low_pass'),
+		getSystemSetting('pitch_sensitivity', 'standard')
+	]);
+
+	const learnerUsers = users.filter((u) => !u.isAdmin);
+	const adminUsers = users.filter((u) => u.isAdmin);
+	const adminUserIdSet = new Set(adminUsers.map((a) => a.id));
+
+	// Precompute track totals and lesson key list per track (eliminates O(N*M) nested unit filters)
+	const trackTotals: Record<string, number> = {};
+	const trackLessonsMap: Record<string, string[]> = {};
+	for (const t of TRACKS) {
+		const trackUnits = units.filter((u) => u.track === t.id);
+		trackTotals[t.id] = trackUnits.reduce((sum, u) => sum + u.lessons.length, 0);
+		trackLessonsMap[t.id] = trackUnits.flatMap((u) => u.lessons.map((l) => `${u.id}/${l.id}`));
+	}
+>>>>>>> Stashed changes
 
 	const completionsByUser = new Map<number, Record<string, number>>();
+	const completionsCountByStage: Record<string, number> = {};
 	for (const c of completions) {
 		const cur = completionsByUser.get(c.userId) ?? {};
 		cur[c.lessonKey] = c.stars;
 		completionsByUser.set(c.userId, cur);
+		if (c.stars > 0) {
+			completionsCountByStage[c.lessonKey] = (completionsCountByStage[c.lessonKey] || 0) + 1;
+		}
 	}
 
 	const today = new Date().toISOString().slice(0, 10);
@@ -90,14 +156,11 @@ export const load: PageServerLoad = async (event) => {
 		for (const t of TRACKS) {
 			let done = 0;
 			let starsSum = 0;
-			for (const unit of units.filter((un) => un.track === t.id)) {
-				for (const lesson of unit.lessons) {
-					const key = `${unit.id}/${lesson.id}`;
-					const stars = comp[key] ?? 0;
-					if (stars > 0) {
-						done += 1;
-						starsSum += stars;
-					}
+			for (const key of trackLessonsMap[t.id] || []) {
+				const stars = comp[key] ?? 0;
+				if (stars > 0) {
+					done += 1;
+					starsSum += stars;
 				}
 			}
 			perTrack[t.id] = { done, total: trackTotals[t.id], stars: starsSum };
@@ -124,6 +187,7 @@ export const load: PageServerLoad = async (event) => {
 			avgTimeSpentSec: 0
 		};
 
+<<<<<<< Updated upstream
 		// Also check lesson_completions from users as completions baseline
 		const completedUsersCount = users.filter((u) => {
 			const comp = completionsByUser.get(u.id);
@@ -137,6 +201,18 @@ export const load: PageServerLoad = async (event) => {
 		const unopenedCount = Math.max(0, users.length - uniqueUsers);
 		const passRate = totalAttempts > 0 ? Math.round((totalPassed / totalAttempts) * 100) : 0;
 		const dropRate = totalAttempts > 0 ? Math.round((tel.totalFailed / totalAttempts) * 100) : 0;
+=======
+		// Check lesson_completions from users as completions baseline (O(1) lookup)
+		const completedUsersCount = completionsCountByStage[s.id] || 0;
+		const totalPassed = Math.max(tel.totalPassed, completedUsersCount);
+		const totalAttempts = Math.max(tel.totalAttempts, totalPassed + (tel.totalFailed || 0));
+		const totalViews = Math.max(tel.totalViews, totalAttempts);
+		const uniqueUsers = Math.min(learnerUsers.length, Math.max(tel.uniqueUsers, completedUsersCount));
+		// Unopened count should reflect learners, not inflated by admin accounts
+		const unopenedCount = Math.max(0, learnerUsers.length - uniqueUsers);
+		const passRate = totalAttempts > 0 ? Math.min(100, Math.round((totalPassed / totalAttempts) * 100)) : 0;
+		const dropRate = totalAttempts > 0 ? Math.min(100, Math.round((tel.totalFailed / totalAttempts) * 100)) : 0;
+>>>>>>> Stashed changes
 
 		return {
 			id: s.id,
@@ -150,6 +226,16 @@ export const load: PageServerLoad = async (event) => {
 			originalDescription: s.description,
 			isActive: override?.isActive ?? true,
 			hasOverride: !!override,
+<<<<<<< Updated upstream
+=======
+			challengeJson: JSON.stringify(
+				override?.contentJson
+					? parseQuestChallenges(override.contentJson) ?? s.challenges
+					: s.challenges,
+				null,
+				2
+			),
+>>>>>>> Stashed changes
 			wordsCount: s.words.length,
 			wordsList: s.words.map((w) => ({ hanzi: w.hanzi, pinyin: w.pinyin, thai: w.thai })),
 			stats: {
@@ -186,15 +272,22 @@ export const load: PageServerLoad = async (event) => {
 		} catch {}
 	}
 
+<<<<<<< Updated upstream
 	const learnerUsers = users.filter((u) => !u.isAdmin);
 	const adminUsers = users.filter((u) => u.isAdmin);
 
+=======
+>>>>>>> Stashed changes
 	const stats = {
 		totalUsers: users.length,
 		totalLearners: learnerUsers.length,
 		totalAdmins: adminUsers.length,
 		totalXp: learnerUsers.reduce((s, u) => s + u.xp, 0),
+<<<<<<< Updated upstream
 		totalCompletions: completions.filter((c) => c.stars > 0 && !adminUsers.some((a) => a.id === c.userId)).length,
+=======
+		totalCompletions: completions.filter((c) => c.stars > 0 && !adminUserIdSet.has(c.userId)).length,
+>>>>>>> Stashed changes
 		activeToday: usersWithDetail.filter((u) => !u.isAdmin && u.activeToday).length,
 		topStreak: learnerUsers.reduce((m, u) => Math.max(m, u.streak), 0),
 		avgGopScore: classPhonemeStats.avgGop,
@@ -204,6 +297,11 @@ export const load: PageServerLoad = async (event) => {
 
 	return {
 		needsLogin: false as const,
+<<<<<<< Updated upstream
+=======
+		skillsAnalytics,
+		teacherInterventions,
+>>>>>>> Stashed changes
 		adminUsername: currentUser.username,
 		isImpersonating: !!locals.user?.isImpersonated,
 		impersonatedUserId: locals.user?.isImpersonated ? locals.user.id : null,
@@ -213,7 +311,18 @@ export const load: PageServerLoad = async (event) => {
 		stages: enrichedStages,
 		auditLogs,
 		classPhonemeStats,
+<<<<<<< Updated upstream
 		advancedAnalytics,
+=======
+		participationTrend,
+		practiceBreakdown,
+		learningAnalyticsByMode: {
+			stage: questAnalytics,
+			word: pitchAnalytics
+		},
+		listeningPolicy,
+		pitchSensitivity,
+>>>>>>> Stashed changes
 		selectedUserId,
 		selectedUserDetail,
 		selectedUserRemedials,
@@ -276,6 +385,17 @@ export const actions: Actions = {
 			});
 		}
 
+<<<<<<< Updated upstream
+=======
+		// 2. Authorization check: ensure user has admin role before issuing session
+		if (!isUserAdmin(row.username)) {
+			return fail(403, {
+				error: `บัญชี "${row.username}" ไม่มีสิทธิ์เข้าถึงระบบผู้ดูแล (Admin) กรุณาใช้บัญชีที่ได้รับอนุญาต`,
+				username
+			});
+		}
+
+>>>>>>> Stashed changes
 		// Clear rate limit tracking on successful authentication
 		handleLoginSuccess(event, username);
 
@@ -298,8 +418,28 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const targetUserId = String(data.get('targetUserId') ?? '').trim();
+<<<<<<< Updated upstream
 		if (!targetUserId) {
 			return fail(400, { error: 'Missing target user ID' });
+=======
+		const targetIdNum = Number(targetUserId);
+		if (!targetUserId || !targetIdNum || isNaN(targetIdNum)) {
+			return fail(400, { error: 'รหัสผู้ใช้งานไม่ถูกต้อง' });
+		}
+
+		// Prevent impersonating another admin account
+		const { getDb } = await import('$lib/server/db');
+		const client = getDb();
+		if (client) {
+			const uRes = await client.execute({ sql: 'SELECT id, username FROM users WHERE id = ?', args: [targetIdNum] });
+			const targetRow = uRes.rows[0];
+			if (!targetRow) {
+				return fail(404, { error: 'ไม่พบบัญชีผู้เรียนที่ต้องการสวมบทบาท' });
+			}
+			if (isUserAdmin(String(targetRow.username))) {
+				return fail(400, { error: 'ไม่สามารถสวมบทบาทบัญชีผู้ดูแลระบบ (Admin) ได้' });
+			}
+>>>>>>> Stashed changes
 		}
 
 		cookies.set('impersonate_user_id', targetUserId, {
@@ -348,24 +488,76 @@ export const actions: Actions = {
 		const title = String(data.get('title') ?? '').trim();
 		const category = String(data.get('category') ?? '').trim();
 		const description = String(data.get('description') ?? '').trim();
+<<<<<<< Updated upstream
 		const isActive = data.get('isActive') === 'true' || data.get('isActive') === '1' || data.get('isActive') === 'on';
 
 		if (!stageId || !title) {
 			return fail(400, { error: 'ต้องระบุรหัสด่านและชื่อบทเรียน' });
 		}
 
+=======
+		const challengeJson = String(data.get('challengeJson') ?? '');
+		const isActive = data.get('isActive') === 'true' || data.get('isActive') === '1' || data.get('isActive') === 'on';
+
+		const sourceStage = ALL_QUEST_STAGES.find((stage) => stage.id === stageId);
+		if (!stageId || !sourceStage || !title) {
+			return fail(400, { error: 'ต้องระบุรหัสด่านและชื่อบทเรียน' });
+		}
+
+		const challenges = parseQuestChallenges(challengeJson);
+		if (!challenges) {
+			return fail(400, {
+				error: 'เนื้อหาโจทย์ไม่ถูกต้อง: ตรวจชนิดโจทย์ คำศัพท์ ตัวเลือก และคำตอบที่ถูกต้องอีกครั้ง'
+			});
+		}
+
+>>>>>>> Stashed changes
 		await saveStageOverride({
 			stageId,
 			title,
 			category: category || 'ทั่วไป',
 			description,
 			isActive,
+<<<<<<< Updated upstream
+=======
+			contentJson: JSON.stringify(challenges),
+>>>>>>> Stashed changes
 			updatedBy: admin.username
 		});
 
 		return { success: true, savedStageId: stageId };
 	},
 
+<<<<<<< Updated upstream
+=======
+	toggleStageActive: async ({ request, locals }) => {
+		const admin = locals.realAdmin || locals.user;
+		if (!admin?.isAdmin) {
+			throw error(403, 'Forbidden: Admin access required');
+		}
+
+		const data = await request.formData();
+		const stageId = String(data.get('stageId') ?? '').trim();
+		const stage = ALL_QUEST_STAGES.find((item) => item.id === stageId);
+		if (!stage) return fail(400, { error: 'ไม่พบรหัสด่านที่ต้องการเปลี่ยนสถานะ' });
+
+		const override = (await getStageOverrides())[stageId];
+		const isActive = !(override?.isActive ?? true);
+		await saveStageOverride({
+			stageId,
+			title: override?.title || stage.title,
+			category: override?.category || stage.category,
+			description: override?.description || stage.description,
+			isActive,
+			customWords: override?.customWords,
+			contentJson: override?.contentJson ?? JSON.stringify(stage.challenges),
+			updatedBy: admin.username
+		});
+
+		return { success: true, toggledStageId: stageId, isActive };
+	},
+
+>>>>>>> Stashed changes
 	resetStageOverride: async ({ request, locals }) => {
 		const admin = locals.realAdmin || locals.user;
 		if (!admin?.isAdmin) {
@@ -380,5 +572,142 @@ export const actions: Actions = {
 
 		await resetStageOverride(stageId, admin.username);
 		return { success: true, resetStageId: stageId };
+<<<<<<< Updated upstream
+=======
+	},
+
+	saveListeningPolicy: async ({ request, locals }) => {
+		const admin = locals.realAdmin || locals.user;
+		if (!admin?.isAdmin) throw error(403, 'Forbidden');
+		const data = await request.formData();
+		const policy = String(data.get('policy') ?? 'low_pass').trim();
+		await setSystemSetting('listening_policy', policy);
+		await recordAuditLog({
+			actorUsername: admin.username,
+			action: 'update_listening_policy',
+			resourceType: 'system_setting',
+			resourceId: 'listening_policy',
+			details: { policy }
+		});
+		return { success: true, policy };
+	},
+
+	assignTeacherIntervention: async ({ request, locals }) => {
+		const admin = locals.realAdmin || locals.user;
+		if (!admin?.isAdmin) throw error(403, 'Forbidden');
+		const data = await request.formData();
+		const targetUserId = String(data.get('targetUserId') ?? '').trim();
+		const title = String(data.get('title') ?? '').trim();
+		const message = String(data.get('message') ?? '').trim();
+		const remedialWords = String(data.get('remedialWords') ?? '').trim();
+		const status = (String(data.get('status') ?? 'pending') as 'pending' | 'improved');
+
+		if (!targetUserId || !title || !message) {
+			return fail(400, { error: 'กรุณากรอกรหัสผู้เรียน หัวข้อ และข้อความคำแนะนำให้ครบถ้วน' });
+		}
+
+		await createTeacherIntervention(targetUserId, title, message, remedialWords, admin.username, status);
+		await recordAuditLog({
+			actorUsername: admin.username,
+			action: 'assign_teacher_intervention',
+			resourceType: 'user',
+			resourceId: targetUserId,
+			details: { title, remedialWords, status }
+		});
+		return { success: true, targetUserId };
+	},
+
+	updateTeacherIntervention: async ({ request, locals }) => {
+		const admin = locals.realAdmin || locals.user;
+		if (!admin?.isAdmin) throw error(403, 'Forbidden');
+		const data = await request.formData();
+		const interventionId = Number(data.get('interventionId'));
+		const title = String(data.get('title') ?? '').trim();
+		const message = String(data.get('message') ?? '').trim();
+		const remedialWords = String(data.get('remedialWords') ?? '').trim();
+		const status = (String(data.get('status') ?? 'pending') as 'pending' | 'improved');
+
+		if (!interventionId || isNaN(interventionId) || !title || !message) {
+			return fail(400, { error: 'กรุณากรอกรหัสคำแนะนำ หัวข้อ และข้อความคำแนะนำให้ครบถ้วน' });
+		}
+
+		await updateTeacherIntervention(interventionId, title, message, remedialWords, status);
+		await recordAuditLog({
+			actorUsername: admin.username,
+			action: 'update_teacher_intervention',
+			resourceType: 'intervention',
+			resourceId: String(interventionId),
+			details: { title, remedialWords, status }
+		});
+		return { success: true, interventionId };
+	},
+
+	savePitchTuning: async ({ request, locals }) => {
+		const admin = locals.realAdmin || locals.user;
+		if (!admin?.isAdmin) throw error(403, 'Forbidden');
+		const data = await request.formData();
+		const sensitivity = String(data.get('sensitivity') ?? 'standard').trim();
+		await setSystemSetting('pitch_sensitivity', sensitivity);
+		await recordAuditLog({
+			actorUsername: admin.username,
+			action: 'update_pitch_sensitivity',
+			resourceType: 'system_setting',
+			resourceId: 'pitch_sensitivity',
+			details: { sensitivity }
+		});
+		return { success: true, sensitivity };
+	},
+
+	syncTursoToNeon: async ({ locals }) => {
+		const admin = locals.realAdmin || locals.user;
+		if (!admin?.isAdmin) throw error(403, 'Forbidden');
+		const { syncTursoToNeon } = await import('$lib/server/neonSync');
+		const result = await syncTursoToNeon();
+		await recordAuditLog({
+			actorUsername: admin.username,
+			action: 'sync_turso_to_neon',
+			resourceType: 'database',
+			resourceId: 'neondb',
+			details: result
+		});
+		return result;
+	},
+
+	deleteMockLearners: async ({ locals }) => {
+		const admin = locals.realAdmin || locals.user;
+		if (!admin?.isAdmin) throw error(403, 'Forbidden');
+		const { getDb } = await import('$lib/server/db');
+		const db = getDb();
+		if (!db) throw error(500, 'Database unavailable');
+
+		// 1. Delete all mock records from Turso (handles both string names and integer IDs >= 1000)
+		await db.execute("DELETE FROM phoneme_evaluations WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000");
+		await db.execute("DELETE FROM pronunciation_evaluations WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000");
+		await db.execute("DELETE FROM assessment_records WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000 OR id >= 100000");
+		await db.execute("DELETE FROM assessment_summaries WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000 OR id >= 1000");
+		await db.execute("DELETE FROM stage_telemetry WHERE user_id LIKE 'mock_learner_%' OR (user_id IS NOT NULL AND user_id != 'anonymous' AND CAST(user_id AS integer) >= 1000)");
+		await db.execute("DELETE FROM lesson_completions WHERE CAST(user_id AS integer) >= 1000");
+		await db.execute("DELETE FROM user_mistakes WHERE CAST(user_id AS integer) >= 1000");
+		await db.execute("DELETE FROM progress WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'mock_learner_%' OR CAST(id AS integer) >= 1000)");
+		const delUsers = await db.execute("DELETE FROM users WHERE username LIKE 'mock_learner_%' OR CAST(id AS integer) >= 1000");
+
+		// 2. Also directly purge mock records from Neon PostgreSQL
+		try {
+			const { purgeMockDataFromNeon } = await import('$lib/server/neonSync');
+			await purgeMockDataFromNeon();
+		} catch (e) {
+			console.warn('Neon purge after mock delete warning:', e);
+		}
+
+		await recordAuditLog({
+			actorUsername: admin.username,
+			action: 'delete_mock_learners',
+			resourceType: 'users',
+			resourceId: 'mock_learners',
+			details: { deletedUsers: delUsers.rowsAffected ?? 100 }
+		});
+
+		return { success: true, deleted: delUsers.rowsAffected ?? 100 };
+>>>>>>> Stashed changes
 	}
 };

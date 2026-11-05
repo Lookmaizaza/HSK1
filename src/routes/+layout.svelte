@@ -33,7 +33,17 @@
 
 {@render children()}
 <InAppBrowserGuard />
+<<<<<<< Updated upstream
 {#if data.user && !data.user.isAdmin && data.user.role !== 'admin'}
 	<PdpaConsentModal user={data.user} />
 {/if}
+=======
+>>>>>>> Stashed changes
 
+{#if data.showConsent && data.user && !data.user.isAdmin && !data.user.isImpersonated}
+	<PdpaConsentModal user={data.user} initiallyOpen={data.showConsent} />
+{/if}
+
+{#if data.user && !data.user.isAdmin && !data.user.isImpersonated}
+	<AssessmentPromptModal user={data.user} />
+{/if}

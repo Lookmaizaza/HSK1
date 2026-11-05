@@ -2,7 +2,17 @@
 <script lang="ts">
 	import { ShieldCheck, Mic, Lock, CheckCircle2, AlertCircle, Volume2, Sparkles } from '@lucide/svelte';
 
+<<<<<<< Updated upstream
 	let { user = null }: { user?: { id: number; username: string; isAdmin?: boolean; role?: 'admin' | 'user' } | null } = $props();
+=======
+	let {
+		user = null,
+		initiallyOpen = false
+	}: {
+		user?: { id: number; username: string; isAdmin?: boolean; isImpersonated?: boolean } | null;
+		initiallyOpen?: boolean;
+	} = $props();
+>>>>>>> Stashed changes
 
 	let isOpen = $state(false);
 	let isRequestingMic = $state(false);
@@ -14,8 +24,10 @@
 	let audioConsent = $state(true);
 	let researchConsent = $state(true);
 
-	// Check consent whenever user logs in or page loads
+	// The server is the source of truth:
+	// Only render when user is logged in, is a learner (not admin, not impersonated), and hasn't consented
 	$effect(() => {
+<<<<<<< Updated upstream
 		// CRITICAL SEPARATION: If not logged in OR if user is an ADMIN, NEVER show PDPA modal.
 		// Administrators manage the platform and are NOT subjects of student learning research.
 		if (!user || !user.id || user.isAdmin || user.role === 'admin') {
@@ -33,6 +45,13 @@
 		} else {
 			isOpen = false;
 		}
+=======
+		if (!user || user.isAdmin || user.isImpersonated) {
+			isOpen = false;
+			return;
+		}
+		isOpen = Boolean(initiallyOpen && user.id);
+>>>>>>> Stashed changes
 	});
 
 	async function requestMicrophonePermission(): Promise<boolean> {
@@ -127,12 +146,12 @@
 					<span
 						class="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary border border-primary/20"
 					>
-						<ShieldCheck class="size-3.5" /> PDPA & Privacy Notice
+						<ShieldCheck class="size-3.5" /> ข้อตกลงความยินยอม (PDPA)
 					</span>
 					<span
 						class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
 					>
-						<Lock class="size-3" /> Zero Audio Storage at Rest
+						<Lock class="size-3" /> ไม่เก็บไฟล์เสียงลงเซิร์ฟเวอร์
 					</span>
 				</div>
 
@@ -140,7 +159,7 @@
 					ยินดีต้อนรับ {user?.username ? `คุณ ${user.username}` : ''} สู่ระบบ "语 ปากจีน"
 				</h2>
 				<p class="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-					เพื่อให้ท่านได้รับประสบการณ์ฝึกพูดและวิเคราะห์การออกเสียงภาษาจีนอย่างแม่นยำ พร้อมคุ้มครองความเป็นส่วนตัวตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)
+					เพื่อให้ท่านได้รับประสบการณ์ฝึกพูดและวิเคราะห์การออกเสียงภาษาจีนอย่างมีประสิทธิภาพ พร้อมความคุ้มครองข้อมูลส่วนบุคคลตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA)
 				</p>
 			</div>
 
@@ -154,10 +173,10 @@
 					</div>
 					<div class="space-y-1 text-xs leading-relaxed text-emerald-950 dark:text-emerald-100">
 						<div class="font-bold text-emerald-800 dark:text-emerald-200">
-							🛡️ นโยบายความปลอดภัยของข้อมูลเสียง (Zero Audio Storage)
+							การประมวลผลเสียงแบบเรียลไทม์ (Zero Audio Storage)
 						</div>
 						<p>
-							ระบบจะประมวลผลสัญญาณเสียงแบบเรียลไทม์ในหน่วยความจำชั่วคราวเพื่อตรวจจับวรรณยุกต์และหน่วยเสียงเท่านั้น โดย<strong>ไม่มีการบันทึกหรือจัดเก็บไฟล์เสียงดิบ (.wav) ลงในเซิร์ฟเวอร์</strong>
+							ระบบประมวลผลสัญญาณเสียงชั่วคราวในหน่วยความจำเพื่อวิเคราะห์วรรณยุกต์และหน่วยเสียงเท่านั้น โดย<strong>ไม่มีการบันทึกหรือจัดเก็บไฟล์เสียงพูดลงในเซิร์ฟเวอร์</strong>
 						</p>
 					</div>
 				</div>
@@ -172,7 +191,7 @@
 						class="mt-0.5 rounded border-input size-4 text-primary focus:ring-primary accent-primary"
 					/>
 					<span class="leading-tight text-foreground font-medium">
-						ยินยอมให้ประมวลผลเสียงพูดแบบเรียลไทม์เพื่อการประเมินผลการออกเสียง (จำเป็นสำหรับการฝึกพูด)
+						ยินยอมให้ประมวลผลเสียงพูดแบบเรียลไทม์เพื่อตรวจประเมินผลการออกเสียงภาษาจีน
 					</span>
 				</label>
 
@@ -183,7 +202,7 @@
 						class="mt-0.5 rounded border-input size-4 text-primary focus:ring-primary accent-primary"
 					/>
 					<span class="leading-tight text-foreground font-medium">
-						ยินยอมให้นำข้อมูลสถิติเชิงตัวเลข (คะแนนความแม่นยำ GOP, วรรณยุกต์, หน่วยเสียง) ไปใช้วิจัยและพัฒนาแบบไม่ระบุตัวตน
+						ยินยอมให้นำข้อมูลเชิงสถิติ (คะแนนความชัดเจน, วรรณยุกต์, หน่วยเสียง) ไปใช้เพื่อการพัฒนาการเรียนรู้โดยไม่ระบุตัวตน
 					</span>
 				</label>
 			</div>
@@ -198,7 +217,6 @@
 
 			<!-- 4. ACTION BUTTONS -->
 			<div class="flex flex-col sm:flex-row gap-2.5 pt-1">
-				<!-- Primary Button: Accept and Request Mic Permission immediately -->
 				<button
 					type="button"
 					onclick={() => handleAccept(true)}
@@ -210,17 +228,16 @@
 						<span>กำลังขอสิทธิ์ไมโครโฟน...</span>
 					{:else}
 						<Mic class="size-4" />
-						<span>ยอมรับและเปิดใช้งานไมค์ทันที</span>
+						<span>ยินยอมและเปิดใช้งานไมโครโฟน</span>
 					{/if}
 				</button>
 
-				<!-- Secondary Button: Accept without prompt immediately -->
 				<button
 					type="button"
 					onclick={() => handleAccept(false)}
 					class="rounded-2xl border bg-background hover:bg-muted px-4 py-3 text-xs font-bold text-muted-foreground hover:text-foreground transition active:scale-95 cursor-pointer"
 				>
-					ยอมรับภายหลัง
+					ยินยอมภายหลัง
 				</button>
 			</div>
 		</div>

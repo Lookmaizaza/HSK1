@@ -628,3 +628,20 @@ export const ALL_QUEST_STAGES: QuestStage[] = [
 export const QUEST_STAGE_MAP = new Map<string, QuestStage>(
 	ALL_QUEST_STAGES.map((s) => [s.id, s])
 );
+
+export function parseQuestChallenges(raw: unknown): Challenge[] | null {
+	if (!raw) return null;
+	try {
+		const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+		if (!Array.isArray(parsed) || parsed.length === 0) return null;
+		for (const item of parsed) {
+			if (!item || typeof item !== 'object') return null;
+			if (!item.id || !item.type || !item.word) return null;
+			const validTypes = ['speak', 'listen_speak', 'translate', 'sentence_build'];
+			if (!validTypes.includes(item.type)) return null;
+		}
+		return parsed as Challenge[];
+	} catch {
+		return null;
+	}
+}
