@@ -1,16 +1,8 @@
-<<<<<<< Updated upstream
-// src/lib/server/neon.ts
-=======
->>>>>>> Stashed changes
 // Neon Serverless PostgreSQL Database Client & Operations over HTTP
 import { env } from '$env/dynamic/private';
 
 function getNeonConfig() {
-<<<<<<< Updated upstream
-	const dbUrl = env.DATABASE_URL?.trim();
-=======
 	const dbUrl = (env.DATABASE_URL || (env as any).Neon_DB || process.env.DATABASE_URL || process.env.Neon_DB)?.trim();
->>>>>>> Stashed changes
 	if (!dbUrl) return null;
 
 	try {
@@ -218,8 +210,6 @@ export async function getNeonAuditLogs(limit = 50): Promise<Array<{
 	}));
 }
 
-<<<<<<< Updated upstream
-=======
 let pronunciationEvaluationSchemaReady: Promise<void> | null = null;
 
 async function executeNeonQueryOrThrow<T = any>(query: string): Promise<T[]> {
@@ -449,7 +439,6 @@ function ensureNeonStageContentSchema(): Promise<void> {
 	return stageContentSchemaReady;
 }
 
->>>>>>> Stashed changes
 /**
  * Fetches stage overrides from Neon DB
  */
@@ -458,13 +447,6 @@ export async function getNeonStageOverrides(): Promise<Record<string, {
 	category?: string;
 	description?: string;
 	isActive: boolean;
-<<<<<<< Updated upstream
-	updatedBy?: string;
-	updatedAt?: string;
-}>> {
-	const query = `
-		SELECT stage_id, title, category, description, is_active, updated_by, updated_at
-=======
 	contentJson?: string;
 	updatedBy?: string;
 	updatedAt?: string;
@@ -472,7 +454,6 @@ export async function getNeonStageOverrides(): Promise<Record<string, {
 	await ensureNeonStageContentSchema();
 	const query = `
 		SELECT stage_id, title, category, description, is_active, content_json, updated_by, updated_at
->>>>>>> Stashed changes
 		FROM stage_overrides;
 	`;
 
@@ -484,10 +465,7 @@ export async function getNeonStageOverrides(): Promise<Record<string, {
 			category: r.category,
 			description: r.description,
 			isActive: r.is_active ?? true,
-<<<<<<< Updated upstream
-=======
 			contentJson: r.content_json ?? undefined,
->>>>>>> Stashed changes
 			updatedBy: r.updated_by,
 			updatedAt: r.updated_at
 		};
@@ -504,51 +482,33 @@ export async function saveNeonStageOverride(params: {
 	category: string;
 	description: string;
 	isActive: boolean;
-<<<<<<< Updated upstream
-	updatedBy: string;
-}) {
-=======
 	contentJson?: string;
 	updatedBy: string;
 }) {
 	await ensureNeonStageContentSchema();
->>>>>>> Stashed changes
 	const safeId = params.stageId.replace(/'/g, "''");
 	const safeTitle = params.title.replace(/'/g, "''");
 	const safeCat = params.category.replace(/'/g, "''");
 	const safeDesc = params.description.replace(/'/g, "''");
-<<<<<<< Updated upstream
-=======
 	const safeContent = (params.contentJson ?? '').replace(/'/g, "''");
->>>>>>> Stashed changes
 	const safeUser = params.updatedBy.replace(/'/g, "''");
 	const isActive = params.isActive ? 'TRUE' : 'FALSE';
 
 	const query = `
-<<<<<<< Updated upstream
-		INSERT INTO stage_overrides (stage_id, title, category, description, is_active, updated_by, updated_at)
-		VALUES ('${safeId}', '${safeTitle}', '${safeCat}', '${safeDesc}', ${isActive}, '${safeUser}', CURRENT_TIMESTAMP)
-=======
 		INSERT INTO stage_overrides (stage_id, title, category, description, is_active, content_json, updated_by, updated_at)
 		VALUES ('${safeId}', '${safeTitle}', '${safeCat}', '${safeDesc}', ${isActive}, '${safeContent}', '${safeUser}', CURRENT_TIMESTAMP)
->>>>>>> Stashed changes
 		ON CONFLICT (stage_id) DO UPDATE SET
 			title = EXCLUDED.title,
 			category = EXCLUDED.category,
 			description = EXCLUDED.description,
 			is_active = EXCLUDED.is_active,
-<<<<<<< Updated upstream
-=======
 			content_json = EXCLUDED.content_json,
->>>>>>> Stashed changes
 			updated_by = EXCLUDED.updated_by,
 			updated_at = CURRENT_TIMESTAMP;
 	`;
 
 	return executeNeonQuery(query);
 }
-<<<<<<< Updated upstream
-=======
 
 /**
  * Records individual pretest/posttest word assessment to Neon DB (scores and metrics only - zero audio)
@@ -779,4 +739,3 @@ export async function recordNeonHanziWritingAttempt(params: {
 	`;
 	await executeNeonQuery(query);
 }
->>>>>>> Stashed changes

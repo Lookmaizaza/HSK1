@@ -170,3 +170,15 @@ export async function syncTursoToNeon(): Promise<{
 		return { success: false, synced: stats, error: err?.message || String(err) };
 	}
 }
+
+export async function purgeMockDataFromNeon(): Promise<void> {
+	try {
+		await executeNeon(`
+			DELETE FROM users WHERE username LIKE 'mock_learner_%';
+			DELETE FROM progress WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'mock_learner_%');
+			DELETE FROM pronunciation_evaluations WHERE user_id LIKE 'mock_%' OR user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE username LIKE 'mock_learner_%');
+		`);
+	} catch (e) {
+		console.warn('⚠️ [Neon] Failed to purge mock data:', e);
+	}
+}

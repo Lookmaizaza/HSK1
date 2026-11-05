@@ -133,52 +133,7 @@ async function callThaiLLM(messages: ReturnType<typeof buildMessages>, apiKey: s
 	return data?.choices?.[0]?.message?.content ?? '';
 }
 
-export const POST: RequestHandler = async ({ request, fetch }) => {
-	const body = (await request.json()) as ConverseRequest;
-	const scenario = findScenario(body.scenarioId);
-	if (!scenario) throw error(404, 'Unknown scenario');
-
-	const modelId = body.model ?? 'pathumma-thaillm';
-	const messages = buildMessages(scenario, body.turns ?? [], body.userSaid ?? '');
-
-	let content = '';
-	if (modelId === 'pathumma-thaillm') {
-		const key = env.THAILLM_API_KEY;
-		if (!key) throw error(401, 'THAILLM_API_KEY not configured');
-		content = await callThaiLLM(messages, key, fetch);
-	} else {
-		const key = body.apiKey?.trim() || env.OPENROUTER_API_KEY;
-		if (!key) throw error(401, 'OpenRouter API key required');
-		content = await callOpenRouter(messages, key, fetch);
-	}
-
-	let parsed: ConverseResponse;
-	try {
-		const jsonStr = extractJsonObject(content);
-		if (!jsonStr) throw new Error('no_json');
-		parsed = JSON.parse(jsonStr);
-		// Sanity defaults.
-		parsed.score = parsed.score ?? 0;
-		parsed.endScenario = parsed.endScenario ?? false;
-		parsed.feedback = parsed.feedback ?? null;
-		if (!parsed.reply?.hanzi) throw new Error('no_reply');
-	} catch {
-		// Hard fallback to the scenario's prewritten opener.
-		parsed = {
-			reply: {
-				hanzi: scenario.opener,
-				pinyin: scenario.openerPinyin,
-				translation: scenario.openerThai
-			},
-			feedback: null,
-			score: 0,
-			endScenario: false
-		};
-	}
-
-<<<<<<< Updated upstream
-	return json(parsed);
-=======
+function generateSmartDialogueResponse(scenario: any, turns: any[], userSaid: string = ''): ConverseResponse {
 	const text = userSaid.toLowerCase().trim();
 	const userTurnCount = turns.filter((t) => t.role === 'user').length;
 
@@ -447,7 +402,7 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 	}
 
 	// Smart Offline Dialogue Engine (No API key required!)
-	const smartResponse = generateSmartDialogueResponse(scenario, body.turns ?? [], body.userSaid);
+	const smartResponse = generateSmartDialogueResponse(scenario, body.turns ?? [], body.userSaid ?? '');
 	if (smartResponse.endScenario && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
 		recordChatbotSession({
 			userId: String(locals.user.id),
@@ -459,5 +414,4 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 		}).catch(() => {});
 	}
 	return json(smartResponse);
->>>>>>> Stashed changes
 };

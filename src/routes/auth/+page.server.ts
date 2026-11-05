@@ -14,16 +14,12 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = (event) => {
 	const { locals, url } = event;
-<<<<<<< Updated upstream
-	if (locals.user) throw redirect(303, '/');
-=======
 	if (locals.user) {
 		if (locals.user.isAdmin) {
 			throw redirect(303, '/admin');
 		}
 		throw redirect(303, '/');
 	}
->>>>>>> Stashed changes
 	const protection = checkLoginProtection(event, '');
 	return {
 		mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login',
@@ -83,28 +79,16 @@ export const actions: Actions = {
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
-<<<<<<< Updated upstream
-		// Brute-force check on IP
-		const protection = checkLoginProtection(event, username);
-		if (protection.isBlocked) {
-			return fail(429, {
-				error: `มีการพยายามเข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับคำขอชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
-=======
 		const protection = checkLoginProtection(event, username);
 		if (protection.isBlocked) {
 			return fail(429, {
 				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
->>>>>>> Stashed changes
 				username,
 				isBlocked: true,
 				remainingSeconds: protection.remainingSeconds
 			});
 		}
 
-<<<<<<< Updated upstream
-		if (username.length < 2) return fail(400, { error: 'Username must be at least 2 characters', username });
-		if (password.length < 6) return fail(400, { error: 'Password must be at least 6 characters', username });
-=======
 		if (username.length < 2) return fail(400, { error: 'ชื่อผู้ใช้ต้องมีอย่างน้อย 2 ตัวอักษร', username });
 		if (password.length < 6) return fail(400, { error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', username });
 
@@ -115,7 +99,6 @@ export const actions: Actions = {
 				username
 			});
 		}
->>>>>>> Stashed changes
 
 		try {
 			if (await findUserByUsername(username)) {
@@ -145,26 +128,16 @@ export const actions: Actions = {
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
-<<<<<<< Updated upstream
-		// 1. Check rate limit before performing DB queries or bcrypt check
-		const protection = checkLoginProtection(event, username);
-		if (protection.isBlocked) {
-			return fail(429, {
-				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับการเข้าสู่ระบบชั่วคราวเป็นเวลา 2 นาทีเพื่อความปลอดภัย (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
-=======
 		const protection = checkLoginProtection(event, username);
 		if (protection.isBlocked) {
 			return fail(429, {
 				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
->>>>>>> Stashed changes
 				username,
 				isBlocked: true,
 				remainingSeconds: protection.remainingSeconds
 			});
 		}
 
-<<<<<<< Updated upstream
-=======
 		// Strict guard: Admin accounts must not log in via learner auth page
 		if (isUserAdmin(username)) {
 			return fail(403, {
@@ -173,7 +146,6 @@ export const actions: Actions = {
 			});
 		}
 
->>>>>>> Stashed changes
 		try {
 			const row = await findUserByUsername(username);
 			if (!row || !verifyPassword(password, row.password_hash)) {
@@ -192,13 +164,7 @@ export const actions: Actions = {
 				});
 			}
 
-<<<<<<< Updated upstream
-			// Clear rate limit tracking on success
 			handleLoginSuccess(event, username);
-
-=======
-			handleLoginSuccess(event, username);
->>>>>>> Stashed changes
 			await mergeLocalProgress(row.id, local);
 			const session = await createSession(row.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);

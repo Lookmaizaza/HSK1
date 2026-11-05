@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { initProgress } from '$lib/progress.svelte';
 	import InAppBrowserGuard from '$lib/components/InAppBrowserGuard.svelte';
+	import AssessmentPromptModal from '$lib/components/AssessmentPromptModal.svelte';
 	import PdpaConsentModal from '$lib/components/PdpaConsentModal.svelte';
 
 	let { children, data } = $props();
@@ -33,12 +34,6 @@
 
 {@render children()}
 <InAppBrowserGuard />
-<<<<<<< Updated upstream
-{#if data.user && !data.user.isAdmin && data.user.role !== 'admin'}
-	<PdpaConsentModal user={data.user} />
-{/if}
-=======
->>>>>>> Stashed changes
 
 {#if data.showConsent && data.user && !data.user.isAdmin && !data.user.isImpersonated}
 	<PdpaConsentModal user={data.user} initiallyOpen={data.showConsent} />

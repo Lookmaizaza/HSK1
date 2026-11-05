@@ -1,9 +1,5 @@
 <script lang="ts">
-<<<<<<< Updated upstream
-	import { Flame, Heart, Zap, Settings as SettingsIcon, ArrowLeft, LogIn, LogOut, User, Shield, BarChart2 } from '@lucide/svelte';
-=======
 	import { ArrowLeft, Flame, Heart, Zap, Settings as SettingsIcon, LogIn, LogOut, User, Shield, BarChart2, Award, AlertCircle } from '@lucide/svelte';
->>>>>>> Stashed changes
 	import { Button } from '$lib/components/ui/button';
 	import { progress } from '$lib/progress.svelte';
 	import { apiKey } from '$lib/apiKey.svelte';
@@ -32,24 +28,11 @@
 		settingsOpen = false;
 	}
 
-	let { showBack = false, backHref = '/' }: { showBack?: boolean; backHref?: string } = $props();
 
 	const user = $derived(page.data.user);
 </script>
 
 <header class="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
-<<<<<<< Updated upstream
-	<div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-		<div class="flex items-center gap-2">
-			{#if showBack}
-				<Button variant="ghost" size="icon" href={backHref}>
-					<ArrowLeft class="size-5" />
-				</Button>
-			{/if}
-			<a href="/" class="flex items-center gap-2 font-extrabold tracking-tight">
-				<span class="flex size-9 items-center justify-center rounded-xl bg-primary text-xl text-primary-foreground">語</span>
-				<span class="text-lg">ปากจีน</span>
-=======
 	<div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
 		<div class="flex min-w-0 items-center gap-2 sm:gap-3">
 			{#if showBack}
@@ -68,7 +51,6 @@
 					</div>
 					<span class="hidden text-xs font-medium text-muted-foreground sm:block">ห้องเรียนภาษาจีน HSK</span>
 				</div>
->>>>>>> Stashed changes
 			</a>
 		</div>
 		<div class="flex items-center gap-3 text-sm font-semibold">

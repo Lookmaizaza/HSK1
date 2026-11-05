@@ -29,14 +29,11 @@ if (typeof setInterval !== 'undefined') {
 				attemptStore.delete(key);
 			}
 		}
-<<<<<<< Updated upstream
-=======
 		for (const [key, record] of requestWindows.entries()) {
 			if (now - record.windowStart > 60 * 60 * 1000) {
 				requestWindows.delete(key);
 			}
 		}
->>>>>>> Stashed changes
 	}, 5 * 60 * 1000).unref?.();
 }
 
@@ -146,8 +143,6 @@ export function resetRateLimit(key: string): void {
 	attemptStore.delete(key);
 }
 
-<<<<<<< Updated upstream
-=======
 interface RequestWindow {
 	count: number;
 	windowStart: number;
@@ -180,7 +175,6 @@ export function consumeRateLimit(
 	return { allowed: true, remainingSeconds: 0 };
 }
 
->>>>>>> Stashed changes
 /**
  * Comprehensive Login Brute-force Checker for RequestEvent
  * Checks both IP and username thresholds

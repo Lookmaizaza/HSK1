@@ -1,9 +1,4 @@
 import { json, error, type RequestEvent } from '@sveltejs/kit';
-<<<<<<< Updated upstream
-import { recordStageTelemetry } from '$lib/server/db';
-
-export const POST = async ({ locals, request }: RequestEvent) => {
-=======
 import { recordStageTelemetry, getUserConsent } from '$lib/server/db';
 import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 
@@ -18,7 +13,6 @@ export const POST = async (event: RequestEvent) => {
 		throw error(429, `Too many telemetry requests. Please retry in ${rate.remainingSeconds}s.`);
 	}
 
->>>>>>> Stashed changes
 	let body: any;
 	try {
 		body = await request.json();
@@ -40,8 +34,6 @@ export const POST = async (event: RequestEvent) => {
 	// Security: Only logged-in users get their real user ID recorded; unauthenticated clients cannot spoof arbitrary user IDs
 	const userId = locals.user ? locals.user.id : 'anonymous';
 
-<<<<<<< Updated upstream
-=======
 	if (locals.user) {
 		const consented = await getUserConsent(String(locals.user.id), 'pdpa_research_telemetry').catch(
 			() => false
@@ -51,7 +43,6 @@ export const POST = async (event: RequestEvent) => {
 		}
 	}
 
->>>>>>> Stashed changes
 	await recordStageTelemetry({
 		stageId: rawStageId,
 		userId,

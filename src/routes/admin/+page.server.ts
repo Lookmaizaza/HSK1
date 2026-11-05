@@ -14,12 +14,6 @@ import {
 	recordAuditLog,
 	getAuditLogs,
 	getPronunciationPhonemeErrorStats,
-<<<<<<< Updated upstream
-	getDiagnosticAnalytics,
-	getAdvancedLearningAnalytics
-} from '$lib/server/db';
-import { ALL_QUEST_STAGES } from '$lib/data/questLevels';
-=======
 	getParticipationTrend,
 	getPracticeBreakdown,
 	getDiagnosticAnalytics,
@@ -34,7 +28,6 @@ import { ALL_QUEST_STAGES } from '$lib/data/questLevels';
 	getSkillsAnalyticsSummary
 } from '$lib/server/db';
 import { ALL_QUEST_STAGES, parseQuestChallenges } from '$lib/data/questLevels';
->>>>>>> Stashed changes
 import { TRACKS, units } from '$lib/data/lessons';
 import { generateRemedialVocab } from '$lib/analytics/remedialEngine';
 import { HSK1_VOCAB_PRESETS } from '$lib/vocabLoader';
@@ -62,15 +55,11 @@ export const load: PageServerLoad = async (event) => {
 		? Number(url.searchParams.get('userId'))
 		: null;
 
-<<<<<<< Updated upstream
-	const [
-=======
 	await checkAndUpdateInterventionStatus().catch(() => 0);
 
 	const [
 		skillsAnalytics,
 		teacherInterventions,
->>>>>>> Stashed changes
 		users,
 		completions,
 		researchStats,
@@ -78,11 +67,6 @@ export const load: PageServerLoad = async (event) => {
 		stageOverrides,
 		auditLogs,
 		classPhonemeStats,
-<<<<<<< Updated upstream
-		selectedUserDetail,
-		advancedAnalytics
-	] = await Promise.all([
-=======
 		participationTrend,
 		practiceBreakdown,
 		selectedUserDetail,
@@ -93,7 +77,6 @@ export const load: PageServerLoad = async (event) => {
 	] = await Promise.all([
 		getSkillsAnalyticsSummary(),
 		getAllTeacherInterventions(),
->>>>>>> Stashed changes
 		listAllUsersWithProgress(),
 		listAllCompletions(),
 		getResearchExportStats(),
@@ -101,19 +84,6 @@ export const load: PageServerLoad = async (event) => {
 		getStageOverrides(),
 		getAuditLogs(40),
 		getPronunciationPhonemeErrorStats(),
-<<<<<<< Updated upstream
-		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
-		getAdvancedLearningAnalytics()
-	]);
-
-	// Calculate track totals
-	const trackTotals = Object.fromEntries(
-		TRACKS.map((t) => [
-			t.id,
-			units.filter((u) => u.track === t.id).reduce((sum, u) => sum + u.lessons.length, 0)
-		])
-	) as Record<string, number>;
-=======
 		getParticipationTrend(),
 		getPracticeBreakdown(),
 		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
@@ -135,7 +105,6 @@ export const load: PageServerLoad = async (event) => {
 		trackTotals[t.id] = trackUnits.reduce((sum, u) => sum + u.lessons.length, 0);
 		trackLessonsMap[t.id] = trackUnits.flatMap((u) => u.lessons.map((l) => `${u.id}/${l.id}`));
 	}
->>>>>>> Stashed changes
 
 	const completionsByUser = new Map<number, Record<string, number>>();
 	const completionsCountByStage: Record<string, number> = {};
@@ -187,21 +156,6 @@ export const load: PageServerLoad = async (event) => {
 			avgTimeSpentSec: 0
 		};
 
-<<<<<<< Updated upstream
-		// Also check lesson_completions from users as completions baseline
-		const completedUsersCount = users.filter((u) => {
-			const comp = completionsByUser.get(u.id);
-			return comp && comp[s.id] && comp[s.id] > 0;
-		}).length;
-
-		const totalPassed = Math.max(tel.totalPassed, completedUsersCount);
-		const totalAttempts = Math.max(tel.totalAttempts, totalPassed);
-		const totalViews = Math.max(tel.totalViews, totalAttempts);
-		const uniqueUsers = Math.max(tel.uniqueUsers, totalPassed);
-		const unopenedCount = Math.max(0, users.length - uniqueUsers);
-		const passRate = totalAttempts > 0 ? Math.round((totalPassed / totalAttempts) * 100) : 0;
-		const dropRate = totalAttempts > 0 ? Math.round((tel.totalFailed / totalAttempts) * 100) : 0;
-=======
 		// Check lesson_completions from users as completions baseline (O(1) lookup)
 		const completedUsersCount = completionsCountByStage[s.id] || 0;
 		const totalPassed = Math.max(tel.totalPassed, completedUsersCount);
@@ -212,7 +166,6 @@ export const load: PageServerLoad = async (event) => {
 		const unopenedCount = Math.max(0, learnerUsers.length - uniqueUsers);
 		const passRate = totalAttempts > 0 ? Math.min(100, Math.round((totalPassed / totalAttempts) * 100)) : 0;
 		const dropRate = totalAttempts > 0 ? Math.min(100, Math.round((tel.totalFailed / totalAttempts) * 100)) : 0;
->>>>>>> Stashed changes
 
 		return {
 			id: s.id,
@@ -226,8 +179,6 @@ export const load: PageServerLoad = async (event) => {
 			originalDescription: s.description,
 			isActive: override?.isActive ?? true,
 			hasOverride: !!override,
-<<<<<<< Updated upstream
-=======
 			challengeJson: JSON.stringify(
 				override?.contentJson
 					? parseQuestChallenges(override.contentJson) ?? s.challenges
@@ -235,7 +186,6 @@ export const load: PageServerLoad = async (event) => {
 				null,
 				2
 			),
->>>>>>> Stashed changes
 			wordsCount: s.words.length,
 			wordsList: s.words.map((w) => ({ hanzi: w.hanzi, pinyin: w.pinyin, thai: w.thai })),
 			stats: {
@@ -272,22 +222,12 @@ export const load: PageServerLoad = async (event) => {
 		} catch {}
 	}
 
-<<<<<<< Updated upstream
-	const learnerUsers = users.filter((u) => !u.isAdmin);
-	const adminUsers = users.filter((u) => u.isAdmin);
-
-=======
->>>>>>> Stashed changes
 	const stats = {
 		totalUsers: users.length,
 		totalLearners: learnerUsers.length,
 		totalAdmins: adminUsers.length,
 		totalXp: learnerUsers.reduce((s, u) => s + u.xp, 0),
-<<<<<<< Updated upstream
-		totalCompletions: completions.filter((c) => c.stars > 0 && !adminUsers.some((a) => a.id === c.userId)).length,
-=======
 		totalCompletions: completions.filter((c) => c.stars > 0 && !adminUserIdSet.has(c.userId)).length,
->>>>>>> Stashed changes
 		activeToday: usersWithDetail.filter((u) => !u.isAdmin && u.activeToday).length,
 		topStreak: learnerUsers.reduce((m, u) => Math.max(m, u.streak), 0),
 		avgGopScore: classPhonemeStats.avgGop,
@@ -297,11 +237,8 @@ export const load: PageServerLoad = async (event) => {
 
 	return {
 		needsLogin: false as const,
-<<<<<<< Updated upstream
-=======
 		skillsAnalytics,
 		teacherInterventions,
->>>>>>> Stashed changes
 		adminUsername: currentUser.username,
 		isImpersonating: !!locals.user?.isImpersonated,
 		impersonatedUserId: locals.user?.isImpersonated ? locals.user.id : null,
@@ -311,9 +248,6 @@ export const load: PageServerLoad = async (event) => {
 		stages: enrichedStages,
 		auditLogs,
 		classPhonemeStats,
-<<<<<<< Updated upstream
-		advancedAnalytics,
-=======
 		participationTrend,
 		practiceBreakdown,
 		learningAnalyticsByMode: {
@@ -322,7 +256,6 @@ export const load: PageServerLoad = async (event) => {
 		},
 		listeningPolicy,
 		pitchSensitivity,
->>>>>>> Stashed changes
 		selectedUserId,
 		selectedUserDetail,
 		selectedUserRemedials,
@@ -385,8 +318,6 @@ export const actions: Actions = {
 			});
 		}
 
-<<<<<<< Updated upstream
-=======
 		// 2. Authorization check: ensure user has admin role before issuing session
 		if (!isUserAdmin(row.username)) {
 			return fail(403, {
@@ -395,7 +326,6 @@ export const actions: Actions = {
 			});
 		}
 
->>>>>>> Stashed changes
 		// Clear rate limit tracking on successful authentication
 		handleLoginSuccess(event, username);
 
@@ -418,10 +348,6 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const targetUserId = String(data.get('targetUserId') ?? '').trim();
-<<<<<<< Updated upstream
-		if (!targetUserId) {
-			return fail(400, { error: 'Missing target user ID' });
-=======
 		const targetIdNum = Number(targetUserId);
 		if (!targetUserId || !targetIdNum || isNaN(targetIdNum)) {
 			return fail(400, { error: 'รหัสผู้ใช้งานไม่ถูกต้อง' });
@@ -439,7 +365,6 @@ export const actions: Actions = {
 			if (isUserAdmin(String(targetRow.username))) {
 				return fail(400, { error: 'ไม่สามารถสวมบทบาทบัญชีผู้ดูแลระบบ (Admin) ได้' });
 			}
->>>>>>> Stashed changes
 		}
 
 		cookies.set('impersonate_user_id', targetUserId, {
@@ -488,14 +413,6 @@ export const actions: Actions = {
 		const title = String(data.get('title') ?? '').trim();
 		const category = String(data.get('category') ?? '').trim();
 		const description = String(data.get('description') ?? '').trim();
-<<<<<<< Updated upstream
-		const isActive = data.get('isActive') === 'true' || data.get('isActive') === '1' || data.get('isActive') === 'on';
-
-		if (!stageId || !title) {
-			return fail(400, { error: 'ต้องระบุรหัสด่านและชื่อบทเรียน' });
-		}
-
-=======
 		const challengeJson = String(data.get('challengeJson') ?? '');
 		const isActive = data.get('isActive') === 'true' || data.get('isActive') === '1' || data.get('isActive') === 'on';
 
@@ -511,25 +428,19 @@ export const actions: Actions = {
 			});
 		}
 
->>>>>>> Stashed changes
 		await saveStageOverride({
 			stageId,
 			title,
 			category: category || 'ทั่วไป',
 			description,
 			isActive,
-<<<<<<< Updated upstream
-=======
 			contentJson: JSON.stringify(challenges),
->>>>>>> Stashed changes
 			updatedBy: admin.username
 		});
 
 		return { success: true, savedStageId: stageId };
 	},
 
-<<<<<<< Updated upstream
-=======
 	toggleStageActive: async ({ request, locals }) => {
 		const admin = locals.realAdmin || locals.user;
 		if (!admin?.isAdmin) {
@@ -557,7 +468,6 @@ export const actions: Actions = {
 		return { success: true, toggledStageId: stageId, isActive };
 	},
 
->>>>>>> Stashed changes
 	resetStageOverride: async ({ request, locals }) => {
 		const admin = locals.realAdmin || locals.user;
 		if (!admin?.isAdmin) {
@@ -572,8 +482,6 @@ export const actions: Actions = {
 
 		await resetStageOverride(stageId, admin.username);
 		return { success: true, resetStageId: stageId };
-<<<<<<< Updated upstream
-=======
 	},
 
 	saveListeningPolicy: async ({ request, locals }) => {
@@ -708,6 +616,5 @@ export const actions: Actions = {
 		});
 
 		return { success: true, deleted: delUsers.rowsAffected ?? 100 };
->>>>>>> Stashed changes
 	}
 };
