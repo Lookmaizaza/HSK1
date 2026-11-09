@@ -556,6 +556,8 @@
 			const telemetryPayload = {
 				eventType: 'pronunciation_evaluation',
 				timestamp: new Date().toISOString(),
+				practiceMode: 'word' as const,
+				stageId: null,
 				word: {
 					id: selectedPreset.id,
 					hanzi: selectedPreset.hanzi,

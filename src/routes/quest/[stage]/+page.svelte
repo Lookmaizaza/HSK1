@@ -23,8 +23,44 @@
 		type SentenceVerificationResult
 	} from '$lib/speech';
 
+	let { data } = $props();
+
 	const stageId = $page.params.stage || '';
-	const stageData: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
+	const baseStage: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
+	const stageData = $derived(
+		baseStage
+			? ({
+					...baseStage,
+					title: data?.stageTitle || baseStage.title,
+					description: data?.stageDescription || baseStage.description,
+					challenges: data?.challenges || baseStage.challenges
+			  } as QuestStage)
+			: undefined
+	);
+
+	let stageStartTime = Date.now();
+	let listenCount = 0;
+	let hintsUsed = 0;
+	let retriesCount = 0;
+	let stageCompleted = false;
+
+	function sendStageTelemetry(eventType: 'view' | 'attempt' | 'pass' | 'fail' | 'hint' | 'listen', score = 0) {
+		if (!stageId || typeof window === 'undefined') return;
+		const timeSpentMs = Date.now() - stageStartTime;
+		fetch('/api/v1/telemetry/stage-event', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				stageId,
+				eventType,
+				score,
+				timeSpentMs,
+				retriesCount,
+				listenCount,
+				hintsUsed
+			})
+		}).catch(() => {});
+	}
 
 	let currentIndex = $state(0);
 	let isRecording = $state(false);
@@ -62,11 +98,15 @@
 		if (!stageData) {
 			goto('/');
 		} else {
+			sendStageTelemetry('view');
 			playAudioIfListenSpeak(stageData.challenges[0]);
 		}
 	});
 
 	onDestroy(() => {
+		if (!stageCompleted) {
+			sendStageTelemetry('fail');
+		}
 		clearAudioTimer();
 		stopRecording();
 	});
@@ -76,10 +116,16 @@
 
 	function toggleHint() {
 		showHint = !showHint;
+		if (showHint) {
+			hintsUsed++;
+			sendStageTelemetry('hint');
+		}
 	}
 
 	function playAudio() {
 		clearAudioTimer();
+		listenCount++;
+		sendStageTelemetry('listen');
 		if (currentChallenge) {
 			if (currentChallenge.type === 'sentence_build' && currentChallenge.sentenceHanzi) {
 				speak(currentChallenge.sentenceHanzi);
@@ -138,6 +184,8 @@
 	}
 
 	async function startRecording() {
+		retriesCount++;
+		sendStageTelemetry('attempt');
 		clearAudioTimer();
 		if (typeof window !== 'undefined' && window.speechSynthesis) {
 			try {
@@ -338,6 +386,8 @@
 				const telemetryPayload = {
 					eventType: 'pronunciation_evaluation',
 					timestamp: new Date().toISOString(),
+					practiceMode: 'stage' as const,
+					stageId,
 					word: {
 						id: currentChallenge.word.hanzi,
 						hanzi: currentChallenge.word.hanzi,
@@ -452,6 +502,8 @@
 	}
 
 	function triggerVictory() {
+		stageCompleted = true;
+		sendStageTelemetry('pass', 100);
 		phase = 'victory';
 		progress.addXp(25);
 		if (stageId) progress.completeLesson(stageId, 3);

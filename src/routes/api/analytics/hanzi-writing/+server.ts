@@ -41,6 +41,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		throw error(400, 'Invalid word, pinyin, or attempts.');
 	}
 
+	// Do not record writing attempts from admin accounts to keep learner analytics clean
+	if (locals.user?.isAdmin || locals.user?.isImpersonated) {
+		return json({ success: true, ignored: true, reason: 'admin_account' });
+	}
+
 	const userId = locals.user ? String(locals.user.id) : 'anonymous';
 	for (const item of attempts) {
 		if (!isRecord(item)) throw error(400, 'Invalid attempt entry.');
@@ -80,7 +85,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 		const strokeResults = writingDetails.strokeResults;
 		const strokeNumbers = new Set<number>();
-		const validatedStrokeResults: HanziWritingAttemptRecord['writingDetails']['strokeResults'] = [];
+		const validatedStrokeResults: NonNullable<HanziWritingAttemptRecord['writingDetails']>['strokeResults'] = [];
 		let totalStrokeMistakes = 0;
 		let completedStrokes = 0;
 		for (const result of strokeResults) {
@@ -112,7 +117,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		}
 
 		let previousTotalMistakes = 0;
-		const validatedMistakeEvents: HanziWritingAttemptRecord['writingDetails']['mistakeEvents'] = [];
+		const validatedMistakeEvents: NonNullable<HanziWritingAttemptRecord['writingDetails']>['mistakeEvents'] = [];
 		for (const event of writingDetails.mistakeEvents) {
 			if (
 				!isRecord(event) ||

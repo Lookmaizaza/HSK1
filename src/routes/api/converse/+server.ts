@@ -5,6 +5,7 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { findScenario } from '$lib/data/scenarios';
+import { recordChatbotSession } from '$lib/server/db';
 import type { RequestHandler } from './$types';
 
 type Turn = {
@@ -360,7 +361,7 @@ function generateSmartDialogueResponse(
 	}
 }
 
-export const POST: RequestHandler = async ({ request, fetch }) => {
+export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 	const body = (await request.json()) as ConverseRequest;
 	const scenario = findScenario(body.scenarioId);
 	if (!scenario) throw error(404, 'Unknown scenario');
@@ -400,6 +401,16 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 					parsed.score = parsed.score ?? 85;
 					parsed.endScenario = parsed.endScenario ?? false;
 					parsed.feedback = parsed.feedback ?? null;
+					if (parsed.endScenario && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
+						recordChatbotSession({
+							userId: String(locals.user.id),
+							scenarioId: scenario.id,
+							scenarioTitle: scenario.title,
+							turnsCount: (body.turns?.length || 0) + 1,
+							avgScore: parsed.score,
+							totalXp: Math.round(parsed.score / 10)
+						}).catch(() => {});
+					}
 					return json(parsed);
 				}
 			}
@@ -410,5 +421,15 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 
 	// Smart Offline Dialogue Engine (No API key required!)
 	const smartResponse = generateSmartDialogueResponse(scenario, body.turns ?? [], body.userSaid);
+	if (smartResponse.endScenario && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
+		recordChatbotSession({
+			userId: String(locals.user.id),
+			scenarioId: scenario.id,
+			scenarioTitle: scenario.title,
+			turnsCount: (body.turns?.length || 0) + 1,
+			avgScore: smartResponse.score,
+			totalXp: Math.round(smartResponse.score / 10)
+		}).catch(() => {});
+	}
 	return json(smartResponse);
 };

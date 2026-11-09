@@ -7,7 +7,7 @@
 	import { Award, Sparkles, X, ChevronRight, Clock, ShieldCheck, CheckCircle2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 
-	let { user = null }: { user?: { id: number; username: string } | null } = $props();
+	let { user = null }: { user?: { id: number; username: string; isAdmin?: boolean; isImpersonated?: boolean } | null } = $props();
 
 	let isOpen = $state(false);
 	let promptType = $state<'pre' | 'mid' | 'post'>('pre');
@@ -22,14 +22,19 @@
 
 	$effect(() => {
 		// Re-check when user or progress changes
-		if (user && user.id) {
+		if (user && user.id && !user.isAdmin && !user.isImpersonated) {
 			checkAssessmentEligibility();
+		} else {
+			isOpen = false;
 		}
 	});
 
 	async function checkAssessmentEligibility() {
-		// Don't show modal if already on the assessment page itself or in-app browser
-		if (!user || !user.id || typeof window === 'undefined') return;
+		// Strict guard: Admin accounts and impersonation mode MUST NEVER see assessment prompts
+		if (!user || !user.id || user.isAdmin || user.isImpersonated || typeof window === 'undefined') {
+			isOpen = false;
+			return;
+		}
 		if (window.location.pathname.startsWith('/assessment')) {
 			isOpen = false;
 			return;
@@ -122,7 +127,7 @@
 			<!-- Close / Snooze button -->
 			<button 
 				onclick={snoozeModal}
-				class="absolute top-4 right-4 text-muted-foreground hover:text-foreground size-8 rounded-full flex items-center justify-center hover:bg-muted transition"
+				class="absolute top-4 right-4 text-muted-foreground hover:text-foreground size-8 rounded-full flex items-center justify-center hover:bg-muted transition cursor-pointer"
 				aria-label="ปิด"
 			>
 				<X class="size-4" />
@@ -138,7 +143,7 @@
 				{promptBadge}
 			</span>
 
-			<h2 class="text-xl sm:text-2xl font-black tracking-tight mb-2">
+			<h2 class="text-xl sm:text-2xl font-black tracking-tight mb-2 text-foreground">
 				{promptTitle}
 			</h2>
 
@@ -166,7 +171,7 @@
 			<div class="flex flex-col gap-2.5">
 				<Button 
 					onclick={startTest}
-					class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-6 rounded-2xl shadow-lg shadow-emerald-600/20 text-sm gap-2"
+					class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-6 rounded-2xl shadow-lg shadow-emerald-600/20 text-sm gap-2 cursor-pointer"
 				>
 					<Sparkles class="size-4" />
 					เริ่มประเมินทักษะเลย
@@ -176,7 +181,7 @@
 				<Button 
 					variant="ghost" 
 					onclick={snoozeModal}
-					class="w-full text-xs text-muted-foreground hover:text-foreground font-semibold"
+					class="w-full text-xs text-muted-foreground hover:text-foreground font-semibold cursor-pointer"
 				>
 					ไว้ทำคราวหน้า (ข้ามไปก่อน)
 				</Button>

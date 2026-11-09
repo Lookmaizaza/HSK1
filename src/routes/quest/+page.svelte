@@ -37,7 +37,19 @@
 	let { data } = $props();
 
 	let selectedLevel = $state<number>(1);
-	const filteredStages = $derived(ALL_QUEST_STAGES.filter((s) => s.hskLevel === selectedLevel));
+	const stageOverrides = $derived((data.stageOverrides || {}) as Record<string, any>);
+	const filteredStages = $derived(
+		ALL_QUEST_STAGES.filter((s) => s.hskLevel === selectedLevel).map((s) => {
+			const ov = stageOverrides[s.id];
+			if (!ov) return s;
+			return {
+				...s,
+				title: ov.title || s.title,
+				description: ov.description || s.description,
+				isActive: ov.isActive !== false
+			};
+		}).filter((s: any) => s.isActive !== false)
+	);
 
 	// จับคู่รูปไอคอนตามหมวดหมู่เนื้อหาของแต่ละด่าน
 	function getStageIcon(stage: QuestStage) {

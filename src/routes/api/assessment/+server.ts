@@ -3,8 +3,13 @@ import type { RequestHandler } from './$types';
 import { 
 	recordAssessmentWord, 
 	saveAssessmentSummary, 
-	getUserAssessmentStatus 
+	getUserAssessmentStatus,
+	recordPronunciationEvaluation,
+	recordPhonemeEvaluations,
+	syncAllAssessmentsToEvaluations,
+	isUserAdmin
 } from '$lib/server/db';
+import { extractTargetPhonemes } from '$lib/pronunciation';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	const user = locals.user;
@@ -57,6 +62,56 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				perOverall: perOverall ?? 0
 			});
 
+			// If not admin, mirror evaluation into main pronunciation & phoneme tables for analytics
+			if (!user.isAdmin && !isUserAdmin(user.username)) {
+				try {
+					const isToneMatch = Number(targetTone) === Number(detectedTone);
+					const phonemeDetails = [{
+						phoneme: wordId,
+						score: toneScore ?? 0,
+						isMatch: isToneMatch,
+						targetTone: Number(targetTone),
+						detectedTone: Number(detectedTone)
+					}];
+
+					await recordPronunciationEvaluation({
+						user_id: String(user.id),
+						word_id: String(wordId),
+						pinyin: String(pinyin),
+						practice_mode: 'word',
+						stage_id: null,
+						attempt_number: 1,
+						audio_duration_sec: 1.0,
+						scores: {
+							gop_overall: Number(gopOverall ?? toneScore ?? 0),
+							per_overall: Number(perOverall ?? (isToneMatch ? 0 : 25)),
+							tone_score: Number(toneScore ?? 0),
+							phoneme_details: phonemeDetails
+						}
+					});
+
+					const targetPhonemes = extractTargetPhonemes(String(pinyin || ''));
+					if (targetPhonemes.length > 0) {
+						const phonemeRecords = targetPhonemes.map((pt) => ({
+							userId: String(user.id),
+							wordId: String(wordId),
+							pinyin: String(pinyin),
+							phoneme: pt.phoneme,
+							phonemeType: pt.type,
+							gop: Number(gopOverall ?? toneScore ?? 0),
+							status: isToneMatch ? 'correct' : 'substitution',
+							target: pt.phoneme,
+							recognized: isToneMatch ? pt.phoneme : '?',
+							practiceMode: 'word' as const,
+							stageId: undefined
+						}));
+						await recordPhonemeEvaluations(phonemeRecords);
+					}
+				} catch (evalErr) {
+					console.warn('⚠️ [Pretest Assessment] Failed to mirror word to pronunciation analytics:', evalErr);
+				}
+			}
+
 			return json({ success: true });
 		}
 
@@ -72,6 +127,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				avgGop: avgGop ?? 0,
 				avgPer: avgPer ?? 0
 			});
+
+			// If not admin, backfill and ensure all words from this assessment are in pronunciation & phoneme tables
+			if (!user.isAdmin && !isUserAdmin(user.username)) {
+				try {
+					await syncAllAssessmentsToEvaluations(String(user.id));
+				} catch (syncErr) {
+					console.warn('⚠️ [Pretest Assessment] Failed to sync assessments to evaluations on finish:', syncErr);
+				}
+			}
 
 			return json({ success: true });
 		}

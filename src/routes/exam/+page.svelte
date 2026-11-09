@@ -257,6 +257,31 @@
 		} else {
 			progress.addXp(30);
 		}
+
+		// Send exam attempt to Backend Learning Analytics API
+		try {
+			const totalTime = (currentExam?.durationMinutes || 35) * 60;
+			const spent = Math.max(0, totalTime - remainingSeconds);
+			fetch('/api/exam', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					hskLevel: selectedLevel,
+					examCode: currentExam?.id || 'H10901',
+					totalScore: examResult.totalScore,
+					maxScore: examResult.maxScore,
+					passScore: examResult.passScore,
+					isPassed: examResult.isPassed,
+					listeningScore: examResult.listeningScore,
+					readingScore: examResult.readingScore,
+					writingScore: examResult.writingScore,
+					correctCount: examResult.correctCount,
+					wrongCount: examResult.wrongCount,
+					timeSpentSec: spent
+				})
+			}).catch(() => {});
+		} catch {}
+
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 

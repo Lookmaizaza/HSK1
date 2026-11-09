@@ -37,13 +37,9 @@
 	// Scientific CAPT threshold: minimum 20 words required for reliable acoustic diagnostics
 	const MIN_DIAGNOSTIC_WORDS = 20;
 
-	// Total unique practiced words count across all levels
+	// Strict Pre-test requirement: Must complete the 20-word diagnostic baseline pre-test
 	const totalPracticedWords = $derived(vocabOverview?.practicedWords ?? 0);
-	const isDiagnosticUnlocked = $derived(totalPracticedWords >= MIN_DIAGNOSTIC_WORDS);
-	const wordsRemaining = $derived(Math.max(0, MIN_DIAGNOSTIC_WORDS - totalPracticedWords));
-	const unlockProgressPercent = $derived(
-		Math.min(100, Math.round((totalPracticedWords / MIN_DIAGNOSTIC_WORDS) * 100))
-	);
+	const isDiagnosticUnlocked = $derived(Boolean(data.hasPre));
 
 	// Selected Level Tab: 'all' | 1 | 2 | 3
 	let selectedLevel = $state<'all' | 1 | 2 | 3>('all');
@@ -149,22 +145,9 @@
 <AppHeader />
 
 <main class="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
-	<!-- 1. COMPACT HEADER WITH FAST ACTIONS -->
-	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b">
-		<div class="space-y-1">
-			<div class="flex items-center gap-2">
-				<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20 shadow-xs">
-					<Sparkles class="size-3.5" />
-					HSK 1 · 2 · 3
-				</span>
-				<span class="text-xs text-muted-foreground font-semibold">
-					{vocabOverview.totalWords.toLocaleString()} คำศัพท์
-				</span>
-			</div>
-			<h1 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-				แดชบอร์ดการออกเสียง
-			</h1>
-		</div>
+	<!-- 1. ANALYTICS HERO -->
+	<section class="relative isolate overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-sm sm:p-7">
+		<div class="pointer-events-none absolute inset-y-0 right-0 -z-10 w-1/3 bg-gradient-to-l from-amber-400/10 to-transparent"></div>
 
 		<div class="flex items-center gap-2">
 			<a
@@ -176,13 +159,48 @@
 			</a>
 			<a
 				href="/pitch"
-				class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-emerald-600/20 transition active:scale-95"
+				class="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-primary/20 transition active:scale-95"
 			>
 				<Mic class="size-3.5" />
 				<span>ห้องฝึกพูดสด</span>
 			</a>
 		</div>
-	</div>
+	</section>
+
+		<!-- ข้อเสนอแนะและการมอบหมายจากผู้สอน (Teacher Interventions & Feedback) -->
+	{#if data.teacherInterventions && data.teacherInterventions.length > 0}
+		<section class="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-2 font-black text-amber-900 dark:text-amber-200 text-sm">
+					<span>💡 ข้อเสนอแนะจากผู้สอนถึงคุณ</span>
+				</div>
+				<span class="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-100">
+					{data.teacherInterventions.length} ข้อความ
+				</span>
+			</div>
+			<div class="space-y-2 text-xs">
+				{#each data.teacherInterventions as item (item.id)}
+					<div class="rounded-2xl bg-card border border-amber-500/20 p-3.5 space-y-1.5">
+						<div class="font-extrabold text-foreground flex items-center justify-between">
+							<span>{item.title}</span>
+							<span class="text-[10px] text-muted-foreground font-mono">จาก @{item.assignedBy}</span>
+						</div>
+						<p class="text-muted-foreground leading-relaxed">{item.message}</p>
+						{#if item.remedialWords?.length}
+							<div class="flex flex-wrap items-center gap-1.5 pt-1">
+								<span class="text-[11px] font-bold text-amber-700 dark:text-amber-300">คำศัพท์ที่ครูแนะนำให้ฝึกซ้ำ:</span>
+								{#each item.remedialWords as word (word)}
+									<span class="rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 font-extrabold px-2 py-0.5 text-xs">
+										{word}
+									</span>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/if}
 
 	<!-- 2. HSK LEVEL SELECTOR TABS (HSK 1, HSK 2, HSK 3 & ทุกระดับ) -->
 	<section class="space-y-2">
@@ -279,92 +297,29 @@
 		</div>
 	</section>
 
-	<!-- 3. ACOUSTIC DATA COLLECTION PROGRESS (20 WORDS MINIMUM) -->
+	<!-- 3. ACOUSTIC DATA COLLECTION PROGRESS (PRETEST GATE) -->
 	{#if !isDiagnosticUnlocked}
 		<section class="rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-background p-6 sm:p-8 space-y-5 shadow-sm">
 			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div class="space-y-1.5">
+				<div class="space-y-2">
 					<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-primary/15 text-primary border border-primary/25">
 						<Lock class="size-3.5" />
-						<span>ต้องการ 20 คำเพื่อปลดล็อกแดชบอร์ด</span>
+						<span>ปลดล็อกแดชบอร์ดการวิเคราะห์</span>
 					</div>
 					<h2 class="text-xl sm:text-2xl font-black text-foreground">
-						ฝึกไปแล้ว {totalPracticedWords} / {MIN_DIAGNOSTIC_WORDS} คำ
+						ทำแบบทดสอบก่อนเรียน (Pre-test 20 คำ) เพื่อเปิดระบบผลวิเคราะห์
 					</h2>
 					<p class="text-xs sm:text-sm text-muted-foreground max-w-xl leading-relaxed">
-						ลองฝึกออกเสียงให้ครบ 20 คำก่อนนะ ระบบถึงจะเริ่มวิเคราะห์ระดับเสียงวรรณยุกต์ และสรุปวิธีวางลิ้นกับรูปปากที่เหมาะกับคุณให้แบบเจาะลึก
+						ใช้เวลาเพียง 2-3 นาทีในการออกเสียงคำศัพท์พื้นฐาน 20 คำ ระบบจะประมวลผลเกณฑ์วัดระดับสัทศาสตร์เริ่มต้น (Baseline) จุดแข็ง-จุดอ่อน วรรณยุกต์ และโฟนีมให้คุณทันที 100%
 					</p>
 				</div>
 				<div class="sm:text-right shrink-0">
-					<span class="text-4xl font-black font-mono text-primary">
-						{unlockProgressPercent}%
-					</span>
-					<div class="text-xs font-bold text-muted-foreground mt-0.5">
-						เหลืออีก {wordsRemaining} คำจะปลดล็อกแดชบอร์ด
-					</div>
-				</div>
-			</div>
-
-			<!-- Visual Progress Bar -->
-			<div class="space-y-1">
-				<div class="h-3 w-full rounded-full bg-muted overflow-hidden">
-					<div
-						class="h-full rounded-full bg-primary transition-all duration-700 ease-out"
-						style="width: {unlockProgressPercent}%"
-					></div>
-				</div>
-				<div class="flex justify-between text-[11px] font-semibold text-muted-foreground">
-					<span>0 คำ</span>
-					<span class="text-primary font-bold">เป้าหมาย 20 คำ</span>
-				</div>
-			</div>
-
-			<!-- Quick Launch into HSK 1, HSK 2, HSK 3 -->
-			<div class="pt-2 border-t">
-				<div class="text-xs font-bold text-muted-foreground mb-3">
-					เลือกระดับเพื่อเริ่มฝึกออกเสียงสะสมคำศัพท์:
-				</div>
-				<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 					<a
-						href="/pitch"
-						class="rounded-2xl border bg-background hover:bg-muted/60 p-4 transition active:scale-98 flex items-center justify-between group shadow-2xs"
+						href="/assessment?type=pre"
+						class="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3.5 text-sm font-extrabold shadow-md hover:shadow-lg transition active:scale-98 cursor-pointer"
 					>
-						<div>
-							<div class="flex items-center gap-1.5 font-bold text-sm text-foreground">
-								<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">HSK 1</span>
-								<span>ระดับพื้นฐาน</span>
-							</div>
-							<div class="text-xs text-muted-foreground mt-1">300 คำศัพท์ (คำสั้นๆ จำง่าย)</div>
-						</div>
-						<Mic class="size-4 text-muted-foreground group-hover:text-emerald-600 transition-colors" />
-					</a>
-
-					<a
-						href="/pitch"
-						class="rounded-2xl border bg-background hover:bg-muted/60 p-4 transition active:scale-98 flex items-center justify-between group shadow-2xs"
-					>
-						<div>
-							<div class="flex items-center gap-1.5 font-bold text-sm text-foreground">
-								<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400">HSK 2</span>
-								<span>ระดับต้น</span>
-							</div>
-							<div class="text-xs text-muted-foreground mt-1">200 คำศัพท์ (ประโยคสนทนาทั่วไป)</div>
-						</div>
-						<Mic class="size-4 text-muted-foreground group-hover:text-blue-600 transition-colors" />
-					</a>
-
-					<a
-						href="/pitch"
-						class="rounded-2xl border bg-background hover:bg-muted/60 p-4 transition active:scale-98 flex items-center justify-between group shadow-2xs"
-					>
-						<div>
-							<div class="flex items-center gap-1.5 font-bold text-sm text-foreground">
-								<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-500/15 text-purple-600 dark:text-purple-400">HSK 3</span>
-								<span>ระดับกลาง</span>
-							</div>
-							<div class="text-xs text-muted-foreground mt-1">500 คำศัพท์ (สื่อสารคล่องขึ้น)</div>
-						</div>
-						<Mic class="size-4 text-muted-foreground group-hover:text-purple-600 transition-colors" />
+						<Sparkles class="size-4" />
+						<span>เริ่มทำแบบทดสอบก่อนเรียน (20 คำ) →</span>
 					</a>
 				</div>
 			</div>
@@ -373,7 +328,7 @@
 		<!-- 4. UNLOCKED FULL ACOUSTIC & PHONETIC DIAGNOSTIC SUITE -->
 		<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
 			<Unlock class="size-3.5" />
-			<span>ปลดล็อกแดชบอร์ดแล้ว (ฝึกสะสม {totalPracticedWords} คำ) · {activeLevelTitle}</span>
+			<span>ปลดล็อกผลวิเคราะห์เสียงแล้วจากการทำแบบประเมินก่อนเรียน (Pre-test) · {activeLevelTitle}</span>
 		</div>
 
 		<!-- 4.1 HERO VISUAL SCORE GAUGE & KEY METRICS -->

@@ -6,9 +6,11 @@ import {
 import {
 	recordPronunciationEvaluation,
 	recordPhonemeEvaluations,
-	recordLearningEvent
+	recordLearningEvent,
+	getUserConsent
 } from '$lib/server/db';
 import { extractTargetPhonemes } from '$lib/pronunciation';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 
 // GET /api/v1/telemetry/score-ingest (Health / Schema Check)
 export const GET = async () => {
@@ -25,7 +27,17 @@ export const GET = async () => {
 };
 
 // POST /api/v1/telemetry/score-ingest
-export const POST = async ({ locals, request, url }: RequestEvent) => {
+export const POST = async (event: RequestEvent) => {
+	const { locals, request, url } = event;
+	const rate = consumeRateLimit(
+		`telemetry:${locals.user ? `u${locals.user.id}` : extractClientIp(event)}`,
+		300,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many telemetry requests. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
 	let body: Partial<PronunciationAssessmentTelemetry>;
 	try {
 		body = await request.json();
@@ -37,14 +49,25 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 		throw error(400, 'Missing required fields: word, behavior, or assessment.');
 	}
 
-	const userId = locals.user?.id ? String(locals.user.id) : (body.userId ? String(body.userId) : undefined);
-	const username = locals.user?.username || body.username || (userId ? `Learner_${userId}` : 'Guest_Learner');
+	// Identity comes only from the session; never trust a client-supplied userId.
+	const userId = locals.user?.id ? String(locals.user.id) : undefined;
+	const username = locals.user?.username || 'Guest_Learner';
+	const practiceMode: 'stage' | 'word' | undefined =
+		body.practiceMode === 'stage' || body.practiceMode === 'word' ? body.practiceMode : undefined;
+	const stageId = typeof body.stageId === 'string' && /^[a-zA-Z0-9_-]{2,64}$/.test(body.stageId)
+		? body.stageId
+		: undefined;
+	if (practiceMode === 'stage' && !stageId) {
+		throw error(400, 'Stage practice telemetry must include a valid stageId.');
+	}
 
 	const telemetry: PronunciationAssessmentTelemetry = {
 		eventType: 'pronunciation_evaluation',
 		timestamp: body.timestamp || new Date().toISOString(),
 		userId,
 		username,
+		practiceMode,
+		stageId,
 		word: {
 			id: body.word.id || body.word.hanzi,
 			hanzi: body.word.hanzi,
@@ -81,8 +104,11 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 		learnerName: username
 	});
 
-	// If authenticated user or userId provided, persist records across telemetry tables
-	if (userId) {
+	// Persist only for logged-in learners who granted research telemetry consent.
+	const consented = userId
+		? await getUserConsent(userId, 'pdpa_research_telemetry').catch(() => false)
+		: false;
+	if (userId && consented) {
 		try {
 			const phonemeDetails = telemetry.assessment.syllableResults.map((s) => ({
 				phoneme: s.hanzi,
@@ -96,6 +122,8 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 				user_id: String(userId),
 				word_id: telemetry.word.hanzi,
 				pinyin: telemetry.word.pinyin,
+				practice_mode: practiceMode ?? 'unknown',
+				stage_id: stageId ?? null,
 				attempt_number: 1,
 				audio_duration_sec: Math.round((telemetry.assessment.acoustics.totalDurationMs / 1000) * 100) / 100,
 				scores: {
@@ -118,7 +146,9 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 					gop: telemetry.assessment.overallScore,
 					status: telemetry.assessment.isPassed ? 'correct' : 'substitution',
 					target: pt.phoneme,
-					recognized: telemetry.assessment.isPassed ? pt.phoneme : (telemetry.assessment.recognizedWord || '?')
+					recognized: telemetry.assessment.isPassed ? pt.phoneme : (telemetry.assessment.recognizedWord || '?'),
+					practiceMode: (practiceMode ?? 'unknown') as 'stage' | 'word' | 'unknown',
+					stageId: stageId ?? undefined
 				}));
 				await recordPhonemeEvaluations(phonemeRecords);
 			}
@@ -130,7 +160,9 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 					eventType: 'pronounced',
 					wordId: telemetry.word.hanzi,
 					statementId: xapiStatements.assessmentStatement.id,
-					xapiStatement: xapiStatements.assessmentStatement
+					xapiStatement: xapiStatements.assessmentStatement,
+					practiceMode: practiceMode ?? 'unknown',
+					stageId: stageId ?? null
 				});
 			}
 
@@ -140,7 +172,9 @@ export const POST = async ({ locals, request, url }: RequestEvent) => {
 					eventType: 'listened_to_example',
 					wordId: telemetry.word.hanzi,
 					statementId: xapiStatements.listeningStatement.id,
-					xapiStatement: xapiStatements.listeningStatement
+					xapiStatement: xapiStatements.listeningStatement,
+					practiceMode: practiceMode ?? 'unknown',
+					stageId: stageId ?? null
 				});
 			}
 		} catch (dbErr) {

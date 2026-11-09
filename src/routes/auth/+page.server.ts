@@ -6,13 +6,26 @@ import {
 	verifyPassword,
 	getProgress,
 	completeLesson,
-	addXp
+	addXp,
+	isUserAdmin
 } from '$lib/server/db';
+import { checkLoginProtection, handleLoginFailure, handleLoginSuccess } from '$lib/server/rateLimit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ locals, url }) => {
-	if (locals.user) throw redirect(303, '/');
-	return { mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login' };
+export const load: PageServerLoad = (event) => {
+	const { locals, url } = event;
+	if (locals.user) {
+		if (locals.user.isAdmin) {
+			throw redirect(303, '/admin');
+		}
+		throw redirect(303, '/');
+	}
+	const protection = checkLoginProtection(event, '');
+	return {
+		mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login',
+		isBlocked: protection.isBlocked,
+		remainingSeconds: protection.remainingSeconds
+	};
 };
 
 function setSessionCookie(
@@ -35,7 +48,6 @@ function readForm(data: FormData) {
 	return { username, password };
 }
 
-// One-time merge of any localStorage progress the client posts during sign-up/login.
 type MergePayload = {
 	xp?: number;
 	completed?: Record<string, number>;
@@ -61,20 +73,40 @@ async function mergeLocalProgress(userId: number, raw: string | null) {
 }
 
 export const actions: Actions = {
-	register: async ({ request, cookies }) => {
+	register: async (event) => {
+		const { request, cookies } = event;
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
-		if (username.length < 2) return fail(400, { error: 'Username must be at least 2 characters', username });
-		if (password.length < 6) return fail(400, { error: 'Password must be at least 6 characters', username });
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+				username,
+				isBlocked: true,
+				remainingSeconds: protection.remainingSeconds
+			});
+		}
+
+		if (username.length < 2) return fail(400, { error: 'ชื่อผู้ใช้ต้องมีอย่างน้อย 2 ตัวอักษร', username });
+		if (password.length < 6) return fail(400, { error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', username });
+
+		// Strict guard: Admin accounts cannot register via public auth page
+		if (isUserAdmin(username)) {
+			return fail(400, {
+				error: 'ชื่อผู้ใช้นี้สงวนไว้สำหรับผู้ดูแลระบบ กรุณาเข้าสู่ระบบที่หน้าผู้ดูแลระบบ (/admin)',
+				username
+			});
+		}
 
 		try {
 			if (await findUserByUsername(username)) {
-				return fail(400, { error: 'Username already taken', username });
+				return fail(400, { error: 'ชื่อผู้ใช้นี้มีผู้ใช้งานแล้ว', username });
 			}
 
 			const user = await createUser(username, password);
+			handleLoginSuccess(event, username);
 			await mergeLocalProgress(user.id, local);
 			const session = await createSession(user.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);
@@ -82,7 +114,7 @@ export const actions: Actions = {
 			const msg = e instanceof Error ? e.message : String(e);
 			return fail(500, {
 				error: msg.includes('Database not available')
-					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า (ต้องใส่ TURSO_DATABASE_URL ใน Vercel)'
+					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่พร้อมใช้งาน'
 					: `เกิดข้อผิดพลาด: ${msg}`,
 				username
 			});
@@ -90,16 +122,49 @@ export const actions: Actions = {
 		throw redirect(303, '/');
 	},
 
-	login: async ({ request, cookies }) => {
+	login: async (event) => {
+		const { request, cookies } = event;
 		const data = await request.formData();
 		const { username, password } = readForm(data);
 		const local = String(data.get('local') ?? '') || null;
 
+		const protection = checkLoginProtection(event, username);
+		if (protection.isBlocked) {
+			return fail(429, {
+				error: `เข้าสู่ระบบผิดพลาดเกิน 5 ครั้ง ระบบระงับชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${protection.remainingSeconds} วินาที)`,
+				username,
+				isBlocked: true,
+				remainingSeconds: protection.remainingSeconds
+			});
+		}
+
+		// Strict guard: Admin accounts must not log in via learner auth page
+		if (isUserAdmin(username)) {
+			return fail(403, {
+				error: `บัญชี "${username}" เป็นบัญชีผู้ดูแลระบบ กรุณาเข้าสู่ระบบที่หน้าจัดการผู้ดูแล (/admin)`,
+				username
+			});
+		}
+
 		try {
 			const row = await findUserByUsername(username);
 			if (!row || !verifyPassword(password, row.password_hash)) {
-				return fail(400, { error: 'Invalid username or password', username });
+				const failure = await handleLoginFailure(event, username);
+				if (failure.isBlocked) {
+					return fail(429, {
+						error: `กรอกรหัสผ่านผิดติดต่อกันครบ 5 ครั้ง บัญชี/IP นี้ถูกระงับชั่วคราว 2 นาทีเพื่อความปลอดภัย (กรุณารออีก ${failure.remainingSeconds} วินาที)`,
+						username,
+						isBlocked: true,
+						remainingSeconds: failure.remainingSeconds
+					});
+				}
+				return fail(400, {
+					error: `ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (เหลือโอกาสลองอีก ${failure.attemptsRemaining} ครั้ง ก่อนถูกระงับชั่วคราว 2 นาที)`,
+					username
+				});
 			}
+
+			handleLoginSuccess(event, username);
 			await mergeLocalProgress(row.id, local);
 			const session = await createSession(row.id);
 			setSessionCookie(cookies, session.token, session.expiresAt);
@@ -107,7 +172,7 @@ export const actions: Actions = {
 			const msg = e instanceof Error ? e.message : String(e);
 			return fail(500, {
 				error: msg.includes('Database not available')
-					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่ได้ตั้งค่า (ต้องใส่ TURSO_DATABASE_URL ใน Vercel)'
+					? 'ระบบฐานข้อมูลบนเซิร์ฟเวอร์ยังไม่พร้อมใช้งาน'
 					: `เกิดข้อผิดพลาด: ${msg}`,
 				username
 			});

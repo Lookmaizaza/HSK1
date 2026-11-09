@@ -635,35 +635,45 @@
 
 			// Telemetry & Error Tracking
 			const telemetryPayload = {
-				attemptId: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-				timestamp: Date.now(),
-				metadata: {
-					clientVersion: '1.2.0',
-					platform: navigator.userAgent
-				},
-				target: {
-					presetId: selectedPreset.id,
+				eventType: 'pronunciation_evaluation',
+				timestamp: new Date().toISOString(),
+				practiceMode: 'word' as const,
+				stageId: null,
+				word: {
+					id: selectedPreset.id,
 					hanzi: selectedPreset.hanzi,
 					pinyin: selectedPreset.pinyin,
-					targetTone: selectedPreset.tone,
-					expectedContour: TONE_PROFILES[selectedPreset.tone]?.chaoPitch || ''
+					meaning: selectedPreset.thai || selectedPreset.english,
+					expectedTone: selectedPreset.tone,
+					tonePattern: selectedPreset.tonePattern
 				},
-				interaction: {
-					listenCount,
-					listenTimestamps,
-					practiceDurationMs: res.totalDurationMs
+				behavior: {
+					listenedToExample: listenCount > 0,
+					listenCount: listenCount,
+					listenTimestamps: [...listenTimestamps]
 				},
-				evaluation: {
-					audioFeatures: {
-						durationMs: res.totalDurationMs,
+				assessment: {
+					isPassed: isPassed,
+					overallScore: finalScore,
+					rawScore: res.overallScore,
+					isToneMatch: isTonePerfect,
+					isWordMatch: isWordCorrect,
+					recognizedWord: finalHeard || undefined,
+					speechCandidates: [...speechCandidates],
+					syllableResults: res.syllableResults.map((s) => ({
+						syllableIndex: s.syllableIndex,
+						hanzi: s.hanzi,
+						pinyin: s.pinyin,
+						targetTone: s.targetTone,
+						detectedTone: s.detectedTone,
+						isMatch: s.isMatch,
+						score: s.score,
+						feedback: s.feedback,
+						isAIModel: s.isAIModel
+					})),
+					acoustics: {
 						avgF0: res.avgF0,
-						voicedFrameCount: pitchPoints.length
-					},
-					scores: {
-						overallScore: finalScore,
-						isPassed,
-						isWordMatch: isWordCorrect,
-						isAllMatch: res.isAllMatch
+						totalDurationMs: res.totalDurationMs
 					},
 					overallFeedback: res.overallFeedback
 				}

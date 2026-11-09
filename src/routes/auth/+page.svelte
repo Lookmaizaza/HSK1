@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { AlertTriangle, Lock } from '@lucide/svelte';
 
 	let { data, form } = $props();
 	let mode = $state<'login' | 'register'>('login');
@@ -11,6 +12,8 @@
 		mode = (data.mode as 'login' | 'register') ?? 'login';
 	});
 	let submitting = $state(false);
+	let isLockoutBlocked = $derived(Boolean((form as any)?.isBlocked || (data as any)?.isBlocked));
+	let lockoutRemainingSeconds = $derived((form as any)?.remainingSeconds || (data as any)?.remainingSeconds || 120);
 
 	const localProgress = $derived(browser ? (localStorage.getItem('hsk-progress') ?? '') : '');
 
@@ -90,14 +93,25 @@
 					/>
 				</div>
 
-				{#if form?.error}
-					<div class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-						{form.error}
+				{#if isLockoutBlocked}
+					<div class="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-800 flex items-start gap-2.5">
+						<AlertTriangle class="size-4 shrink-0 text-rose-600 mt-0.5" />
+						<div>
+							<div class="font-bold">ระบบระงับการเข้าสู่ระบบชั่วคราว (Brute-Force Protection)</div>
+							<div class="mt-0.5">{form?.error || `IP ของคุณถูกระงับชั่วคราวเป็นเวลา 2 นาที (กรุณารออีก ${lockoutRemainingSeconds} วินาที)`}</div>
+						</div>
+					</div>
+				{:else if form?.error}
+					<div class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 flex items-center gap-2">
+						<AlertTriangle class="size-4 shrink-0 text-rose-600" />
+						<span>{form.error}</span>
 					</div>
 				{/if}
 
-				<Button type="submit" class="h-12 text-base font-bold" disabled={submitting}>
-					{#if submitting}
+				<Button type="submit" class="h-12 text-base font-bold flex items-center justify-center gap-2" disabled={submitting || isLockoutBlocked}>
+					{#if isLockoutBlocked}
+						<Lock class="size-4" /> ระงับชั่วคราว 2 นาที
+					{:else if submitting}
 						Please wait…
 					{:else}
 						{mode === 'login' ? 'Log in' : 'Create account'}

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+DATABASE_URL = (os.getenv("DATABASE_URL") or os.getenv("Neon_DB") or "").strip()
 
 pool: Optional[asyncpg.Pool] = None
 
@@ -18,8 +18,13 @@ def get_clean_database_url(url: str) -> str:
     """Normalize database connection string for asyncpg (strip parameters if needed or enforce ssl)."""
     if not url:
         return ""
-    # asyncpg expects postgresql:// or postgres://
-    return url
+    try:
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(url)
+        # asyncpg does not accept query params like sslmode or channel_binding directly
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, "", parsed.fragment))
+    except Exception:
+        return url
 
 
 async def init_db_pool() -> Optional[asyncpg.Pool]:
@@ -31,8 +36,9 @@ async def init_db_pool() -> Optional[asyncpg.Pool]:
 
     try:
         # Neon PostgreSQL requires SSL
+        clean_dsn = get_clean_database_url(DATABASE_URL)
         pool = await asyncpg.create_pool(
-            dsn=DATABASE_URL,
+            dsn=clean_dsn,
             min_size=1,
             max_size=10,
             ssl="require" if "sslmode=require" in DATABASE_URL or "neon.tech" in DATABASE_URL else None
@@ -361,3 +367,39 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
             {"target": "zh", "recognized": "z", "type": "initial", "count": 6, "avg_gop": 62.4}
         ]
     }
+
+
+async def record_learning_events_batch(events: List[Dict[str, Any]]) -> int:
+    """Batch insert multiple learning events into Neon PostgreSQL in a single vectorized round-trip."""
+    if not pool or not events:
+        return 0
+
+    records = [
+        (
+            e["user_id"],
+            e["verb"],
+            e["lesson_id"],
+            e["word"],
+            e.get("target_tone"),
+            e.get("detected_tone"),
+            e.get("is_correct", False),
+            float(e["confidence"]) if e.get("confidence") is not None else None,
+            json.dumps(e.get("xapi_statement", {}))
+        )
+        for e in events
+    ]
+
+    query = """
+        INSERT INTO learning_events (
+            user_id, verb, lesson_id, word,
+            target_tone, detected_tone, is_correct, confidence, xapi_statement
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+    """
+
+    try:
+        async with pool.acquire() as conn:
+            await conn.executemany(query, records)
+            return len(records)
+    except Exception as err:
+        print(f"⚠️ [Neon DB] Failed to batch insert events: {err}")
+        return 0
