@@ -15,7 +15,6 @@
 		Target,
 		TrendingUp,
 		Flame,
-		Gamepad2,
 		Award,
 		AudioWaveform,
 		Smile,
@@ -150,13 +149,6 @@
 		<div class="pointer-events-none absolute inset-y-0 right-0 -z-10 w-1/3 bg-gradient-to-l from-amber-400/10 to-transparent"></div>
 
 		<div class="flex items-center gap-2">
-			<a
-				href="/"
-				class="inline-flex items-center gap-1.5 rounded-xl border bg-card hover:bg-muted text-foreground px-4 py-2.5 text-xs font-bold transition shadow-xs active:scale-95"
-			>
-				<Gamepad2 class="size-3.5" />
-				<span>ด่านเควสต์</span>
-			</a>
 			<a
 				href="/pitch"
 				class="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-primary/20 transition active:scale-95"

@@ -3,7 +3,10 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { progress } from '$lib/progress.svelte';
+	import {
+		MID_ASSESSMENT_XP_THRESHOLD,
+		POST_ASSESSMENT_XP_THRESHOLD
+	} from '$lib/assessmentEligibility';
 	import { Award, Sparkles, X, ChevronRight, Clock, ShieldCheck, CheckCircle2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 
@@ -67,8 +70,8 @@
 				return;
 			}
 
-			// 2. Check Mid-test (Trigger if hasPre is true, hasMid is false, and progress.xp >= 60)
-			if (hasPre && !hasMid && progress.xp >= 60) {
+			// 2. Check Mid-test after the learner has made meaningful progress.
+			if (hasPre && !hasMid && data.xp >= MID_ASSESSMENT_XP_THRESHOLD) {
 				const snoozeKey = `yupakjeen_snooze_mid_${userId}`;
 				const lastSnooze = localStorage.getItem(snoozeKey);
 				if (lastSnooze && Date.now() - Number(lastSnooze) < 12 * 60 * 60 * 1000) {
@@ -84,8 +87,8 @@
 				return;
 			}
 
-			// 3. Check Post-test (Trigger if hasMid is true, hasPost is false, and progress.xp >= 150)
-			if (hasMid && !hasPost && progress.xp >= 150) {
+			// 3. Check Post-test after substantially more practice than the mid-test.
+			if (hasMid && !hasPost && data.xp >= POST_ASSESSMENT_XP_THRESHOLD) {
 				const snoozeKey = `yupakjeen_snooze_post_${userId}`;
 				const lastSnooze = localStorage.getItem(snoozeKey);
 				if (lastSnooze && Date.now() - Number(lastSnooze) < 12 * 60 * 60 * 1000) {

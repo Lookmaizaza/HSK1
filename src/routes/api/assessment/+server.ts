@@ -7,7 +7,8 @@ import {
 	recordPronunciationEvaluation,
 	recordPhonemeEvaluations,
 	syncAllAssessmentsToEvaluations,
-	isUserAdmin
+	isUserAdmin,
+	getProgress
 } from '$lib/server/db';
 import { extractTargetPhonemes } from '$lib/pronunciation';
 
@@ -19,7 +20,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 	try {
 		const status = await getUserAssessmentStatus(String(user.id));
-		return json({ success: true, ...status });
+		const progress = await getProgress(user.id);
+		return json({ success: true, ...status, xp: progress.xp });
 	} catch (err: any) {
 		console.error('Error fetching assessment status:', err);
 		return json({ error: 'Internal server error' }, { status: 500 });
