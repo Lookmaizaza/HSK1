@@ -151,6 +151,10 @@ export async function syncAllTables() {
 
 	// 5. Pronunciation Evaluations
 	console.log('\n⏳ 5. Syncing "pronunciation_evaluations"...');
+	await executeNeon(`ALTER TABLE pronunciation_evaluations DROP CONSTRAINT IF EXISTS pronunciation_evaluations_practice_mode_check;`).catch(() => {});
+	await executeNeon(`ALTER TABLE pronunciation_evaluations ADD CONSTRAINT pronunciation_evaluations_practice_mode_check CHECK (practice_mode IN ('word', 'stage', 'assessment', 'unknown'));`).catch(() => {});
+	// Clear stale evaluations in Neon so it matches Turso
+	await executeNeon(`DELETE FROM pronunciation_evaluations WHERE evaluation_id NOT IN ('eval_242', 'eval_243', 'eval_244', 'eval_245', 'eval_246')`);
 	const evalsRes = await turso.execute('SELECT * FROM pronunciation_evaluations');
 	for (const c of chunk(evalsRes.rows, 50)) {
 		const vals = c.map(ev => {
@@ -266,6 +270,4 @@ export async function syncAllTables() {
 }
 
 // If run directly
-if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
-	syncAllTables().catch((e) => console.error('Fatal sync error:', e));
-}
+syncAllTables().catch((e) => console.error('Fatal sync error:', e));

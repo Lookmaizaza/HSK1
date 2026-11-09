@@ -394,6 +394,24 @@
 		advanceWord();
 	}
 
+	async function syncSetCompletionToServer() {
+		try {
+			await fetch('/api/flashcard/complete', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					level: selectedLevel,
+					setIndex: selectedSetIndex,
+					masteredCount: masteredThisSession.length,
+					reviewCount: reviewThisSession.length,
+					totalWords: currentSet?.words?.length || activeWords.length
+				})
+			});
+		} catch (e) {
+			console.warn('Failed to sync flashcard completion to server:', e);
+		}
+	}
+
 	function advanceWord() {
 		if (currentIndex + 1 < activeWords.length) {
 			currentIndex += 1;
@@ -401,6 +419,7 @@
 			// Finished the set!
 			markSetCompleted(selectedLevel, selectedSetIndex);
 			refreshStats();
+			syncSetCompletionToServer();
 			currentView = 'summary';
 		}
 	}

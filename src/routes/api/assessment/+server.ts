@@ -80,8 +80,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						user_id: String(user.id),
 						word_id: String(wordId),
 						pinyin: String(pinyin),
-						practice_mode: 'word',
-						stage_id: null,
+						practice_mode: 'assessment',
+						stage_id: String(testType || 'pre'),
 						attempt_number: 1,
 						audio_duration_sec: 1.0,
 						scores: {

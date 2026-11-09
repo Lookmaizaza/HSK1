@@ -4,9 +4,10 @@
 	interface Props {
 		activeLearningAnalytics: any;
 		stages: any[];
-		funnelFilterHsk: number | 'all';
-		onFilterHsk: (lvl: number | 'all') => void;
+		funnelFilterHsk?: number | 'all';
+		onFilterHsk?: (lvl: number | 'all') => void;
 		onTuneStage: (stageId: string, dropRate: number) => void;
+		embedded?: boolean;
 	}
 
 	let {
@@ -14,7 +15,8 @@
 		stages = [],
 		funnelFilterHsk = 'all',
 		onFilterHsk,
-		onTuneStage
+		onTuneStage,
+		embedded = false
 	}: Props = $props();
 
 	let totalViews = $derived(activeLearningAnalytics?.dropOffFunnel?.totalViews ?? 0);
@@ -26,35 +28,39 @@
 </script>
 
 <div class="space-y-6">
-	<!-- Header Section -->
-	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
-		<div class="flex items-center gap-3">
-			<div class="flex size-11 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs shrink-0">
-				<TrendingUp class="size-6" />
+	{#if !embedded}
+		<!-- Header Section -->
+		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
+			<div class="flex items-center gap-3">
+				<div class="flex size-11 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs shrink-0">
+					<TrendingUp class="size-6" />
+				</div>
+				<div>
+					<div class="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Progression Funnel Analytics</div>
+					<h2 class="text-xl font-black text-foreground">เส้นทางด่านและจุดสะดุด (Drop-off Funnel & Bottlenecks)</h2>
+					<p class="text-xs text-muted-foreground mt-0.5">วิเคราะห์อัตราการหลุดกลางคัน ค้นหาด่านคอขวดที่ผู้เรียนหยุดเล่น และปรับจูนเกณฑ์ผ่านด่านทันที</p>
+				</div>
 			</div>
-			<div>
-				<div class="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Progression Funnel Analytics</div>
-				<h2 class="text-xl font-black text-foreground">เส้นทางด่านและจุดสะดุด (Drop-off Funnel & Bottlenecks)</h2>
-				<p class="text-xs text-muted-foreground mt-0.5">วิเคราะห์อัตราการหลุดกลางคัน ค้นหาด่านคอขวดที่ผู้เรียนหยุดเล่น และปรับจูนเกณฑ์ผ่านด่านทันที</p>
-			</div>
-		</div>
 
-		<div class="flex flex-wrap items-center gap-2">
-			<span class="rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 font-mono font-bold text-xs px-3 py-1 border border-rose-500/20">
-				อัตราหลุด Quest รวม: {activeLearningAnalytics?.dropOffFunnel?.totalViews ? `${activeLearningAnalytics.dropOffFunnel.overallDropOffRate}%` : '—'}
-			</span>
-			<div class="flex rounded-xl border bg-muted/30 p-0.5 text-xs">
-				{#each [('all' as const), 1, 2, 3] as lvl (lvl)}
-					<button
-						onclick={() => onFilterHsk(lvl)}
-						class="rounded-lg px-2.5 py-1 font-bold transition {funnelFilterHsk === lvl ? 'bg-primary text-white shadow-xs' : 'text-muted-foreground hover:text-foreground'}"
-					>
-						{lvl === 'all' ? 'ทุก HSK' : `HSK ${lvl}`}
-					</button>
-				{/each}
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 font-mono font-bold text-xs px-3 py-1 border border-rose-500/20">
+					อัตราหลุด Quest รวม: {activeLearningAnalytics?.dropOffFunnel?.totalViews ? `${activeLearningAnalytics.dropOffFunnel.overallDropOffRate}%` : '—'}
+				</span>
+				{#if onFilterHsk}
+					<div class="flex rounded-xl border bg-muted/30 p-0.5 text-xs">
+						{#each [('all' as const), 1, 2, 3] as lvl (lvl)}
+							<button
+								onclick={() => onFilterHsk(lvl)}
+								class="rounded-lg px-2.5 py-1 font-bold transition {funnelFilterHsk === lvl ? 'bg-primary text-white shadow-xs' : 'text-muted-foreground hover:text-foreground'}"
+							>
+								{lvl === 'all' ? 'ทุก HSK' : `HSK ${lvl}`}
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		</div>
-	</div>
+	{/if}
 
 	<!-- Funnel Visual Progression Steps with Drop Rates -->
 	<section class="rounded-3xl border bg-card p-6 shadow-xs space-y-4">

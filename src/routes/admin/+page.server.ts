@@ -25,7 +25,8 @@ import {
 	updateTeacherIntervention,
 	getAllTeacherInterventions,
 	checkAndUpdateInterventionStatus,
-	getSkillsAnalyticsSummary
+	getSkillsAnalyticsSummary,
+	getFlashcardAnalytics
 } from '$lib/server/db';
 import { ALL_QUEST_STAGES, parseQuestChallenges } from '$lib/data/questLevels';
 import { TRACKS, units } from '$lib/data/lessons';
@@ -73,7 +74,8 @@ export const load: PageServerLoad = async (event) => {
 		questAnalytics,
 		pitchAnalytics,
 		listeningPolicy,
-		pitchSensitivity
+		pitchSensitivity,
+		flashcardAnalytics
 	] = await Promise.all([
 		getSkillsAnalyticsSummary(),
 		getAllTeacherInterventions(),
@@ -90,7 +92,8 @@ export const load: PageServerLoad = async (event) => {
 		getAdvancedLearningAnalytics('stage'),
 		getAdvancedLearningAnalytics('word'),
 		getSystemSetting('listening_policy', 'low_pass'),
-		getSystemSetting('pitch_sensitivity', 'standard')
+		getSystemSetting('pitch_sensitivity', 'standard'),
+		getFlashcardAnalytics()
 	]);
 
 	const learnerUsers = users.filter((u) => !u.isAdmin);
@@ -271,6 +274,7 @@ export const load: PageServerLoad = async (event) => {
 		},
 		listeningPolicy,
 		pitchSensitivity,
+		flashcardAnalytics,
 		selectedUserId,
 		selectedUserDetail,
 		selectedUserRemedials,

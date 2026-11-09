@@ -1,4 +1,11 @@
-import adapter from '@sveltejs/adapter-auto';
+import autoAdapter from '@sveltejs/adapter-auto';
+import vercelAdapter from '@sveltejs/adapter-vercel';
+
+// Dynamic adapter selection:
+// When building on Vercel, use @sveltejs/adapter-vercel for native serverless endpoints.
+// When building locally or in other environments, fallback to @sveltejs/adapter-auto.
+const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+const selectAdapter = isVercel ? vercelAdapter : autoAdapter;
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -7,7 +14,7 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
-		adapter: adapter()
+		adapter: selectAdapter()
 	}
 };
 

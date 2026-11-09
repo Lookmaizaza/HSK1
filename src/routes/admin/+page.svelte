@@ -5,13 +5,12 @@
 	import CohortVisualAnalytics from '$lib/components/admin/CohortVisualAnalytics.svelte';
 	import Learner360ProfileModal from '$lib/components/admin/Learner360ProfileModal.svelte';
 	import ToneAnalyticsView from '$lib/components/admin/skills/ToneAnalyticsView.svelte';
-	import PhoneticsAnalyticsView from '$lib/components/admin/skills/PhoneticsAnalyticsView.svelte';
 	import ListeningImpactView from '$lib/components/admin/skills/ListeningImpactView.svelte';
-	import VocabularyRetentionView from '$lib/components/admin/skills/VocabularyRetentionView.svelte';
 	import DropOffFunnelView from '$lib/components/admin/skills/DropOffFunnelView.svelte';
 	import HanziWritingView from '$lib/components/admin/skills/HanziWritingView.svelte';
 	import DialogueFluencyView from '$lib/components/admin/skills/DialogueFluencyView.svelte';
 	import ExamDiagnosticsView from '$lib/components/admin/skills/ExamDiagnosticsView.svelte';
+	import FlashcardAnalyticsView from '$lib/components/admin/skills/FlashcardAnalyticsView.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import {
 		Users,
@@ -88,16 +87,14 @@
 		| 'users'
 		| 'admins'
 		| 'stages'
+		| 'flashcards'
 		| 'tone_analytics'
-		| 'phoneme_analytics'
 		| 'listening_analytics'
-		| 'vocab_analytics'
 		| 'funnel_analytics'
 		| 'hanzi_writing'
 		| 'ai_dialogue'
 		| 'mock_exams'
 		| 'learning'
-		| 'interventions'
 		| 'audit'
 		| 'export';
 	let activeTab = $state<AdminTab>('dashboard');
@@ -218,7 +215,7 @@
 	let practiceBreakdownHsk = $state(1);
 
 	// Stages Management State
-	let stageHskLevel = $state<number>(1);
+	let stageHskLevel = $state<number | 'all'>('all');
 	let stageSearchQuery = $state('');
 	let editingStage = $state<any | null>(null);
 	let stageConfirm = $state<{
@@ -250,7 +247,6 @@
 
 	// Advanced Learning Analytics Interactive State
 	let analyticsToast = $state<{ type: 'success' | 'info'; message: string } | null>(null);
-	let selectedMinimalPairIndex = $state(0);
 	let activePitchTone = $state<number>(3); // Tone 3 (most confused)
 	let listeningPolicySetting = $state<'low_pass' | 'hard_vocab' | 'strict' | 'none'>(
 		((data as any).listeningPolicy as any) || 'low_pass'
@@ -540,10 +536,6 @@
 		}
 	}
 
-	function handleGenerateRemedialDeck() {
-		showAnalyticsToast('🚀 สร้างชุดเควสต์ทบทวน Spaced Repetition จากคำศัพท์ติดขัด 5 คำ พร้อมกำหนดรอบทบทวนเรียบร้อย!', 'success');
-	}
-
 	// Login Submitting & Lockout state
 	let submitting = $state(false);
 	let isLockoutBlocked = $derived(Boolean((form as any)?.isBlocked || (data as any)?.isBlocked));
@@ -672,7 +664,9 @@
 	// Filtered Stages
 	const filteredStages = $derived.by(() => {
 		if (!data.stages) return [];
-		let list = data.stages.filter((s) => s.hskLevel === stageHskLevel);
+		let list = stageHskLevel === 'all'
+			? data.stages
+			: data.stages.filter((s) => s.hskLevel === stageHskLevel);
 
 		if (stageSearchQuery.trim()) {
 			const q = stageSearchQuery.toLowerCase().trim();
@@ -926,29 +920,12 @@
 							{data.stats.totalAdmins}
 						</span>
 					</button>
-
-					<!-- 3. ช่วยเหลือผู้เรียน & ข้อเสนอแนะครู -->
-					<button
-						onclick={() => { activeTab = 'interventions'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'interventions' ? 'bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<Lightbulb class="size-4 mt-0.5 text-amber-600 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">การดูแลและซ่อมเสริม (Interventions)</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">มอบหมายชุดฝึกและคำแนะนำจากครู</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							{data.teacherInterventions?.length ?? 0}
-						</span>
-					</button>
 				</div>
 
 				<!-- Group 2.5: วิเคราะห์ทักษะเฉพาะด้าน (8 หัวข้อย่อย Focus mode) -->
 				<div class="space-y-1">
 					<div class="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-						วิเคราะห์ทักษะเฉพาะด้าน (8 ทักษะ)
+						วิเคราะห์ทักษะเฉพาะด้าน (5 ทักษะ)
 					</div>
 
 					<!-- 1. วรรณยุกต์และระดับเสียง -->
@@ -968,24 +945,7 @@
 						</span>
 					</button>
 
-					<!-- 2. สัทศาสตร์และพยัญชนะคู่สับสน -->
-					<button
-						onclick={() => { activeTab = 'phoneme_analytics'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'phoneme_analytics' ? 'bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<BrainCircuit class="size-4 mt-0.5 text-amber-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">สัทศาสตร์ & คู่เทียบเสียง</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">9x9 Matrix & Minimal Pairs</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							9x9
-						</span>
-					</button>
-
-					<!-- 3. การฟังและผลกระทบเสียงตัวอย่าง -->
+					<!-- 2. การฟังและผลกระทบเสียงตัวอย่าง -->
 					<button
 						onclick={() => { activeTab = 'listening_analytics'; mobileSidebarOpen = false; }}
 						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'listening_analytics' ? 'bg-blue-500/15 border border-blue-500/30 text-blue-700 dark:text-blue-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
@@ -1002,41 +962,7 @@
 						</span>
 					</button>
 
-					<!-- 4. คลังคำศัพท์และ Spaced Repetition -->
-					<button
-						onclick={() => { activeTab = 'vocab_analytics'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'vocab_analytics' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<RotateCcw class="size-4 mt-0.5 text-emerald-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">คลังคำศัพท์ & SRS</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">High-Friction Vocab Recovery</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							SRS
-						</span>
-					</button>
-
-					<!-- 5. เส้นทางด่านและจุดสะดุด -->
-					<button
-						onclick={() => { activeTab = 'funnel_analytics'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'funnel_analytics' ? 'bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<TrendingUp class="size-4 mt-0.5 text-rose-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">เส้นทางด่าน & Funnel</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">Bottlenecks & Drop-off</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							Funnel
-						</span>
-					</button>
-
-					<!-- 6. การเขียนลำดับขีดอักษรจีน -->
+					<!-- 3. การเขียนลำดับขีดอักษรจีน -->
 					<button
 						onclick={() => { activeTab = 'hanzi_writing'; mobileSidebarOpen = false; }}
 						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'hanzi_writing' ? 'bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
@@ -1053,7 +979,7 @@
 						</span>
 					</button>
 
-					<!-- 7. สนทนาตามสถานการณ์จริง -->
+					<!-- 4. สนทนาตามสถานการณ์จริง -->
 					<button
 						onclick={() => { activeTab = 'ai_dialogue'; mobileSidebarOpen = false; }}
 						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'ai_dialogue' ? 'bg-violet-500/15 border border-violet-500/30 text-violet-700 dark:text-violet-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
@@ -1070,7 +996,7 @@
 						</span>
 					</button>
 
-					<!-- 8. การสอบวัดระดับ HSK -->
+					<!-- 5. การสอบวัดระดับ HSK -->
 					<button
 						onclick={() => { activeTab = 'mock_exams'; mobileSidebarOpen = false; }}
 						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'mock_exams' ? 'bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
@@ -1099,8 +1025,24 @@
 					>
 						<div class="flex items-center gap-2.5">
 							<Layers class="size-4" />
-							<span>จัดการด่าน (Stages {data.stages.length})</span>
+							<span>จัดการด่าน & เส้นทางเรียนรู้ ({data.stages.length})</span>
 						</div>
+						<span class="rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
+							Funnel
+						</span>
+					</button>
+
+					<button
+						onclick={() => { activeTab = 'flashcards'; mobileSidebarOpen = false; }}
+						class="w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition {activeTab === 'flashcards' ? 'bg-primary text-primary-foreground shadow-xs font-black' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+					>
+						<div class="flex items-center gap-2.5">
+							<BookOpen class="size-4 text-emerald-500" />
+							<span>การฝึกชุดคำศัพท์ (Flashcards)</span>
+						</div>
+						<span class="rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
+							{data.flashcardAnalytics?.summary?.totalCompletions ?? 0}
+						</span>
 					</button>
 				</div>
 
@@ -2016,7 +1958,7 @@
 				</div>
 			{/if}
 
-						{#if activeTab === 'admins'}
+			{#if activeTab === 'admins'}
 				<!-- SECTION 2: ตรวจสอบผู้ดูแลระบบทั้งหมด (ADMINISTRATORS SECTION - DISTINCT SECTION) -->
 				<div class="rounded-3xl border border-purple-500/20 bg-card p-6 shadow-xs space-y-4">
 					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b">
@@ -2103,219 +2045,156 @@
 				<DialogueFluencyView skillsAnalytics={data.skillsAnalytics} />
 			{/if}
 
-{#if activeTab === 'interventions'}
-				<!-- SMART TEACHER INTERVENTIONS -->
-				<div class="space-y-4">
-					<div class="grid gap-3 sm:grid-cols-3">
-						<div class="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4">
-							<div class="text-[11px] font-bold text-muted-foreground">🚨 ผู้เรียนที่ต้องดูแล (GOP &lt; 70%)</div>
-							<div class="text-2xl font-black text-rose-600 font-mono mt-1">{atRiskUsers.length} คน</div>
-							<div class="text-[11px] text-muted-foreground">ยังไม่ได้รับคำแนะนำ: {atRiskNotContacted.length} คน</div>
+			{#if activeTab === 'stages'}
+				<!-- STAGES MANAGEMENT & PROGRESSION FUNNEL VIEW -->
+				<div class="space-y-6">
+					<!-- Unified Top Header -->
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
+						<div class="flex items-center gap-3">
+							<div class="flex size-11 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs shrink-0">
+								<Layers class="size-6" />
+							</div>
+							<div>
+								<div class="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Curriculum & Funnel Analytics</div>
+								<h2 class="text-xl font-black text-foreground">จัดการด่าน & เส้นทางการเรียนรู้ (Stages & Progression Funnel)</h2>
+								<p class="text-xs text-muted-foreground mt-0.5">วิเคราะห์อัตราการหลุดกลางคัน ค้นหาด่านคอขวด ตรวจสอบสถิติ และปรับจูนแก้ไขเนื้อหาด่าน</p>
+							</div>
 						</div>
-						<div class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
-							<div class="text-[11px] font-bold text-muted-foreground">📨 ส่งคำแนะนำแล้ว (รอติดตามผล)</div>
-							<div class="text-2xl font-black text-amber-600 font-mono mt-1">{interventionStats.pending} รายการ</div>
-							<div class="text-[11px] text-muted-foreground">ทั้งหมด {(data.teacherInterventions || []).length} รายการ</div>
-						</div>
-						<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-							<div class="text-[11px] font-bold text-muted-foreground">✅ พัฒนาขึ้นแล้ว (GOP ≥ 70%)</div>
-							<div class="text-2xl font-black text-emerald-600 font-mono mt-1">{interventionStats.improved} รายการ</div>
-							<div class="text-[11px] text-muted-foreground">ระบบอัปเดตสถานะอัตโนมัติจากคะแนนล่าสุด</div>
+
+						<div class="flex flex-wrap items-center gap-2">
+							<span class="rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 font-mono font-bold text-xs px-3 py-1 border border-rose-500/20">
+								อัตราหลุด Quest รวม: {activeLearningAnalytics?.dropOffFunnel?.totalViews ? `${activeLearningAnalytics.dropOffFunnel.overallDropOffRate}%` : '—'}
+							</span>
+							<div class="flex rounded-xl border bg-muted/30 p-0.5 text-xs">
+								{#each [('all' as const), 1, 2, 3] as lvl (lvl)}
+									<button
+										onclick={() => { stageHskLevel = lvl; funnelFilterHsk = lvl; }}
+										class="rounded-lg px-2.5 py-1 font-bold transition {stageHskLevel === lvl ? 'bg-primary text-white shadow-xs' : 'text-muted-foreground hover:text-foreground'}"
+									>
+										{lvl === 'all' ? 'ทุก HSK' : `HSK ${lvl}`}
+									</button>
+								{/each}
+							</div>
 						</div>
 					</div>
 
-					<!-- At-risk learners -->
-					<div class="rounded-3xl border border-amber-500/20 bg-card p-5 shadow-xs space-y-3">
-						<div class="flex items-center justify-between border-b pb-3">
+					<!-- Funnel Visual Progression Steps & Bottlenecks -->
+					<DropOffFunnelView
+						{activeLearningAnalytics}
+						stages={data.stages || []}
+						funnelFilterHsk={stageHskLevel}
+						onFilterHsk={(lvl) => { stageHskLevel = lvl; funnelFilterHsk = lvl; }}
+						onTuneStage={handleTuneBottleneckStage}
+						embedded={true}
+					/>
+
+					<!-- Stage Directory Table Section -->
+					<div class="rounded-3xl border bg-card p-6 shadow-xs space-y-4">
+						<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-3">
 							<div>
-								<h2 class="text-sm font-extrabold flex items-center gap-2"><Lightbulb class="size-4 text-amber-600" /> รายชื่อผู้เรียนที่น่าเป็นห่วง (At-Risk Learners)</h2>
-								<p class="text-[11px] text-muted-foreground mt-0.5">เรียงตาม GOP ต่ำสุด · กด "ส่งคำแนะนำ" เพื่อเปิดหน้าต่างที่เติมคำที่ผิดบ่อยให้อัตโนมัติ</p>
+								<h3 class="text-base font-extrabold text-foreground">ตารางจัดการด่านและเนื้อหา (Stage Directory & Content Editor)</h3>
+								<p class="text-xs text-muted-foreground mt-0.5">ดูสถิติคนเข้าดู, คนผ่าน, คนไม่ผ่าน และคลิกแก้ไขด่านได้ทันที</p>
 							</div>
-							<button onclick={() => openCreateIntervention()} class="text-xs font-bold text-primary hover:underline cursor-pointer">+ ส่งคำแนะนำทั่วไป</button>
+							<div class="flex flex-wrap items-center gap-2">
+								<div class="relative w-48 sm:w-64">
+									<Search class="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
+									<Input
+										bind:value={stageSearchQuery}
+										placeholder="ค้นหาชื่อด่าน, หมวดหมู่, หรือรหัส..."
+										class="pl-8 h-8 text-xs bg-muted/20 border-muted pr-7"
+									/>
+									{#if stageSearchQuery}
+										<button
+											onclick={() => (stageSearchQuery = '')}
+											class="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+											title="ล้างคำค้นหา"
+										>
+											<X class="size-3.5" />
+										</button>
+									{/if}
+								</div>
+								<div class="flex items-center gap-1">
+									{#each [('all' as const), 1, 2, 3] as lvl (lvl)}
+										<button
+											onclick={() => { stageHskLevel = lvl; funnelFilterHsk = lvl; }}
+											class="rounded-xl px-3 py-1 text-xs font-extrabold transition {stageHskLevel === lvl ? 'bg-primary text-white shadow-xs' : 'border text-muted-foreground hover:bg-muted'}"
+										>
+											{lvl === 'all' ? 'ทุก HSK' : `HSK ${lvl}`}
+										</button>
+									{/each}
+								</div>
+							</div>
 						</div>
+
+						{#if stageSearchQuery}
+							<div class="flex items-center justify-between text-xs bg-primary/10 border border-primary/20 rounded-xl px-3 py-1.5 text-primary">
+								<div class="flex items-center gap-1.5">
+									<Filter class="size-3.5" />
+									<span>ผลการกรองด้วยคำค้น: <strong>"{stageSearchQuery}"</strong> (พบ {filteredStages.length} ด่าน)</span>
+								</div>
+								<button onclick={() => (stageSearchQuery = '')} class="font-bold underline cursor-pointer hover:opacity-80">
+									ล้างตัวกรอง
+								</button>
+							</div>
+						{/if}
+
 						<div class="overflow-x-auto rounded-2xl border">
-							<table class="w-full text-xs">
-								<thead class="border-b bg-muted/30 text-muted-foreground">
+							<table class="w-full text-left text-xs">
+								<thead class="border-b bg-muted/30 font-bold uppercase tracking-wider text-muted-foreground">
 									<tr>
-										<th class="h-9 px-3.5 text-left font-semibold">ผู้เรียน</th>
-										<th class="h-9 px-3 text-right font-semibold">GOP</th>
-										<th class="h-9 px-3 text-right font-semibold">PER</th>
-										<th class="h-9 px-3 text-right font-semibold">ฝึกสะสม</th>
-										<th class="h-9 px-3 text-center font-semibold">สถานะ</th>
-										<th class="h-9 px-3.5 text-right font-semibold">การจัดการ</th>
+										<th class="py-2.5 px-3">ด่าน</th>
+										<th class="py-2.5 px-3">ชื่อด่าน & หมวดหมู่</th>
+										<th class="py-2.5 px-3 text-right">คำ</th>
+										<th class="py-2.5 px-3 text-right">เข้าดู</th>
+										<th class="py-2.5 px-3 text-right">Drop</th>
+										<th class="py-2.5 px-3 text-right">ผ่าน %</th>
+										<th class="py-2.5 px-3 text-right">สถานะ</th>
+										<th class="py-2.5 px-3 text-right">แก้ไข</th>
 									</tr>
 								</thead>
 								<tbody class="divide-y">
-									{#each atRiskUsers.slice(0, 30) as u (u.id)}
-										{@const last = latestInterventionByUser.get(String(u.id))}
-										<tr class="h-10 hover:bg-amber-500/[0.04]">
-											<td class="px-3.5"><button onclick={() => openUserDrilldown(u)} class="font-bold hover:text-primary hover:underline cursor-pointer">{u.username}</button> <span class="text-[10px] text-muted-foreground">#{u.id}</span></td>
-											<td class="px-3 text-right font-mono font-bold text-rose-600">{u.avgGop?.toFixed(1)}%</td>
-											<td class="px-3 text-right font-mono text-muted-foreground">{u.avgPer != null ? u.avgPer.toFixed(1) + '%' : '—'}</td>
-											<td class="px-3 text-right font-mono">{u.evaluationCount} ครั้ง</td>
-											<td class="px-3 text-center">
-												{#if last}
-													<span class="rounded-full bg-amber-500/10 text-amber-700 px-2 py-0.5 text-[10px] font-bold">📨 ส่งแล้ว · รอติดตามผล</span>
-												{:else}
-													<span class="rounded-full bg-rose-500/10 text-rose-700 px-2 py-0.5 text-[10px] font-bold">🚨 ยังไม่ได้ดูแล</span>
-												{/if}
+									{#each filteredStages as st (st.id)}
+										<tr class="h-10 hover:bg-muted/10 transition">
+											<td class="px-3 font-mono text-muted-foreground">{st.id}</td>
+											<td class="px-3">
+												<div class="font-extrabold text-foreground">{st.title}</div>
+												<div class="text-[10px] text-muted-foreground">{st.category}</div>
 											</td>
-											<td class="px-3.5 text-right">
-												<button onclick={() => openCreateIntervention(u)} class="rounded-lg bg-primary text-white font-bold px-2.5 py-1 text-[11px] hover:bg-primary/90 cursor-pointer">ส่งคำแนะนำ</button>
+											<td class="px-3 text-right font-mono tabular-nums">{st.wordsCount}</td>
+											<td class="px-3 text-right font-mono tabular-nums text-blue-600">{st.stats.totalViews}</td>
+											<td class="px-3 text-right font-mono tabular-nums text-rose-600">{st.stats.dropRate}%</td>
+											<td class="px-3 text-right font-mono tabular-nums font-bold text-emerald-600">{st.stats.passRate}%</td>
+											<td class="px-3 text-right">
+												<form method="POST" action="?/toggleStageActive" use:enhance={confirmStageToggle} class="inline">
+													<input type="hidden" name="stageId" value={st.id} />
+													<button
+														type="submit"
+														disabled={stageToggleBusy}
+														class="font-semibold {st.isActive ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'} hover:underline disabled:opacity-40"
+													>
+														{st.isActive ? 'เปิด' : 'ปิด'}
+													</button>
+												</form>
+											</td>
+											<td class="px-3 text-right">
+												<button
+													onclick={() => (editingStage = { ...st })}
+													class="font-semibold text-primary hover:underline"
+												>
+													แก้ไข
+												</button>
 											</td>
 										</tr>
-									{:else}
-										<tr><td colspan="6" class="py-6 text-center text-muted-foreground">ยอดเยี่ยม! ไม่มีผู้เรียนที่ GOP ต่ำกว่า 70%</td></tr>
 									{/each}
 								</tbody>
 							</table>
-						</div>
-						{#if atRiskUsers.length > 30}
-							<p class="text-[11px] text-muted-foreground">แสดง 30 อันดับแรกจากทั้งหมด {atRiskUsers.length} คน</p>
-						{/if}
-					</div>
-
-					<!-- History -->
-					<div class="rounded-3xl border bg-card p-5 shadow-xs space-y-3">
-						<h3 class="text-xs font-bold text-muted-foreground uppercase tracking-wider">ประวัติคำแนะนำที่ส่งแล้ว & ติดตามผล</h3>
-						<div class="divide-y rounded-2xl border text-xs">
-							{#each (data.teacherInterventions || []) as item (item.id)}
-								{@const improved = effectiveInterventionStatus(item) === 'improved'}
-								<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-									<div class="min-w-0">
-										<div class="font-extrabold text-foreground flex flex-wrap items-center gap-2">
-											<span>{item.title}</span>
-											<span class="text-muted-foreground font-semibold">→ @{usernameById.get(String(item.userId)) ?? 'User #' + item.userId}</span>
-											<span class="rounded-full px-2 py-0.5 text-[10px] font-bold {improved ? 'bg-emerald-500/10 text-emerald-700' : 'bg-amber-500/10 text-amber-700'}">
-												{improved ? '✅ พัฒนาขึ้นแล้ว' : '🚨 รอติดตามผล'}
-											</span>
-										</div>
-										<p class="text-muted-foreground mt-0.5">{item.message}</p>
-										{#if item.remedialWords?.length}
-											<div class="flex flex-wrap items-center gap-1.5 mt-1">
-												<span class="text-[10px] text-muted-foreground font-semibold">คำซ่อมเสริม:</span>
-												{#each item.remedialWords as w (w)}
-													<span class="rounded bg-rose-500/10 text-rose-700 font-bold px-1.5 text-[10px]">{w}</span>
-												{/each}
-											</div>
-										{/if}
-									</div>
-									<div class="flex items-center gap-3 shrink-0">
-										<span class="text-[10px] text-muted-foreground font-mono">โดย @{item.assignedBy} • {fmtDate(item.createdAt)}</span>
-										<button onclick={() => openEditIntervention(item)} class="font-bold text-primary hover:underline cursor-pointer">แก้ไข</button>
-									</div>
-								</div>
-							{:else}
-								<div class="p-6 text-center text-muted-foreground">ยังไม่มีประวัติการส่งคำแนะนำ</div>
-							{/each}
 						</div>
 					</div>
 				</div>
 			{/if}
 
-			{#if activeTab === 'stages'}
-				<!-- STAGES MANAGEMENT VIEW -->
-				<div class="rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-card p-4 shadow-xs space-y-3">
-					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-						<div>
-							<h2 class="text-base font-extrabold text-foreground">วิเคราะห์แบบฝึกหัด & ด่าน (Exercise Stages)</h2>
-							<p class="text-xs text-muted-foreground">ดูสถิติคนเข้าดู, คนผ่าน, คนไม่ผ่าน และคลิกแก้ไขด่านได้ทันที</p>
-						</div>
-						<div class="flex flex-wrap items-center gap-2">
-							<div class="relative w-48 sm:w-64">
-								<Search class="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
-								<Input
-									bind:value={stageSearchQuery}
-									placeholder="ค้นหาชื่อด่าน, หมวดหมู่, หรือรหัส..."
-									class="pl-8 h-8 text-xs bg-muted/20 border-muted pr-7"
-								/>
-								{#if stageSearchQuery}
-									<button
-										onclick={() => (stageSearchQuery = '')}
-										class="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
-										title="ล้างคำค้นหา"
-									>
-										<X class="size-3.5" />
-									</button>
-								{/if}
-							</div>
-							<div class="flex items-center gap-1">
-								{#each [1, 2, 3] as lvl (lvl)}
-									<button
-										onclick={() => (stageHskLevel = lvl)}
-										class="rounded-xl px-3.5 py-1 text-xs font-extrabold transition {stageHskLevel === lvl ? 'bg-primary text-white shadow-xs' : 'border text-muted-foreground hover:bg-muted'}"
-									>
-										HSK {lvl}
-									</button>
-								{/each}
-							</div>
-						</div>
-					</div>
-
-					{#if stageSearchQuery}
-						<div class="flex items-center justify-between text-xs bg-primary/10 border border-primary/20 rounded-xl px-3 py-1.5 text-primary">
-							<div class="flex items-center gap-1.5">
-								<Filter class="size-3.5" />
-								<span>ผลการกรองด้วยคำค้น: <strong>"{stageSearchQuery}"</strong> (พบ {filteredStages.length} ด่าน)</span>
-							</div>
-							<button onclick={() => (stageSearchQuery = '')} class="font-bold underline cursor-pointer hover:opacity-80">
-								ล้างตัวกรอง
-							</button>
-						</div>
-					{/if}
-
-					<div class="overflow-x-auto rounded-lg border">
-						<table class="w-full text-left text-xs">
-							<thead class="border-b bg-muted/30 font-bold uppercase tracking-wider text-muted-foreground">
-								<tr>
-									<th class="h-9 px-3">ด่าน</th>
-									<th class="h-9 px-3">ชื่อด่าน & หมวดหมู่</th>
-									<th class="h-9 px-3 text-right">คำ</th>
-									<th class="h-9 px-3 text-right">เข้าดู</th>
-									<th class="h-9 px-3 text-right">Drop</th>
-									<th class="h-9 px-3 text-right">ผ่าน %</th>
-									<th class="h-9 px-3 text-right">สถานะ</th>
-									<th class="h-9 px-3 text-right">แก้ไข</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y">
-								{#each filteredStages as st (st.id)}
-									<tr class="h-10 hover:bg-muted/10 transition">
-										<td class="px-3 font-mono text-muted-foreground">{st.id}</td>
-										<td class="px-3">
-											<div class="font-extrabold text-foreground">{st.title}</div>
-											<div class="text-[10px] text-muted-foreground">{st.category}</div>
-										</td>
-										<td class="px-3 text-right font-mono tabular-nums">{st.wordsCount}</td>
-										<td class="px-3 text-right font-mono tabular-nums text-blue-600">{st.stats.totalViews}</td>
-										<td class="px-3 text-right font-mono tabular-nums text-rose-600">{st.stats.dropRate}%</td>
-										<td class="px-3 text-right font-mono tabular-nums font-bold text-emerald-600">{st.stats.passRate}%</td>
-										<td class="px-3 text-right">
-											<form method="POST" action="?/toggleStageActive" use:enhance={confirmStageToggle} class="inline">
-												<input type="hidden" name="stageId" value={st.id} />
-												<button
-													type="submit"
-													disabled={stageToggleBusy}
-													class="font-semibold {st.isActive ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'} hover:underline disabled:opacity-40"
-												>
-													{st.isActive ? 'เปิด' : 'ปิด'}
-												</button>
-											</form>
-										</td>
-										<td class="px-3 text-right">
-											<button
-												onclick={() => (editingStage = { ...st })}
-												class="font-semibold text-primary hover:underline"
-											>
-												แก้ไข
-											</button>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				</div>
+			{#if activeTab === 'flashcards'}
+				<FlashcardAnalyticsView flashcardAnalytics={data.flashcardAnalytics} />
 			{/if}
 
 			{#if activeTab === 'tone_analytics' || activeTab === 'learning'}
@@ -2335,16 +2214,6 @@
 				/>
 			{/if}
 
-			{#if activeTab === 'phoneme_analytics'}
-				<PhoneticsAnalyticsView
-					{activeLearningAnalytics}
-					{learningPracticeMode}
-					classPhonemeStats={data.classPhonemeStats}
-					onShowToast={showAnalyticsToast}
-					onChangePracticeMode={(mode) => (learningPracticeMode = mode)}
-				/>
-			{/if}
-
 			{#if activeTab === 'listening_analytics'}
 				<ListeningImpactView
 					{activeLearningAnalytics}
@@ -2354,22 +2223,6 @@
 				/>
 			{/if}
 
-			{#if activeTab === 'vocab_analytics'}
-				<VocabularyRetentionView
-					{activeLearningAnalytics}
-					onShowToast={showAnalyticsToast}
-				/>
-			{/if}
-
-			{#if activeTab === 'funnel_analytics'}
-				<DropOffFunnelView
-					{activeLearningAnalytics}
-					stages={data.stages || []}
-					{funnelFilterHsk}
-					onFilterHsk={(lvl) => (funnelFilterHsk = lvl)}
-					onTuneStage={handleTuneBottleneckStage}
-				/>
-			{/if}
 
 			{#if activeTab === 'audit'}
 				<!-- AUDIT LOGS FULL VIEW -->
@@ -2699,37 +2552,37 @@
 				</div>
 			</div>
 
-			<!-- Sub-navigation tabs inside Modal (Fixed height, no shrink, sticky) -->
-			<div class="flex items-center border-b border-border/70 bg-muted/40 px-6 gap-1 text-xs font-bold text-muted-foreground overflow-x-auto shrink-0 min-h-[48px] h-12 select-none">
+			<!-- Sub-navigation tabs inside Modal (Fixed height, no shrink, sticky, single-line) -->
+			<div class="flex items-center border-b border-border/70 bg-muted/40 px-4 sm:px-6 gap-1.5 text-xs font-bold text-muted-foreground overflow-x-auto shrink-0 min-h-[48px] h-12 select-none">
 				<button
 					onclick={() => (selectedUserTab = '360_profile')}
-					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap cursor-pointer {selectedUserTab === '360_profile' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
+					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap min-w-max cursor-pointer {selectedUserTab === '360_profile' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
 				>
-					<span>🎯</span> <span>360° ภาพรวมวิเคราะห์ผู้เรียน</span>
+					<span class="shrink-0">🎯</span> <span class="whitespace-nowrap">360° ภาพรวมวิเคราะห์ผู้เรียน</span>
 				</button>
 				<button
 					onclick={() => (selectedUserTab = 'dashboard')}
-					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap cursor-pointer {selectedUserTab === 'dashboard' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
+					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap min-w-max cursor-pointer {selectedUserTab === 'dashboard' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
 				>
-					<span>👁️</span> <span>หน้า Dashboard ของผู้ใช้นี้ (User View)</span>
+					<span class="shrink-0">👁️</span> <span class="whitespace-nowrap">หน้า Dashboard ของผู้ใช้นี้ (User View)</span>
 				</button>
 				<button
 					onclick={() => (selectedUserTab = 'progress')}
-					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap cursor-pointer {selectedUserTab === 'progress' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
+					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap min-w-max cursor-pointer {selectedUserTab === 'progress' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
 				>
-					<span>🏆</span> <span>ความคืบหน้าทุกด่าน</span>
+					<span class="shrink-0">🏆</span> <span class="whitespace-nowrap">ความคืบหน้าทุกด่าน</span>
 				</button>
 				<button
 					onclick={() => (selectedUserTab = 'mistakes')}
-					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap cursor-pointer {selectedUserTab === 'mistakes' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
+					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap min-w-max cursor-pointer {selectedUserTab === 'mistakes' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
 				>
-					<span>❌</span> <span>ประวัติคำที่ออกเสียงผิด</span>
+					<span class="shrink-0">❌</span> <span class="whitespace-nowrap">ประวัติคำที่ออกเสียงผิด</span>
 				</button>
 				<button
 					onclick={() => (selectedUserTab = 'evals')}
-					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap cursor-pointer {selectedUserTab === 'evals' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
+					class="inline-flex items-center gap-1.5 h-full px-3.5 border-b-2 transition shrink-0 whitespace-nowrap min-w-max cursor-pointer {selectedUserTab === 'evals' ? 'border-primary text-primary font-black' : 'border-transparent hover:text-foreground'}"
 				>
-					<span>🗣️</span> <span>ผลการประเมินเสียง (GOP & Tone)</span>
+					<span class="shrink-0">🗣️</span> <span class="whitespace-nowrap">ผลการประเมินเสียง (GOP & Tone)</span>
 				</button>
 			</div>
 
@@ -2760,7 +2613,7 @@
 							</div>
 							<div class="space-y-1">
 								<h3 class="text-base font-bold text-foreground">กำลังประมวลผลกราฟวิเคราะห์ผู้เรียน 360°...</h3>
-								<p class="text-xs text-muted-foreground">กำลังดึงข้อมูลพอร์ตโฟลิโอทั้ง 6 โมดูล และคำนวณ Hake's Gain</p>
+								<p class="text-xs text-muted-foreground">กำลังดึงข้อมูลพอร์ตโฟลิโอทั้ง 6 โมดูล และคำนวณดัชนีอัตราการพัฒนาสัมพัทธ์ (g)</p>
 							</div>
 						</div>
 					{:else}
@@ -2996,32 +2849,11 @@
 					<span>วรรณยุกต์และระดับเสียง (Tone Mastery & Pitch)</span>
 				</button>
 				<button
-					onclick={() => { activeTab = 'phoneme_analytics'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<BrainCircuit class="size-4 text-amber-500" />
-					<span>สัทศาสตร์ & คู่เทียบเสียง (Phonetics & Minimal Pairs)</span>
-				</button>
-				<button
 					onclick={() => { activeTab = 'listening_analytics'; quickNavOpen = false; }}
 					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
 				>
 					<Volume2 class="size-4 text-blue-500" />
 					<span>การฟัง & Audio Gate (Listening Impact & LQ5)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'vocab_analytics'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<RotateCcw class="size-4 text-emerald-500" />
-					<span>คลังคำศัพท์ & SRS (Vocabulary Retention)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'funnel_analytics'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<TrendingUp class="size-4 text-rose-500" />
-					<span>เส้นทางด่าน & จุดสะดุด (Drop-off Funnel)</span>
 				</button>
 				<button
 					onclick={() => { activeTab = 'hanzi_writing'; quickNavOpen = false; }}
@@ -3045,18 +2877,18 @@
 					<span>การสอบวัดระดับ HSK (HSK Exam Diagnostics)</span>
 				</button>
 				<button
-					onclick={() => { activeTab = 'interventions'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Lightbulb class="size-4 text-amber-500" />
-					<span>มอบหมายการดูแลและคำแนะนำ (Interventions)</span>
-				</button>
-				<button
 					onclick={() => { activeTab = 'stages'; quickNavOpen = false; }}
 					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
 				>
 					<Layers class="size-4 text-purple-500" />
-					<span>จัดการด่านแบบฝึกหัด (Stages)</span>
+					<span>จัดการด่าน & เส้นทางเรียนรู้ (Stages & Progression Funnel)</span>
+				</button>
+				<button
+					onclick={() => { activeTab = 'flashcards'; quickNavOpen = false; }}
+					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
+				>
+					<BookOpen class="size-4 text-emerald-500" />
+					<span>การฝึกชุดคำศัพท์ (Flashcards Analytics)</span>
 				</button>
 			</div>
 		</div>

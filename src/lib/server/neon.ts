@@ -249,7 +249,7 @@ async function ensurePronunciationEvaluationSchema(): Promise<void> {
 					tone_score DOUBLE PRECISION NOT NULL DEFAULT 0,
 					phoneme_details JSONB NOT NULL DEFAULT '[]'::jsonb,
 					practice_mode TEXT NOT NULL DEFAULT 'unknown'
-						CHECK (practice_mode IN ('word', 'stage', 'unknown')),
+						CHECK (practice_mode IN ('word', 'stage', 'assessment', 'unknown')),
 					stage_id TEXT,
 					created_at BIGINT NOT NULL
 				)
@@ -281,7 +281,7 @@ export async function recordNeonPronunciationEvaluation(params: {
 	perOverall: number;
 	toneScore: number;
 	phonemeDetails: unknown[];
-	practiceMode: 'stage' | 'word' | 'unknown';
+	practiceMode: 'stage' | 'word' | 'assessment' | 'unknown';
 	stageId: string | null;
 	createdAt: number;
 }): Promise<boolean> {
@@ -316,7 +316,7 @@ export async function recordNeonLearningEvent(params: {
 	wordId: string;
 	statementId: string;
 	xapiStatement: unknown;
-	practiceMode: 'stage' | 'word' | 'unknown';
+	practiceMode: 'stage' | 'word' | 'assessment' | 'unknown';
 	stageId: string | null;
 	createdAt: number;
 }): Promise<void> {
@@ -352,7 +352,7 @@ export async function recordNeonPhonemeEvaluation(params: {
 	status: string;
 	target: string;
 	recognized: string;
-	practiceMode: 'stage' | 'word' | 'unknown';
+	practiceMode: 'stage' | 'word' | 'assessment' | 'unknown';
 	stageId: string | null;
 	createdAt: number;
 }): Promise<void> {

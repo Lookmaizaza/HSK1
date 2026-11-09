@@ -283,11 +283,24 @@ CREATE TABLE IF NOT EXISTS teacher_interventions (
 	created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS flashcard_set_completions (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id TEXT NOT NULL,
+	hsk_level INTEGER NOT NULL,
+	set_index INTEGER NOT NULL,
+	mastered_count INTEGER NOT NULL,
+	review_count INTEGER NOT NULL,
+	total_words INTEGER NOT NULL,
+	completed_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_hanzi_writing_user_created ON hanzi_writing_attempts(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_hanzi_writing_word ON hanzi_writing_attempts(word_id);
 CREATE INDEX IF NOT EXISTS idx_exam_attempts_user ON exam_attempts(user_id, hsk_level);
 CREATE INDEX IF NOT EXISTS idx_chatbot_sessions_user ON chatbot_sessions(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_teacher_interventions_user ON teacher_interventions(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_flashcard_set_user ON flashcard_set_completions(user_id, hsk_level);
+CREATE INDEX IF NOT EXISTS idx_flashcard_set_level ON flashcard_set_completions(hsk_level, set_index);
 `;
 
 let initPromise: Promise<void> | null = null;
@@ -833,10 +846,12 @@ export async function recordPronunciationEvaluation(payload: {
 	user_id: string;
 	word_id: string;
 	pinyin: string;
-	practice_mode?: 'stage' | 'word' | 'unknown';
+	practice_mode?: 'stage' | 'word' | 'assessment' | 'unknown';
 	stage_id?: string | null;
 	attempt_number?: number;
 	audio_duration_sec?: number;
+	created_at?: number;
+	idempotency_key?: string | null;
 	scores: {
 		gop_overall: number;
 		per_overall: number;
@@ -851,7 +866,8 @@ export async function recordPronunciationEvaluation(payload: {
 	if (practiceMode === 'stage' && (!stageId || !/^[a-zA-Z0-9_-]{2,64}$/.test(stageId))) {
 		throw new Error('Stage practice evaluation requires a valid stage_id.');
 	}
-	const createdAt = Date.now();
+	const createdAt = payload.created_at ? Number(payload.created_at) : Date.now();
+	const idempotencyKey = payload.idempotency_key || `${payload.user_id}_${payload.word_id}_${createdAt}`;
 	const evaluation = {
 		userId: String(payload.user_id),
 		wordId: String(payload.word_id),
@@ -863,15 +879,25 @@ export async function recordPronunciationEvaluation(payload: {
 		toneScore: Number(payload.scores.tone_score ?? 0),
 		phonemeDetails: payload.scores.phoneme_details ?? [],
 		practiceMode,
-		stageId: practiceMode === 'stage' ? stageId : null,
+		stageId: practiceMode === 'stage' ? stageId : (practiceMode === 'assessment' ? stageId : null),
+		idempotencyKey,
 		createdAt
 	};
 
 	if (client) {
+		// Dedup guard: check if identical record already exists
+		const existingCheck = await client.execute({
+			sql: `SELECT id FROM pronunciation_evaluations WHERE user_id = ? AND word_id = ? AND created_at = ? LIMIT 1`,
+			args: [evaluation.userId, evaluation.wordId, createdAt]
+		}).catch(() => ({ rows: [] }));
+		if (existingCheck.rows && existingCheck.rows.length > 0) {
+			return; // Skip duplicate insertion
+		}
+
 		await client.execute({
 			sql: `INSERT INTO pronunciation_evaluations
-			      (user_id, word_id, pinyin, attempt_number, audio_duration_sec, gop_overall, per_overall, tone_score, phoneme_details, practice_mode, stage_id, created_at)
-			      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			      (user_id, word_id, pinyin, attempt_number, audio_duration_sec, gop_overall, per_overall, tone_score, phoneme_details, practice_mode, stage_id, created_at, idempotency_key)
+			      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			args: [
 				evaluation.userId,
 				evaluation.wordId,
@@ -884,7 +910,8 @@ export async function recordPronunciationEvaluation(payload: {
 				JSON.stringify(evaluation.phonemeDetails),
 				evaluation.practiceMode,
 				evaluation.stageId,
-				createdAt
+				createdAt,
+				evaluation.idempotencyKey
 			]
 		});
 	}
@@ -1722,7 +1749,7 @@ export async function recordPhonemeEvaluations(
 		status: string;
 		target: string;
 		recognized: string;
-		practiceMode?: 'stage' | 'word' | 'unknown';
+		practiceMode?: 'stage' | 'word' | 'assessment' | 'unknown';
 		stageId?: string | null;
 		createdAt?: number;
 	}>
@@ -3502,10 +3529,12 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 			user_id: uId,
 			word_id: wordId,
 			pinyin,
-			practice_mode: 'word',
-			stage_id: null,
+			practice_mode: 'assessment',
+			stage_id: testType,
 			attempt_number: 1,
 			audio_duration_sec: 1.0,
+			created_at: createdAt,
+			idempotency_key: key,
 			scores: {
 				gop_overall: gopOverall,
 				per_overall: perOverall,
@@ -3537,8 +3566,9 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 				status: (isToneMatch ? 'correct' : 'substitution') as 'correct' | 'substitution',
 				target: pt.phoneme,
 				recognized: isToneMatch ? pt.phoneme : '?',
-				practiceMode: 'word' as const,
-				stageId: undefined
+				practiceMode: 'assessment' as const,
+				stageId: testType,
+				createdAt
 			}));
 			await recordPhonemeEvaluations(phonemeRecords).catch(() => {});
 		}
@@ -3644,41 +3674,31 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 	let bottleneckStages: any[] = [];
 
 	try {
-		// Attempts and outcomes from real evaluations
-		const evalCounts = await client.execute(`
-			SELECT 
-				COUNT(*) as total_attempts,
-				COUNT(CASE WHEN gop_overall >= 70 THEN 1 END) as total_passed,
-				COUNT(CASE WHEN gop_overall < 70 THEN 1 END) as total_failed
-			FROM pronunciation_evaluations
-		`);
-		totalAttempts = Number(evalCounts.rows[0]?.total_attempts || 0);
-		totalPassed = Number(evalCounts.rows[0]?.total_passed || 0);
-		totalFailed = Number(evalCounts.rows[0]?.total_failed || 0);
+		const adminIds = await getAdminUserIds();
+		const adminClause = adminIds.length > 0
+			? `WHERE user_id NOT IN (${adminIds.map(() => '?').join(',')}) AND user_id != 'anonymous'`
+			: `WHERE user_id != 'anonymous'`;
+		const adminArgs = adminIds.length > 0 ? adminIds : [];
 
-		// Total views/interactions from learning events & stage telemetry
-		const eventCounts = await client.execute('SELECT COUNT(*) as total_events FROM learning_events');
-		const telCounts = await client.execute('SELECT COUNT(*) as total_tel FROM stage_telemetry');
-		totalViews = Math.max(
-			Number(eventCounts.rows[0]?.total_events || 0) + Number(telCounts.rows[0]?.total_tel || 0),
-			totalAttempts
-		);
-
-		// Stage-level breakdown from real stage_telemetry and lesson_completions
-		const stageRes = await client.execute(`
-			SELECT 
-				stage_id,
-				COUNT(CASE WHEN event_type = 'view' THEN 1 END) as views,
-				COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as attempts,
-				COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as passed,
-				COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as failed
-			FROM stage_telemetry
-			GROUP BY stage_id
-			HAVING views > 0 OR attempts > 0
-		`);
+		// Stage-level breakdown from real stage_telemetry (excluding admins and anonymous)
+		const telRes = await client.execute({
+			sql: `
+				SELECT 
+					stage_id,
+					COUNT(CASE WHEN event_type = 'view' THEN 1 END) as views,
+					COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as attempts,
+					COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as passed,
+					COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as failed
+				FROM stage_telemetry
+				${adminClause}
+				GROUP BY stage_id
+				HAVING views > 0 OR attempts > 0
+			`,
+			args: adminArgs
+		});
 
 		const stageMap = new Map<string, { views: number; attempts: number; passed: number; failed: number }>();
-		for (const r of stageRes.rows) {
+		for (const r of telRes.rows) {
 			stageMap.set(String(r.stage_id), {
 				views: Number(r.views || 0),
 				attempts: Number(r.attempts || 0),
@@ -3687,23 +3707,33 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			});
 		}
 
-		// Also incorporate real completions from lesson_completions table
-		const compRes = await client.execute(`
-			SELECT lesson_key, COUNT(*) as cnt
-			FROM lesson_completions
-			GROUP BY lesson_key
-		`);
+		// Incorporate real completions from lesson_completions table (excluding admins & anonymous)
+		const compRes = await client.execute({
+			sql: `
+				SELECT lesson_key, COUNT(*) as passed_count
+				FROM lesson_completions
+				${adminClause}
+				GROUP BY lesson_key
+			`,
+			args: adminArgs
+		});
 		for (const r of compRes.rows) {
 			const stId = String(r.lesson_key);
-			const cnt = Number(r.cnt || 0);
-			const cur = stageMap.get(stId) || { views: cnt * 2, attempts: cnt, passed: cnt, failed: 0 };
+			const cnt = Number(r.passed_count || 0);
+			const cur = stageMap.get(stId) || { views: cnt, attempts: cnt, passed: cnt, failed: 0 };
 			cur.passed = Math.max(cur.passed, cnt);
 			cur.attempts = Math.max(cur.attempts, cur.passed);
 			cur.views = Math.max(cur.views, cur.attempts);
 			stageMap.set(stId, cur);
 		}
 
+		// Aggregate total views, attempts, passed, failed across real quest stages
 		for (const [stageId, data] of stageMap.entries()) {
+			totalViews += data.views;
+			totalAttempts += data.attempts;
+			totalPassed += data.passed;
+			totalFailed += data.failed;
+
 			const dropRate = data.attempts > 0 ? Math.round((data.failed / data.attempts) * 100) : 0;
 			bottleneckStages.push({
 				stageId,
@@ -4765,18 +4795,20 @@ export async function getSkillsAnalyticsSummary() {
 		client.execute({
 			sql: `SELECT COUNT(*) as events, COUNT(DISTINCT user_id) as users
 			      FROM pronunciation_evaluations
-			      WHERE (practice_mode = 'word' OR practice_mode IS NULL)
+			      WHERE (practice_mode = 'word' OR practice_mode = 'unknown' OR practice_mode IS NULL)
 			      ${adminAndClause}`,
 			args: adminIds
 		}).catch(() => ({ rows: [] })),
 		client.execute({
 			sql: `SELECT COUNT(*) as events, COUNT(DISTINCT user_id) as users
 			      FROM (
-			        SELECT user_id FROM stage_telemetry ${adminClause}
+			        SELECT CAST(user_id AS TEXT) as user_id FROM lesson_completions ${adminClause}
 			        UNION ALL
-			        SELECT user_id FROM pronunciation_evaluations WHERE practice_mode = 'stage' ${adminAndClause}
+			        SELECT user_id FROM stage_telemetry WHERE user_id != 'anonymous' ${adminAndClause}
+			        UNION ALL
+			        SELECT user_id FROM pronunciation_evaluations WHERE practice_mode = 'stage' AND user_id != 'anonymous' ${adminAndClause}
 			      )`,
-			args: [...adminIds, ...adminIds]
+			args: [...adminIds, ...adminIds, ...adminIds]
 		}).catch(() => ({ rows: [] })),
 		client.execute({
 			sql: `SELECT COUNT(*) as events, COUNT(DISTINCT user_id) as users
@@ -4872,5 +4904,275 @@ export async function getSkillsAnalyticsSummary() {
 		},
 		crossFeatureUsage,
 		classRadar6Axis
+	};
+}
+
+// -------------------------------------------------------------
+// Flashcard Set Completions & Analytics
+// -------------------------------------------------------------
+
+export async function recordFlashcardSetCompletion(params: {
+	userId: string | number;
+	hskLevel: number;
+	setIndex: number;
+	masteredCount: number;
+	reviewCount: number;
+	totalWords: number;
+}): Promise<void> {
+	const client = getDb();
+	if (!client) return;
+	await init();
+
+	const userId = String(params.userId);
+	const hskLevel = Number(params.hskLevel);
+	const setIndex = Number(params.setIndex);
+	const masteredCount = Math.max(0, Number(params.masteredCount || 0));
+	const reviewCount = Math.max(0, Number(params.reviewCount || 0));
+	const totalWords = Math.max(1, Number(params.totalWords || masteredCount + reviewCount || 1));
+	const completedAt = Date.now();
+
+	await client.execute({
+		sql: `INSERT INTO flashcard_set_completions 
+			(user_id, hsk_level, set_index, mastered_count, review_count, total_words, completed_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		args: [userId, hskLevel, setIndex, masteredCount, reviewCount, totalWords, completedAt]
+	});
+}
+
+export async function getFlashcardAnalytics() {
+	const client = getDb();
+	await init();
+
+	if (!client) {
+		return {
+			summary: {
+				totalCompletions: 0,
+				uniqueLearners: 0,
+				totalWordsMastered: 0,
+				totalWordsReviewed: 0,
+				avgMasteryRatePct: 0
+			},
+			byLevel: {
+				1: { totalCompletions: 0, avgMasteryRatePct: 0 },
+				2: { totalCompletions: 0, avgMasteryRatePct: 0 },
+				3: { totalCompletions: 0, avgMasteryRatePct: 0 }
+			},
+			setStats: [] as Array<{
+				hskLevel: number;
+				setIndex: number;
+				completionCount: number;
+				uniqueUsers: number;
+				avgMastered: number;
+				avgReview: number;
+				totalWords: number;
+				avgMasteryRatePct: number;
+			}>,
+			recentCompletions: [] as Array<{
+				id: number;
+				userId: string;
+				username: string;
+				displayName: string;
+				hskLevel: number;
+				setIndex: number;
+				masteredCount: number;
+				reviewCount: number;
+				totalWords: number;
+				masteryRatePct: number;
+				completedAt: number;
+			}>
+		};
+	}
+
+	const adminIds = await getAdminUserIds();
+	const adminFilter = adminIds.length > 0
+		? `WHERE user_id NOT IN (${adminIds.map(() => '?').join(',')}) AND user_id != 'anonymous'`
+		: `WHERE user_id != 'anonymous'`;
+	const adminArgs = adminIds.length > 0 ? adminIds : [];
+
+	// Summary totals
+	let totalCompletions = 0;
+	let uniqueLearners = 0;
+	let totalWordsMastered = 0;
+	let totalWordsReviewed = 0;
+	let avgMasteryRatePct = 0;
+
+	try {
+		const sumRes = await client.execute({
+			sql: `
+				SELECT 
+					COUNT(*) as total_completions,
+					COUNT(DISTINCT user_id) as unique_learners,
+					SUM(mastered_count) as total_mastered,
+					SUM(review_count) as total_reviewed,
+					SUM(total_words) as total_words,
+					AVG(CASE WHEN total_words > 0 THEN (mastered_count * 100.0 / total_words) ELSE 0 END) as avg_mastery
+				FROM flashcard_set_completions
+				${adminFilter}
+			`,
+			args: adminArgs
+		});
+		const sumRow = sumRes.rows[0];
+		totalCompletions = Number(sumRow?.total_completions || 0);
+		uniqueLearners = Number(sumRow?.unique_learners || 0);
+		totalWordsMastered = Number(sumRow?.total_mastered || 0);
+		totalWordsReviewed = Number(sumRow?.total_reviewed || 0);
+		avgMasteryRatePct = Math.round(Number(sumRow?.avg_mastery || 0));
+	} catch (e) {
+		console.warn('Failed to fetch flashcard summary:', e);
+	}
+
+	// Breakdown by HSK Level (1, 2, 3)
+	const byLevel: Record<number, { totalCompletions: number; avgMasteryRatePct: number }> = {
+		1: { totalCompletions: 0, avgMasteryRatePct: 0 },
+		2: { totalCompletions: 0, avgMasteryRatePct: 0 },
+		3: { totalCompletions: 0, avgMasteryRatePct: 0 }
+	};
+
+	try {
+		const byLevelRes = await client.execute({
+			sql: `
+				SELECT 
+					hsk_level,
+					COUNT(*) as completions,
+					AVG(CASE WHEN total_words > 0 THEN (mastered_count * 100.0 / total_words) ELSE 0 END) as avg_mastery
+				FROM flashcard_set_completions
+				${adminFilter}
+				GROUP BY hsk_level
+			`,
+			args: adminArgs
+		});
+		for (const r of byLevelRes.rows) {
+			const lvl = Number(r.hsk_level);
+			if (byLevel[lvl]) {
+				byLevel[lvl] = {
+					totalCompletions: Number(r.completions || 0),
+					avgMasteryRatePct: Math.round(Number(r.avg_mastery || 0))
+				};
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to fetch flashcard byLevel:', e);
+	}
+
+	// Breakdown by individual Set
+	let setStats: Array<{
+		hskLevel: number;
+		setIndex: number;
+		completionCount: number;
+		uniqueUsers: number;
+		avgMastered: number;
+		avgReview: number;
+		totalWords: number;
+		avgMasteryRatePct: number;
+	}> = [];
+
+	try {
+		const setRes = await client.execute({
+			sql: `
+				SELECT 
+					hsk_level,
+					set_index,
+					COUNT(*) as completion_count,
+					COUNT(DISTINCT user_id) as unique_users,
+					AVG(mastered_count) as avg_mastered,
+					AVG(review_count) as avg_review,
+					MAX(total_words) as total_words,
+					AVG(CASE WHEN total_words > 0 THEN (mastered_count * 100.0 / total_words) ELSE 0 END) as avg_mastery
+				FROM flashcard_set_completions
+				${adminFilter}
+				GROUP BY hsk_level, set_index
+				ORDER BY hsk_level ASC, set_index ASC
+			`,
+			args: adminArgs
+		});
+
+		setStats = setRes.rows.map((r) => ({
+			hskLevel: Number(r.hsk_level),
+			setIndex: Number(r.set_index),
+			completionCount: Number(r.completion_count || 0),
+			uniqueUsers: Number(r.unique_users || 0),
+			avgMastered: Math.round(Number(r.avg_mastered || 0)),
+			avgReview: Math.round(Number(r.avg_review || 0)),
+			totalWords: Number(r.total_words || 0),
+			avgMasteryRatePct: Math.round(Number(r.avg_mastery || 0))
+		}));
+	} catch (e) {
+		console.warn('Failed to fetch flashcard setStats:', e);
+	}
+
+	// Recent completions
+	let recentCompletions: Array<{
+		id: number;
+		userId: string;
+		username: string;
+		displayName: string;
+		hskLevel: number;
+		setIndex: number;
+		masteredCount: number;
+		reviewCount: number;
+		totalWords: number;
+		masteryRatePct: number;
+		completedAt: number;
+	}> = [];
+
+	try {
+		const recentAdminFilter = adminIds.length > 0
+			? `WHERE f.user_id NOT IN (${adminIds.map(() => '?').join(',')}) AND f.user_id != 'anonymous'`
+			: `WHERE f.user_id != 'anonymous'`;
+
+		const recentRes = await client.execute({
+			sql: `
+				SELECT 
+					f.id,
+					f.user_id,
+					f.hsk_level,
+					f.set_index,
+					f.mastered_count,
+					f.review_count,
+					f.total_words,
+					f.completed_at,
+					u.username,
+					u.display_name
+				FROM flashcard_set_completions f
+				LEFT JOIN users u ON CAST(u.id AS TEXT) = f.user_id
+				${recentAdminFilter}
+				ORDER BY f.completed_at DESC
+				LIMIT 50
+			`,
+			args: adminArgs
+		});
+
+		recentCompletions = recentRes.rows.map((r) => {
+			const total = Number(r.total_words || 1);
+			const mastered = Number(r.mastered_count || 0);
+			return {
+				id: Number(r.id),
+				userId: String(r.user_id),
+				username: String(r.username || r.user_id),
+				displayName: String(r.display_name || r.username || `ผู้เรียน ID ${r.user_id}`),
+				hskLevel: Number(r.hsk_level),
+				setIndex: Number(r.set_index),
+				masteredCount: mastered,
+				reviewCount: Number(r.review_count || 0),
+				totalWords: total,
+				masteryRatePct: Math.round((mastered * 100) / (total || 1)),
+				completedAt: Number(r.completed_at)
+			};
+		});
+	} catch (e) {
+		console.warn('Failed to fetch flashcard recentCompletions:', e);
+	}
+
+	return {
+		summary: {
+			totalCompletions,
+			uniqueLearners,
+			totalWordsMastered,
+			totalWordsReviewed,
+			avgMasteryRatePct
+		},
+		byLevel,
+		setStats,
+		recentCompletions
 	};
 }

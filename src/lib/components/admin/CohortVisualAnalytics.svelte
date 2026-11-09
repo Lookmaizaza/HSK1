@@ -47,67 +47,38 @@
 	const midPhase = $derived(assessmentData?.phases?.mid || { count: 0, avgGop: 0, avgToneScore: 0, avgPer: 0, correctTonesPct: 0 });
 	const postPhase = $derived(assessmentData?.phases?.post || { count: 0, avgGop: 0, avgToneScore: 0, avgPer: 0, correctTonesPct: 0 });
 
-	const rawGainG = $derived(
-		typeof assessmentData?.normalizedGainG === 'number'
-			? assessmentData.normalizedGainG
-			: postPhase.count > 0 && prePhase.count > 0 && prePhase.avgGop < 100
-				? (postPhase.avgGop - prePhase.avgGop) / (100 - prePhase.avgGop)
-				: null
-	);
-
-	const gainG = $derived(rawGainG !== null ? Math.max(-1, Math.min(1, rawGainG)) : null);
 	const deltaGop = $derived(
 		typeof assessmentData?.deltaGop === 'number'
 			? assessmentData.deltaGop
 			: postPhase.count > 0 && prePhase.count > 0
 				? Math.round((postPhase.avgGop - prePhase.avgGop) * 10) / 10
-				: null
+				: midPhase.count > 0 && prePhase.count > 0
+					? Math.round((midPhase.avgGop - prePhase.avgGop) * 10) / 10
+					: null
 	);
-	const pairedCount = $derived(assessmentData?.pairedCount ?? Math.min(prePhase.count, postPhase.count));
+	const pairedCount = $derived(
+		assessmentData?.pairedCount ?? (
+			postPhase.count > 0 && prePhase.count > 0
+				? Math.min(prePhase.count, postPhase.count)
+				: midPhase.count > 0 && prePhase.count > 0
+					? Math.min(prePhase.count, midPhase.count)
+					: 0
+		)
+	);
 
-	// Gain category definition
-	const gainCategory = $derived.by(() => {
-		if (gainG === null) return 'pending';
-		if (gainG >= 0.7) return 'high';
-		if (gainG >= 0.3) return 'medium';
-		return 'low';
-	});
-
-	// Phase Categories for Grouped Bar & Trend Line
+	// Phase Categories for Grouped Bar & Trend Line (Full-width 760px viewBox)
 	const phasesList = $derived([
-		{ label: 'ก่อนเรียน (Pre-test)', data: prePhase, cx: 125 },
-		{ label: 'กลางภาค (Mid-test)', data: midPhase, cx: 285 },
-		{ label: 'หลังเรียน (Post-test)', data: postPhase, cx: 445 }
+		{ label: 'ก่อนเรียน (Pre-test)', data: prePhase, cx: 160 },
+		{ label: 'กลางภาค (Mid-test)', data: midPhase, cx: 380 },
+		{ label: 'หลังเรียน (Post-test)', data: postPhase, cx: 600 }
 	]);
 
 	const trendPoints = $derived(
 		phasesList
 			.filter((p) => p.data.count > 0)
-			.map((p) => `${p.cx},${200 - (Math.max(0, Math.min(100, p.data.avgGop)) / 100) * 165}`)
+			.map((p) => `${p.cx - 32},${200 - (Math.max(0, Math.min(100, p.data.avgGop)) / 100) * 165}`)
 			.join(' ')
 	);
-
-	// Semicircle Gauge Math
-	// Radius 80, Center (110, 105), Angle from -180 (left) to 0 (right)
-	const gaugeRadius = 80;
-	const gaugeCx = 110;
-	const gaugeCy = 105;
-	const clampedGainForNeedle = $derived(gainG !== null ? Math.max(0, Math.min(1, gainG)) : 0);
-	const needleAngleDeg = $derived(-180 + clampedGainForNeedle * 180);
-	const needleAngleRad = $derived((needleAngleDeg * Math.PI) / 180);
-	const needleTipX = $derived(gaugeCx + (gaugeRadius - 15) * Math.cos(needleAngleRad));
-	const needleTipY = $derived(gaugeCy + (gaugeRadius - 15) * Math.sin(needleAngleRad));
-
-	// Arc path generator
-	function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-		const rad = Math.PI / 180;
-		const x1 = cx + r * Math.cos(startAngle * rad);
-		const y1 = cy + r * Math.sin(startAngle * rad);
-		const x2 = cx + r * Math.cos(endAngle * rad);
-		const y2 = cy + r * Math.sin(endAngle * rad);
-		const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
-		return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
-	}
 
 	// ==========================================
 	// BLOCK B: 6-Axis Class Holistic Skill Radar
@@ -285,346 +256,195 @@
 
 <div class="space-y-8">
 	<!-- ========================================================================= -->
-	<!-- BLOCK A: Longitudinal Assessment Growth & Hake's Gain (g) Semicircle Gauge -->
+	<!-- BLOCK A: Longitudinal Assessment Growth (Grouped Bar Chart)               -->
 	<!-- ========================================================================= -->
 	<section class="rounded-3xl border border-border/70 bg-card p-6 shadow-xs relative overflow-hidden">
 		<!-- Decorative subtle glow -->
-		<div class="absolute -top-16 -right-16 size-48 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none"></div>
+		<div class="absolute -top-16 -right-16 size-48 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none"></div>
 
 		<!-- Block Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-border/60">
+		<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border/60">
 			<div class="flex items-center gap-3">
-				<div class="flex size-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+				<div class="flex size-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
 					<TrendingUp class="size-6" />
 				</div>
 				<div>
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-2 flex-wrap">
 						<h3 class="text-lg font-black text-foreground">
-							พัฒนาการระยะยาว Pre → Mid → Post & อัตราการเรียนรู้สัมพัทธ์ (Hake's Gain g)
+							การประเมินพัฒนาการระยะยาวของผู้เรียน (ก่อนเรียน ➔ กลางภาค ➔ หลังจบหลักสูตร)
 						</h3>
-						<span class="rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 text-xs font-bold font-mono">
-							Cohort Macro
+						<span class="rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 text-xs font-bold">
+							ภาพรวมผู้เรียนทั้งรุ่น
 						</span>
 					</div>
 					<p class="text-xs text-muted-foreground mt-0.5">
-						เปรียบเทียบพัฒนาการ 3 ระยะ (GOP %, วรรณยุกต์ %, ความถูกต้องคำ) พร้อมดัชนีวัดผลสัมฤทธิ์ทางการศึกษามาตรฐานสากล
+						เปรียบเทียบพัฒนาการ 3 ระยะ (ความชัดเจน GOP %, วรรณยุกต์ %, ความถูกต้องคำ) ข้ามช่วงเวลาการเรียนรู้
 					</p>
 				</div>
 			</div>
 
-			<!-- Rendered Scientific Formula Card -->
-			<div class="inline-flex items-center gap-2.5 rounded-2xl border bg-card/90 px-3.5 py-1.5 text-xs shadow-2xs">
-				<Sparkles class="size-3.5 text-amber-500" />
-				<span class="font-bold text-foreground text-[11px]">สูตร Hake's Gain:</span>
-				<div class="inline-flex items-center gap-1.5 font-mono text-xs">
-					<span class="font-serif italic font-bold text-indigo-600 dark:text-indigo-400 text-sm">g</span>
-					<span class="text-muted-foreground">=</span>
-					<span class="inline-flex flex-col items-center leading-none text-[10px]">
-						<span class="border-b border-muted-foreground/40 pb-0.5 text-foreground font-semibold">Post% − Pre%</span>
-						<span class="pt-0.5 text-foreground font-semibold">100% − Pre%</span>
-					</span>
+			<!-- Chart Legend in Header -->
+			<div class="flex flex-wrap items-center gap-4 text-xs font-semibold text-muted-foreground bg-muted/20 px-3.5 py-2 rounded-2xl border border-border/40 shrink-0">
+				<div class="flex items-center gap-2">
+					<span class="size-3 rounded-sm bg-indigo-500 inline-block shadow-2xs"></span>
+					<span class="text-foreground">Avg GOP (%)</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<span class="size-3 rounded-sm bg-amber-500 inline-block shadow-2xs"></span>
+					<span class="text-foreground">Tone Score (%)</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<span class="size-3 rounded-sm bg-emerald-500 inline-block shadow-2xs"></span>
+					<span class="text-foreground">Correct Tones (%)</span>
 				</div>
 			</div>
 		</div>
 
-		<!-- Charts Grid: Left = Grouped Bar & Trend Line, Right = Hake's Gain Semicircle Gauge -->
-		<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6 items-center">
-			<!-- LEFT: Grouped Bar & Trajectory Chart (7 cols) -->
-			<div class="lg:col-span-7 flex flex-col justify-between space-y-4">
-				<div class="flex items-center justify-between">
-					<div class="text-xs font-bold text-foreground flex items-center gap-1.5">
-						<BarChart3 class="size-4 text-indigo-500" />
-						<span>กราฟเปรียบเทียบคะแนนเฉลี่ย 3 ระยะ (0 - 100%)</span>
-					</div>
-					<!-- Chart Legend -->
-					<div class="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
-						<div class="flex items-center gap-1.5">
-							<span class="size-2.5 rounded-xs bg-indigo-500 inline-block"></span>
-							<span>Avg GOP (%)</span>
-						</div>
-						<div class="flex items-center gap-1.5">
-							<span class="size-2.5 rounded-xs bg-amber-500 inline-block"></span>
-							<span>Tone Score (%)</span>
-						</div>
-						<div class="flex items-center gap-1.5">
-							<span class="size-2.5 rounded-xs bg-emerald-500 inline-block"></span>
-							<span>Correct Tones (%)</span>
-						</div>
-					</div>
-				</div>
+		<!-- Full-Width Grouped Bar Chart -->
+		<div class="pt-6">
+			<div class="w-full bg-muted/10 rounded-2xl border border-border/50 p-4 overflow-hidden">
+				<svg viewBox="0 0 760 250" class="w-full h-auto max-h-[300px] select-none font-sans" preserveAspectRatio="xMidYMid meet">
+					<!-- Grid lines -->
+					{#each [0, 25, 50, 75, 100] as yVal}
+						{@const y = 200 - (yVal / 100) * 165}
+						<line x1="55" y1={y} x2="725" y2={y} stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+						<text x="46" y={y + 4} text-anchor="end" class="text-[10px] fill-muted-foreground font-mono">{yVal}%</text>
+					{/each}
 
-				<!-- Pure SVG Grouped Bar Chart -->
-				<div class="w-full bg-muted/10 rounded-2xl border border-border/50 p-3 overflow-hidden">
-					<svg viewBox="0 0 540 240" class="w-full h-auto max-h-[260px] select-none font-sans" preserveAspectRatio="xMidYMid meet">
-						<!-- Grid lines -->
-						{#each [0, 25, 50, 75, 100] as yVal}
-							{@const y = 200 - (yVal / 100) * 165}
-							<line x1="45" y1={y} x2="520" y2={y} stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-							<text x="38" y={y + 4} text-anchor="end" class="text-[10px] fill-muted-foreground font-mono">{yVal}%</text>
-						{/each}
-
-						<!-- Connecting Trend Line for GOP across active phases -->
-						{#if trendPoints.split(' ').length >= 2}
-							<polyline
-								points={trendPoints}
-								fill="none"
-								stroke="#6366f1"
-								stroke-width="2.5"
-								stroke-dasharray="4,4"
-								stroke-linecap="round"
-								class="opacity-70 animate-pulse"
-							/>
-						{/if}
-
-						<!-- Draw Grouped Bars for each phase -->
-						{#each phasesList as { label, data, cx }}
-							{@const gopY = 200 - (Math.max(0, Math.min(100, data.avgGop)) / 100) * 165}
-							{@const toneY = 200 - (Math.max(0, Math.min(100, data.avgToneScore)) / 100) * 165}
-							{@const correctY = 200 - (Math.max(0, Math.min(100, data.correctTonesPct)) / 100) * 165}
-							{@const barW = 20}
-
-							{#if data.count > 0}
-								<!-- GOP Bar -->
-								<rect
-									x={cx - 34}
-									y={gopY}
-									width={barW}
-									height={Math.max(0, 200 - gopY)}
-									rx="4"
-									fill="#6366f1"
-									class="transition-all duration-300 hover:opacity-85"
-								/>
-								<text x={cx - 24} y={Math.max(22, gopY - 4)} text-anchor="middle" class="text-[9px] fill-indigo-600 dark:fill-indigo-400 font-mono font-bold">
-									{Math.round(data.avgGop)}%
-								</text>
-
-								<!-- Tone Score Bar -->
-								<rect
-									x={cx - 10}
-									y={toneY}
-									width={barW}
-									height={Math.max(0, 200 - toneY)}
-									rx="4"
-									fill="#f59e0b"
-									class="transition-all duration-300 hover:opacity-85"
-								/>
-								<text x={cx} y={Math.max(22, toneY - 4)} text-anchor="middle" class="text-[9px] fill-amber-600 dark:fill-amber-400 font-mono font-bold">
-									{Math.round(data.avgToneScore)}%
-								</text>
-
-								<!-- Correct Tones Bar -->
-								<rect
-									x={cx + 14}
-									y={correctY}
-									width={barW}
-									height={Math.max(0, 200 - correctY)}
-									rx="4"
-									fill="#10b981"
-									class="transition-all duration-300 hover:opacity-85"
-								/>
-								<text x={cx + 24} y={Math.max(22, correctY - 4)} text-anchor="middle" class="text-[9px] fill-emerald-600 dark:fill-emerald-400 font-mono font-bold">
-									{Math.round(data.correctTonesPct)}%
-								</text>
-							{:else}
-								<!-- Empty state placeholder for phase -->
-								<rect
-									x={cx - 34}
-									y="160"
-									width="68"
-									height="40"
-									rx="6"
-									fill="none"
-									stroke="currentColor"
-									stroke-opacity="0.15"
-									stroke-dasharray="3,3"
-								/>
-								<text x={cx} y="185" text-anchor="middle" class="text-[10px] fill-muted-foreground">
-									ยังไม่มีผู้สอบ
-								</text>
-							{/if}
-
-							<!-- X Axis Labels -->
-							<text x={cx} y="220" text-anchor="middle" class="text-[11px] font-bold fill-foreground">
-								{label}
-							</text>
-							<text x={cx} y="234" text-anchor="middle" class="text-[9.5px] fill-muted-foreground font-mono">
-								(N = {data.count} ครั้ง / {data.uniqueUsers || 0} คน)
-							</text>
-						{/each}
-
-						<!-- Base X axis line -->
-						<line x1="45" y1="200" x2="520" y2="200" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5" />
-					</svg>
-				</div>
-			</div>
-
-			<!-- RIGHT: Hake's Gain Semicircle Gauge (5 cols) -->
-			<div class="lg:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-muted/15 border border-border/50 text-center relative">
-				<div class="text-xs font-bold text-foreground mb-1 flex items-center justify-center gap-1.5">
-					<Award class="size-4 text-emerald-500" />
-					<span>มาตรวัด Hake's Normalized Learning Gain (<span class="font-serif italic font-bold text-indigo-600 dark:text-indigo-400">g</span>)</span>
-				</div>
-				<div class="text-[11px] text-muted-foreground mb-2">
-					วัดประสิทธิภาพการเรียนรู้สัมพัทธ์ Pre → Post ของชั้นเรียน
-				</div>
-
-				<!-- Pure SVG Semicircle Gauge -->
-				<div class="relative w-full max-w-[250px] flex items-center justify-center">
-					<svg viewBox="-12 -8 244 148" class="w-full h-auto overflow-visible select-none">
-						<!-- Outer background shadow arc -->
-						<path
-							d={describeArc(gaugeCx, gaugeCy, gaugeRadius, -180, 0)}
+					<!-- Connecting Trend Line for GOP across active phases -->
+					{#if trendPoints.split(' ').length >= 2}
+						<polyline
+							points={trendPoints}
 							fill="none"
-							stroke="currentColor"
-							stroke-opacity="0.08"
-							stroke-width="18"
+							stroke="#6366f1"
+							stroke-width="2.5"
+							stroke-dasharray="4,4"
 							stroke-linecap="round"
+							class="opacity-70 animate-pulse"
 						/>
-
-						<!-- Color Segment 1: Low Gain (0.00 to 0.30) -> -180 to -126 deg -->
-						<path
-							d={describeArc(gaugeCx, gaugeCy, gaugeRadius, -180, -126)}
-							fill="none"
-							stroke="#ef4444"
-							stroke-width="14"
-							stroke-linecap="butt"
-							class="opacity-80"
-						/>
-
-						<!-- Color Segment 2: Medium Gain (0.30 to 0.70) -> -126 to -54 deg -->
-						<path
-							d={describeArc(gaugeCx, gaugeCy, gaugeRadius, -126, -54)}
-							fill="none"
-							stroke="#f59e0b"
-							stroke-width="14"
-							stroke-linecap="butt"
-							class="opacity-80"
-						/>
-
-						<!-- Color Segment 3: High Gain (0.70 to 1.00) -> -54 to 0 deg -->
-						<path
-							d={describeArc(gaugeCx, gaugeCy, gaugeRadius, -54, 0)}
-							fill="none"
-							stroke="#10b981"
-							stroke-width="14"
-							stroke-linecap="butt"
-							class="opacity-80"
-						/>
-
-						<!-- Needle Indicator -->
-						{#if gainG !== null}
-							<!-- Needle Shadow -->
-							<line
-								x1={gaugeCx}
-								y1={gaugeCy}
-								x2={needleTipX}
-								y2={needleTipY}
-								stroke="#0f172a"
-								stroke-width="3.5"
-								stroke-linecap="round"
-								class="dark:stroke-slate-100 transition-all duration-500"
-							/>
-							<circle cx={needleTipX} cy={needleTipY} r="4" fill="#0f172a" class="dark:fill-slate-100" />
-						{/if}
-
-						<!-- Center Hub -->
-						<circle cx={gaugeCx} cy={gaugeCy} r="7" fill="#0f172a" class="dark:fill-slate-100" />
-						<circle cx={gaugeCx} cy={gaugeCy} r="3" fill="#ffffff" />
-
-						<!-- Outer Boundary Tick Marks (ขีดแบ่งเกณฑ์) -->
-						<line x1="22" y1="105" x2="12" y2="105" stroke="#ef4444" stroke-width="2" stroke-linecap="round" />
-						<line x1="59.4" y1="35.4" x2="52" y2="25.5" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
-						<line x1="160.6" y1="35.4" x2="168" y2="25.5" stroke="#10b981" stroke-width="2" stroke-linecap="round" />
-						<line x1="198" y1="105" x2="208" y2="105" stroke="#10b981" stroke-width="2" stroke-linecap="round" />
-
-						<!-- Zone Markers Outside Arc (ตัวเลขอยู่นอกแถบสี ชัดเจน 100% ไม่บังเส้นเกจ) -->
-						<text x="14" y="122" text-anchor="middle" class="text-[11px] fill-rose-600 dark:fill-rose-400 font-mono font-black">0.0</text>
-						<text x="44" y="16" text-anchor="middle" class="text-[11px] fill-amber-600 dark:fill-amber-400 font-mono font-black drop-shadow-xs">0.30</text>
-						<text x="176" y="16" text-anchor="middle" class="text-[11px] fill-emerald-600 dark:fill-emerald-400 font-mono font-black drop-shadow-xs">0.70</text>
-						<text x="206" y="122" text-anchor="middle" class="text-[11px] fill-emerald-600 dark:fill-emerald-400 font-mono font-black">1.0</text>
-					</svg>
-				</div>
-
-				<!-- Gauge Value Readout -->
-				<div class="mt-1 space-y-1">
-					<div class="text-3xl font-black font-mono tracking-tight text-foreground flex items-center justify-center gap-1.5">
-						<span class="font-serif italic font-semibold text-2xl text-indigo-600 dark:text-indigo-400">g</span>
-						<span>=</span>
-						<span>{gainG !== null ? gainG.toFixed(2) : 'N/A'}</span>
-					</div>
-
-					<!-- Category Badge -->
-					{#if gainCategory === 'high'}
-						<div class="inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-							<CheckCircle2 class="size-3.5" />
-							<span>พัฒนาการสูงมาก (<span class="font-serif italic font-bold">g</span> ≥ 0.70)</span>
-						</div>
-					{:else if gainCategory === 'medium'}
-						<div class="inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-							<TrendingUp class="size-3.5" />
-							<span>พัฒนาการปานกลาง (0.30 ≤ <span class="font-serif italic font-bold">g</span> &lt; 0.70)</span>
-						</div>
-					{:else if gainCategory === 'low'}
-						<div class="inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
-							<AlertTriangle class="size-3.5" />
-							<span>ควรส่งเสริมเป็นพิเศษ (<span class="font-serif italic font-bold">g</span> &lt; 0.30)</span>
-						</div>
-					{:else}
-						<div class="inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold bg-slate-500/15 text-slate-500 border border-slate-300 dark:border-slate-700">
-							<Info class="size-3.5" />
-							<span>รอผลสอบคู่ขนาน Pre-Post</span>
-						</div>
 					{/if}
 
-					<!-- Delta GOP & Paired Learners -->
-					<div class="flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground pt-1">
-						<span>
-							Δ GOP: <strong class={deltaGop !== null && deltaGop >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}>
-								{deltaGop !== null ? (deltaGop >= 0 ? `+${deltaGop}%` : `${deltaGop}%`) : '-'}
-							</strong>
-						</span>
-						<span>•</span>
-						<span>ข้อมูลคู่ขนาน: <strong class="text-foreground">{pairedCount}</strong> คน</span>
-					</div>
-				</div>
+					<!-- Draw Grouped Bars for each phase -->
+					{#each phasesList as { label, data, cx }}
+						{@const gopY = 200 - (Math.max(0, Math.min(100, data.avgGop)) / 100) * 165}
+						{@const toneY = 200 - (Math.max(0, Math.min(100, data.avgToneScore)) / 100) * 165}
+						{@const correctY = 200 - (Math.max(0, Math.min(100, data.correctTonesPct)) / 100) * 165}
+						{@const barW = 28}
+
+						{#if data.count > 0}
+							<!-- GOP Bar -->
+							<rect
+								x={cx - 46}
+								y={gopY}
+								width={barW}
+								height={Math.max(0, 200 - gopY)}
+								rx="6"
+								fill="#6366f1"
+								class="transition-all duration-300 hover:opacity-85"
+							/>
+							<text x={cx - 32} y={Math.max(22, gopY - 6)} text-anchor="middle" class="text-[11px] fill-indigo-600 dark:fill-indigo-400 font-mono font-bold">
+								{Math.round(data.avgGop)}%
+							</text>
+
+							<!-- Tone Score Bar -->
+							<rect
+								x={cx - 14}
+								y={toneY}
+								width={barW}
+								height={Math.max(0, 200 - toneY)}
+								rx="6"
+								fill="#f59e0b"
+								class="transition-all duration-300 hover:opacity-85"
+							/>
+							<text x={cx} y={Math.max(22, toneY - 6)} text-anchor="middle" class="text-[11px] fill-amber-600 dark:fill-amber-400 font-mono font-bold">
+								{Math.round(data.avgToneScore)}%
+							</text>
+
+							<!-- Correct Tones Bar -->
+							<rect
+								x={cx + 18}
+								y={correctY}
+								width={barW}
+								height={Math.max(0, 200 - correctY)}
+								rx="6"
+								fill="#10b981"
+								class="transition-all duration-300 hover:opacity-85"
+							/>
+							<text x={cx + 32} y={Math.max(22, correctY - 6)} text-anchor="middle" class="text-[11px] fill-emerald-600 dark:fill-emerald-400 font-mono font-bold">
+								{Math.round(data.correctTonesPct)}%
+							</text>
+						{:else}
+							<!-- Empty state placeholder for phase -->
+							<rect
+								x={cx - 50}
+								y="150"
+								width="100"
+								height="50"
+								rx="8"
+								fill="none"
+								stroke="currentColor"
+								stroke-opacity="0.15"
+								stroke-dasharray="4,4"
+							/>
+							<text x={cx} y="180" text-anchor="middle" class="text-xs fill-muted-foreground font-medium">
+								ยังไม่มีผู้สอบ
+							</text>
+						{/if}
+
+						<!-- X Axis Labels -->
+						<text x={cx} y="222" text-anchor="middle" class="text-[12px] font-bold fill-foreground">
+							{label}
+						</text>
+						<text x={cx} y="238" text-anchor="middle" class="text-[10px] fill-muted-foreground font-mono">
+							(N = {data.count} ครั้ง / {data.uniqueUsers || 0} คน)
+						</text>
+					{/each}
+
+					<!-- Base X axis line -->
+					<line x1="55" y1="200" x2="725" y2="200" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5" />
+				</svg>
 			</div>
 		</div>
 
 		<!-- Plain-Thai Insight Box (Block A) -->
 		<div class="mt-6 rounded-2xl bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 p-4">
-			<div class="flex items-start gap-3">
-				<div class="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
+			<div class="flex items-start gap-3.5">
+				<div class="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
 					<Lightbulb class="size-5" />
 				</div>
 				<div class="space-y-1.5 text-xs">
-					<div class="font-bold text-foreground text-sm flex items-center gap-1.5">
-						<span>💡 สรุปผล: พัฒนาการระยะยาว Pre → Mid → Post</span>
+					<div class="font-bold text-foreground text-sm flex items-center gap-2">
+						<span>💡 สรุปผลการประเมินและการพัฒนาการของผู้เรียนทั้งรุ่น</span>
+						{#if deltaGop !== null}
+							<span class="rounded-full px-2.5 py-0.5 text-xs font-mono font-bold {deltaGop >= 0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600'}">
+								{deltaGop >= 0 ? `+${deltaGop}%` : `${deltaGop}%`} GOP
+							</span>
+						{/if}
 					</div>
 					<div class="text-muted-foreground leading-relaxed">
-						{#if gainG !== null && pairedCount > 0}
-							{#if gainG >= 0.7}
-								<div class="flex flex-wrap items-center gap-2">
-									<span class="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-bold font-mono">+{deltaGop}% GOP</span>
-									<span class="rounded-md bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 font-bold font-mono">g = {gainG.toFixed(2)}</span>
-									<span>นักเรียน {pairedCount} คนมีพัฒนาการระดับ <strong>สูงมาก</strong> ช่วยปิดช่องว่างความรู้เดิมได้ {Math.round(gainG * 100)}%</span>
-								</div>
-							{:else if gainG >= 0.3}
-								<div class="flex flex-wrap items-center gap-2">
-									<span class="rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 font-bold font-mono">+{deltaGop}% GOP</span>
-									<span class="rounded-md bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 font-bold font-mono">g = {gainG.toFixed(2)}</span>
-									<span>พัฒนาการระดับ <strong>ปานกลาง</strong> แนะนำให้เพิ่มการฝึกซ้ำคำศัพท์ที่ผิดบ่อยในโหมด AI Talk</span>
-								</div>
-							{:else}
-								<div class="flex flex-wrap items-center gap-2">
-									<span class="rounded-md bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-bold font-mono">Δ {deltaGop}%</span>
-									<span class="rounded-md bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-bold font-mono">g = {gainG.toFixed(2)}</span>
-									<span>ต่ำกว่าเกณฑ์เป้าหมาย แนะนำจัดกลุ่มเสริม (Remedial) โดยเน้นวรรณยุกต์เสียง 2 และ 3</span>
-								</div>
-							{/if}
+						{#if postPhase.count > 0 && prePhase.count > 0}
+							<span>
+								ผู้เรียนทำคะแนนความชัดเจนการออกเสียง (GOP) จากระยะก่อนเรียน ({Math.round(prePhase.avgGop)}%) พัฒนาขึ้นเป็น <strong>{Math.round(postPhase.avgGop)}%</strong> ในระยะหลังเรียน
+								({deltaGop !== null && deltaGop >= 0 ? `เพิ่มขึ้น +${deltaGop}%` : `เปลี่ยนแปลง ${deltaGop}%`}) 
+								ความแม่นยำวรรณยุกต์อยู่ที่ {Math.round(postPhase.avgToneScore)}% 
+								{postPhase.avgToneScore < 70 ? '• แนะนำเสริมการฝึกแยกเสียงวรรณยุกต์ 2 และ 3 เพิ่มเติม' : '• ภาพรวมความแม่นยำวรรณยุกต์อยู่ในเกณฑ์ดี'}
+							</span>
+						{:else if midPhase.count > 0 && prePhase.count > 0}
+							<span>
+								ผู้เรียนมีพัฒนาการความชัดเจนในการออกเสียง (GOP) จากก่อนเรียน ({Math.round(prePhase.avgGop)}%) ขยับขึ้นเป็น <strong>{Math.round(midPhase.avgGop)}%</strong> ในระยะกลางภาค 
+								({deltaGop !== null && deltaGop >= 0 ? `เพิ่มขึ้น +${deltaGop}%` : `เปลี่ยนแปลง ${deltaGop}%`}) 
+								โดยคะแนนวรรณยุกต์ขยับจาก {Math.round(prePhase.avgToneScore)}% เป็น {Math.round(midPhase.avgToneScore)}%
+								• แนะนำให้ผู้เรียนฝึกด่านเสียงวรรณยุกต์ที่ 2 และ 3 อย่างต่อเนื่องก่อนเข้าสู่การประเมินหลังเรียน (Post-test)
+							</span>
 						{:else if prePhase.count > 0}
-							<span>ข้อมูล Pre-test {prePhase.count} ครั้ง (เฉลี่ย {prePhase.avgGop}%) — รอข้อมูล Post-test เพื่อคำนวณ Hake's Gain</span>
+							<span>
+								บันทึกค่าพื้นฐานก่อนเรียน (Pre-test Baseline) เรียบร้อยแล้ว (เฉลี่ย GOP {Math.round(prePhase.avgGop)}%, วรรณยุกต์ {Math.round(prePhase.avgToneScore)}%) 
+								เมื่อผู้เรียนทำแบบทดสอบกลางภาคและหลังเรียน ระบบจะประมวลผลการเปรียบเทียบพัฒนาการให้อัตโนมัติ
+							</span>
 						{:else}
-							<span>ยังไม่มีข้อมูลการสอบ Pre-test หรือ Post-test ในระบบ แนะนำให้ผู้เรียนเริ่มทำแบบวัดระดับที่เมนู Assessment</span>
+							<span>
+								ยังไม่มีข้อมูลการประเมินของผู้เรียนในระบบ เมื่อผู้เรียนเริ่มทำแบบทดสอบก่อนเรียน (Pre-test) สถิติจะแสดงขึ้นที่นี่
+							</span>
 						{/if}
 					</div>
 				</div>

@@ -115,6 +115,12 @@
 		unitLabel: string;
 	};
 
+	function resolveClassAvg(val: any, benchmarkVal: any): number {
+		if (typeof val === 'number') return Math.round(val);
+		if (typeof benchmarkVal === 'number') return Math.round(benchmarkVal);
+		return 0;
+	}
+
 	const radarAxes = $derived.by<RadarAxis[]>(() => {
 		if (Array.isArray(radar6Axis?.axes) && radar6Axis.axes.length === 6) {
 			return radar6Axis.axes.map((ax: any) => ({
@@ -122,7 +128,7 @@
 				label: ax.label,
 				shortLabel: ax.shortLabel || ax.label,
 				score: Number(ax.score) || 0,
-				classAvg: Number(ax.classAvg) || Number(classRadarBenchmark?.[ax.key]) || 70,
+				classAvg: resolveClassAvg(ax.classAvg, classRadarBenchmark?.[ax.key]),
 				attempted: Boolean(ax.attempted),
 				evidenceCount: Number(ax.evidenceCount) || 0,
 				unitLabel: ax.unitLabel || 'ครั้ง'
@@ -143,7 +149,7 @@
 				label: 'การออกเสียงพยัญชนะ/สระ',
 				shortLabel: 'พยัญชนะ/สระ',
 				score: Math.round(phonemeGop),
-				classAvg: Number(classRadarBenchmark?.phonemeClarity) || 72,
+				classAvg: typeof classRadarBenchmark?.phonemeClarity === 'number' ? Math.round(classRadarBenchmark.phonemeClarity) : 0,
 				attempted: phonemeGop > 0 || (diagnostic?.totalEvaluations ?? 0) > 0,
 				evidenceCount: diagnostic?.totalEvaluations || detail?.recentEvaluations?.length || 0,
 				unitLabel: 'คำ'
@@ -153,7 +159,7 @@
 				label: 'ความแม่นยำวรรณยุกต์ 4 เสียง',
 				shortLabel: 'วรรณยุกต์',
 				score: Math.round(toneScore),
-				classAvg: Number(classRadarBenchmark?.toneMastery) || 68,
+				classAvg: typeof classRadarBenchmark?.toneMastery === 'number' ? Math.round(classRadarBenchmark.toneMastery) : 0,
 				attempted: toneScore > 0 || (diagnostic?.toneEvaluations ?? 0) > 0,
 				evidenceCount: diagnostic?.toneEvaluations || detail?.recentEvaluations?.length || 0,
 				unitLabel: 'ครั้ง'
@@ -163,7 +169,7 @@
 				label: 'การคัดอักษรจีนลำดับขีด',
 				shortLabel: 'คัดอักษรจีน',
 				score: Math.round(writingScore),
-				classAvg: Number(classRadarBenchmark?.hanziWriting) || 75,
+				classAvg: typeof classRadarBenchmark?.hanziWriting === 'number' ? Math.round(classRadarBenchmark.hanziWriting) : 0,
 				attempted: (writing?.totalAttempts ?? 0) > 0,
 				evidenceCount: writing?.totalAttempts || 0,
 				unitLabel: 'ครั้ง'
@@ -172,8 +178,8 @@
 				key: 'questMastery',
 				label: 'ความก้าวหน้าด่านผจญภัย',
 				shortLabel: 'ด่านผจญภัย',
-				score: Math.min(100, Math.round((questStars / 15) * 100)),
-				classAvg: Number(classRadarBenchmark?.questMastery) || 65,
+				score: Math.min(100, Math.round((questStars / 30) * 100)),
+				classAvg: typeof classRadarBenchmark?.questMastery === 'number' ? Math.round(classRadarBenchmark.questMastery) : 0,
 				attempted: questStars > 0,
 				evidenceCount: questStars,
 				unitLabel: 'ด่าน'
@@ -183,7 +189,7 @@
 				label: 'ความพร้อมสอบจำลอง HSK',
 				shortLabel: 'สอบ HSK',
 				score: Math.round(examScore),
-				classAvg: Number(classRadarBenchmark?.examReadiness) || 70,
+				classAvg: typeof classRadarBenchmark?.examReadiness === 'number' ? Math.round(classRadarBenchmark.examReadiness) : 0,
 				attempted: (exam?.totalAttempts ?? 0) > 0,
 				evidenceCount: exam?.totalAttempts || 0,
 				unitLabel: 'ชุด'
@@ -193,7 +199,7 @@
 				label: 'การสนทนาโต้ตอบ AI',
 				shortLabel: 'สนทนา AI',
 				score: Math.round(chatScore),
-				classAvg: Number(classRadarBenchmark?.conversationalFluency) || 60,
+				classAvg: typeof classRadarBenchmark?.conversationalFluency === 'number' ? Math.round(classRadarBenchmark.conversationalFluency) : 0,
 				attempted: (chatbot?.totalSessions ?? 0) > 0,
 				evidenceCount: chatbot?.totalSessions || 0,
 				unitLabel: 'รอบ'
@@ -732,11 +738,15 @@
 
 						<!-- Delta vs Class Avg -->
 						<div class="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] font-mono">
-							<span class="text-muted-foreground text-[10px]">เฉลี่ยห้อง {axis.classAvg}%</span>
-							{#if axis.attempted}
+							<span class="text-muted-foreground text-[10px]">
+								{axis.classAvg > 0 ? `เฉลี่ยห้อง ${axis.classAvg}%` : 'เฉลี่ยห้อง: ยังไม่มีข้อมูล'}
+							</span>
+							{#if axis.attempted && axis.classAvg > 0}
 								<span class="font-bold {delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
 									{delta >= 0 ? `+${delta}% เหนือเฉลี่ย` : `${delta}% ต่ำกว่าเฉลี่ย`}
 								</span>
+							{:else if axis.attempted}
+								<span class="text-indigo-600 dark:text-indigo-400 font-bold text-[9.5px]">ผู้เรียนคนแรกในรุ่น</span>
 							{:else}
 								<span class="text-muted-foreground text-[9.5px]">ไม่นำมาหารฉุดเกรด</span>
 							{/if}
@@ -758,11 +768,11 @@
 				</div>
 				<div>
 					<h3 class="text-lg font-black text-foreground flex items-center gap-2">
-						<span>พัฒนาการระยะยาว Pre → Mid → Post & Hake's Gain</span>
+						<span>การประเมินพัฒนาการระยะยาวของผู้เรียน (ก่อนเรียน ➔ กลางภาค ➔ หลังจบหลักสูตร)</span>
 						<span class="font-serif italic font-semibold text-indigo-600 dark:text-indigo-400">(g)</span>
 					</h3>
 					<p class="text-xs text-muted-foreground mt-0.5">
-						เส้นทางการพัฒนาการออกเสียงของ {userModal?.username || 'ผู้เรียน'} ตลอดหลักสูตร
+						เส้นทางการพัฒนาการออกเสียงของ {userModal?.username || 'ผู้เรียน'} ตลอดหลักสูตร พร้อมดัชนีวัดอัตราการพัฒนาสัมพัทธ์ (g)
 					</p>
 				</div>
 			</div>
@@ -878,7 +888,7 @@
 					<div class="font-bold text-foreground text-sm">💡 สรุปผลการประเมินของผู้เรียนคนนี้</div>
 					<div class="text-muted-foreground leading-relaxed">
 						{#if isPostDone && isPreDone}
-							{userModal?.username} มีพัฒนาการด้านความแม่นยำ GOP <strong class="text-emerald-600 font-bold">{userDeltaGop !== null && userDeltaGop >= 0 ? `+${userDeltaGop}%` : `${userDeltaGop}%`}</strong> จากจุดเริ่มต้น และมีค่า Hake's Gain <span class="font-serif italic font-semibold">g</span> = <strong>{userGainG?.toFixed(2)}</strong> ({userGainG && userGainG >= 0.7 ? 'พัฒนาการสูงมาก' : userGainG && userGainG >= 0.3 ? 'พัฒนาการปานกลาง' : 'ควรเสริม'}) แสดงว่าการฝึกซ้อมช่วยพัฒนาการออกเสียงได้อย่างมีประสิทธิภาพ
+							{userModal?.username} มีพัฒนาการด้านความแม่นยำ GOP <strong class="text-emerald-600 font-bold">{userDeltaGop !== null && userDeltaGop >= 0 ? `+${userDeltaGop}%` : `${userDeltaGop}%`}</strong> จากจุดเริ่มต้น และมีดัชนีอัตราการพัฒนาสัมพัทธ์ <span class="font-serif italic font-semibold">g</span> = <strong>{userGainG?.toFixed(2)}</strong> ({userGainG && userGainG >= 0.7 ? 'พัฒนาการสูงมาก' : userGainG && userGainG >= 0.3 ? 'พัฒนาการปานกลาง' : 'ควรเสริม'}) แสดงว่าการฝึกซ้อมช่วยพัฒนาการออกเสียงได้อย่างมีประสิทธิภาพ
 						{:else if isPreDone}
 							{userModal?.username} ได้ทำการสอบ Pre-test ไว้เรียบร้อยแล้ว ({userPre.totalWords || 20} คำ • GOP {Math.round(userPre.avgGop)}%) ขณะนี้รอเข้าทำแบบทดสอบ Post-test เมื่อเรียนจบคอร์สเพื่อประเมินอัตราพัฒนาการรวม
 						{:else}
