@@ -87,12 +87,12 @@
 	const radarAxesList = $derived([
 		{
 			key: 'phonemeClarity',
-			name: 'การออกเสียงพยัญชนะ/สระ',
-			shortName: 'พยัญชนะ/สระ',
+			name: 'ความชัดเจนของวรรณยุกต์และเสียง (Tone & GOP)',
+			shortName: 'วรรณยุกต์/GOP',
 			score: Math.round(Number(classRadar?.phonemeClarity || 0)),
 			icon: Mic,
 			color: '#3b82f6',
-			desc: 'ความแม่นยำรายโฟนีม (GOP)'
+			desc: 'ความแม่นยำระดับเสียงและสัทศาสตร์ (GOP)'
 		},
 		{
 			key: 'toneMastery',
@@ -343,7 +343,7 @@
 								class="transition-all duration-300 hover:opacity-85"
 							/>
 							<text x={cx - 32} y={Math.max(22, gopY - 6)} text-anchor="middle" class="text-[11px] fill-indigo-600 dark:fill-indigo-400 font-mono font-bold">
-								{Math.round(data.avgGop)}%
+								{(Number(data.avgGop) || 0).toFixed(1)}%
 							</text>
 
 							<!-- Tone Score Bar -->
@@ -357,7 +357,7 @@
 								class="transition-all duration-300 hover:opacity-85"
 							/>
 							<text x={cx} y={Math.max(22, toneY - 6)} text-anchor="middle" class="text-[11px] fill-amber-600 dark:fill-amber-400 font-mono font-bold">
-								{Math.round(data.avgToneScore)}%
+								{(Number(data.avgToneScore) || 0).toFixed(1)}%
 							</text>
 
 							<!-- Correct Tones Bar -->
@@ -371,7 +371,7 @@
 								class="transition-all duration-300 hover:opacity-85"
 							/>
 							<text x={cx + 32} y={Math.max(22, correctY - 6)} text-anchor="middle" class="text-[11px] fill-emerald-600 dark:fill-emerald-400 font-mono font-bold">
-								{Math.round(data.correctTonesPct)}%
+								{(Number(data.correctTonesPct) || 0).toFixed(1)}%
 							</text>
 						{:else}
 							<!-- Empty state placeholder for phase -->
@@ -424,21 +424,21 @@
 					<div class="text-muted-foreground leading-relaxed">
 						{#if postPhase.count > 0 && prePhase.count > 0}
 							<span>
-								ผู้เรียนทำคะแนนความชัดเจนการออกเสียง (GOP) จากระยะก่อนเรียน ({Math.round(prePhase.avgGop)}%) พัฒนาขึ้นเป็น <strong>{Math.round(postPhase.avgGop)}%</strong> ในระยะหลังเรียน
-								({deltaGop !== null && deltaGop >= 0 ? `เพิ่มขึ้น +${deltaGop}%` : `เปลี่ยนแปลง ${deltaGop}%`}) 
-								ความแม่นยำวรรณยุกต์อยู่ที่ {Math.round(postPhase.avgToneScore)}% 
+								ผู้เรียนทำคะแนนความชัดเจนการออกเสียง (GOP) จากระยะก่อนเรียน ({(Number(prePhase.avgGop) || 0).toFixed(1)}%) พัฒนาขึ้นเป็น <strong>{(Number(postPhase.avgGop) || 0).toFixed(1)}%</strong> ในระยะหลังเรียน
+								({deltaGop !== null && deltaGop >= 0 ? `พัฒนาการคนเดิม +${Number(deltaGop).toFixed(1)}% GOP` : `เปลี่ยนแปลง ${deltaGop}%`}) 
+								ความแม่นยำวรรณยุกต์อยู่ที่ {(Number(postPhase.avgToneScore) || 0).toFixed(1)}% 
 								{postPhase.avgToneScore < 70 ? '• แนะนำเสริมการฝึกแยกเสียงวรรณยุกต์ 2 และ 3 เพิ่มเติม' : '• ภาพรวมความแม่นยำวรรณยุกต์อยู่ในเกณฑ์ดี'}
 							</span>
 						{:else if midPhase.count > 0 && prePhase.count > 0}
 							<span>
-								ผู้เรียนมีพัฒนาการความชัดเจนในการออกเสียง (GOP) จากก่อนเรียน ({Math.round(prePhase.avgGop)}%) ขยับขึ้นเป็น <strong>{Math.round(midPhase.avgGop)}%</strong> ในระยะกลางภาค 
-								({deltaGop !== null && deltaGop >= 0 ? `เพิ่มขึ้น +${deltaGop}%` : `เปลี่ยนแปลง ${deltaGop}%`}) 
-								โดยคะแนนวรรณยุกต์ขยับจาก {Math.round(prePhase.avgToneScore)}% เป็น {Math.round(midPhase.avgToneScore)}%
+								ผู้เรียนมีคะแนนความชัดเจนการออกเสียง (GOP) เฉลี่ยจากก่อนเรียน ({(Number(prePhase.avgGop) || 0).toFixed(1)}%) ขยับขึ้นเป็น <strong>{(Number(midPhase.avgGop) || 0).toFixed(1)}%</strong> ในระยะกลางภาค 
+								({deltaGop !== null && deltaGop >= 0 ? `พัฒนาการคนเดิมที่สอบครบ +${Number(deltaGop).toFixed(1)}% GOP` : `เปลี่ยนแปลง ${deltaGop}%`}) 
+								โดยคะแนนวรรณยุกต์ขยับจาก {(Number(prePhase.avgToneScore) || 0).toFixed(1)}% เป็น {(Number(midPhase.avgToneScore) || 0).toFixed(1)}%
 								• แนะนำให้ผู้เรียนฝึกด่านเสียงวรรณยุกต์ที่ 2 และ 3 อย่างต่อเนื่องก่อนเข้าสู่การประเมินหลังเรียน (Post-test)
 							</span>
 						{:else if prePhase.count > 0}
 							<span>
-								บันทึกค่าพื้นฐานก่อนเรียน (Pre-test Baseline) เรียบร้อยแล้ว (เฉลี่ย GOP {Math.round(prePhase.avgGop)}%, วรรณยุกต์ {Math.round(prePhase.avgToneScore)}%) 
+								บันทึกค่าพื้นฐานก่อนเรียน (Pre-test Baseline) เรียบร้อยแล้ว (เฉลี่ย GOP {(Number(prePhase.avgGop) || 0).toFixed(1)}%, วรรณยุกต์ {(Number(prePhase.avgToneScore) || 0).toFixed(1)}%) 
 								เมื่อผู้เรียนทำแบบทดสอบกลางภาคและหลังเรียน ระบบจะประมวลผลการเปรียบเทียบพัฒนาการให้อัตโนมัติ
 							</span>
 						{:else}

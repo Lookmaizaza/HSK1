@@ -146,8 +146,8 @@
 		return [
 			{
 				key: 'phonemeClarity',
-				label: 'การออกเสียงพยัญชนะ/สระ',
-				shortLabel: 'พยัญชนะ/สระ',
+				label: 'ความชัดเจนของวรรณยุกต์และเสียง (Tone & GOP)',
+				shortLabel: 'วรรณยุกต์/GOP',
 				score: Math.round(phonemeGop),
 				classAvg: typeof classRadarBenchmark?.phonemeClarity === 'number' ? Math.round(classRadarBenchmark.phonemeClarity) : 0,
 				attempted: phonemeGop > 0 || (diagnostic?.totalEvaluations ?? 0) > 0,

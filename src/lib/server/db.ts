@@ -5131,8 +5131,7 @@ export async function getFlashcardAnalytics() {
 					f.review_count,
 					f.total_words,
 					f.completed_at,
-					u.username,
-					u.display_name
+					u.username
 				FROM flashcard_set_completions f
 				LEFT JOIN users u ON CAST(u.id AS TEXT) = f.user_id
 				${recentAdminFilter}
@@ -5149,7 +5148,7 @@ export async function getFlashcardAnalytics() {
 				id: Number(r.id),
 				userId: String(r.user_id),
 				username: String(r.username || r.user_id),
-				displayName: String(r.display_name || r.username || `ผู้เรียน ID ${r.user_id}`),
+				displayName: String(r.username || `ผู้เรียน ID ${r.user_id}`),
 				hskLevel: Number(r.hsk_level),
 				setIndex: Number(r.set_index),
 				masteredCount: mastered,
