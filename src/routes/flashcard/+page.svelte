@@ -48,6 +48,7 @@
 		type SyllableToneResult
 	} from '$lib/pitch';
 	import { initToneNeuralNetwork, predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
+	import { progress } from '$lib/progress.svelte';
 	import { onMount, tick } from 'svelte';
 
 	// Screen view states: 'levelSelect' | 'setSelect' | 'study' | 'summary'
@@ -68,6 +69,7 @@
 	// Voice practice & ONNX AI Tone detection
 	let isListening = $state(false);
 	let voiceScore = $state<number | null>(null);
+	let earnedPracticeXp = $state(0);
 	let voiceFeedback = $state<string | null>(null);
 	let voiceHeard = $state<string | null>(null);
 	let detectedAITone = $state<number | null>(null);
@@ -77,6 +79,8 @@
 
 	// Writing practice modal
 	let writingModalOpen = $state(false);
+	let levelUpPromptOpen = $state(false);
+	let levelUpPromptDismissed = $state(false);
 
 	// HanziWriter container elements for each character in word
 	let charContainers = $state<Record<number, HTMLDivElement | null>>({});
@@ -97,6 +101,12 @@
 		refreshStats();
 		// Warm up our trained ONNX deep learning tone model in background
 		initToneNeuralNetwork().catch(() => {});
+	});
+
+	$effect(() => {
+		if (progress.bossReady && !levelUpPromptDismissed) {
+			levelUpPromptOpen = true;
+		}
 	});
 
 	// Current word being studied
@@ -168,6 +178,7 @@
 	$effect(() => {
 		if (currentView === 'study' && currentWord) {
 			voiceScore = null;
+			earnedPracticeXp = 0;
 			voiceFeedback = null;
 			voiceHeard = null;
 			detectedAITone = null;
@@ -219,6 +230,7 @@
 
 		isListening = false;
 		voiceScore = null;
+		earnedPracticeXp = 0;
 		voiceFeedback = null;
 		voiceHeard = null;
 		detectedAITone = null;
@@ -354,6 +366,14 @@
 			const isPassed = isWordCorrect && isToneReasonable;
 			const finalScore = isPassed ? Math.max(analysis.overallScore, 75) : Math.min(analysis.overallScore, 50);
 			voiceScore = Math.round(finalScore);
+			if (isPassed) {
+				try {
+					earnedPracticeXp = await progress.addPracticeExp();
+				} catch (error) {
+					console.error('Error saving pronunciation practice XP:', error);
+					voiceFeedback = 'ออกเสียงผ่านแล้ว แต่บันทึก XP ไม่สำเร็จ กรุณาลองอีกครั้ง';
+				}
+			}
 			voiceHeard = finalHeard || candidatePool[0] || null;
 			syllableResults = analysis.syllableResults;
 			const firstSyllable = analysis.syllableResults[0];
@@ -874,6 +894,11 @@
 										{voiceFeedback}
 									</p>
 								{/if}
+								{#if earnedPracticeXp > 0}
+									<p class="font-black text-violet-600 dark:text-violet-400">ได้รับ +{earnedPracticeXp} XP</p>
+								{:else if progress.bossReady && voiceScore !== null && voiceScore >= 75}
+									<p class="font-bold text-amber-600 dark:text-amber-400">XP ครบแล้ว ไปพิชิต Boss Stage เพื่อปลดล็อกเลเวลถัดไป</p>
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -975,3 +1000,39 @@
 		</div>
 	{/if}
 </div>
+
+{#if levelUpPromptOpen}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation">
+		<div
+			class="w-full max-w-md rounded-3xl border bg-card p-6 text-center shadow-2xl"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="level-up-title"
+		>
+			<div class="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400">
+				<Award class="size-8" />
+			</div>
+			<h2 id="level-up-title" class="text-2xl font-black text-foreground">XP ครบแล้ว!</h2>
+			<p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+				ยินดีด้วย! ทักษะของคุณพร้อมแล้ว กดทำแบบทดสอบเพื่ออัปเลเวล (Level Up) กันเลย!
+			</p>
+			<a
+				href="/assessment?type=boss"
+				class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
+			>
+				พิชิต Boss Stage
+				<ArrowRight class="size-4" />
+			</a>
+			<button
+				type="button"
+				onclick={() => {
+					levelUpPromptDismissed = true;
+					levelUpPromptOpen = false;
+				}}
+				class="mt-3 w-full rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted"
+			>
+				ไว้ทีหลัง
+			</button>
+		</div>
+	</div>
+{/if}

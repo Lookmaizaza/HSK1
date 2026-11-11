@@ -7,6 +7,7 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { env } from '$env/dynamic/private';
+import { MAX_LEARNER_LEVEL, XP_PER_LEVEL } from '$lib/gamification';
 
 const isServerless = !!(env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.NETLIFY);
 
@@ -61,7 +62,8 @@ CREATE TABLE IF NOT EXISTS progress (
 	xp INTEGER NOT NULL DEFAULT 0,
 	hearts INTEGER NOT NULL DEFAULT 5,
 	streak INTEGER NOT NULL DEFAULT 0,
-	last_practiced TEXT
+	last_practiced TEXT,
+	learner_level INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS lesson_completions (
@@ -310,7 +312,12 @@ function init(): Promise<void> {
 	if (!initPromise) {
 		initPromise = (async () => {
 			await client.executeMultiple(SCHEMA);
-const stageOverrideColumns = await client.execute('PRAGMA table_info(stage_overrides)');
+			const progressColumns = await client.execute('PRAGMA table_info(progress)');
+			const progressColumnNames = new Set(progressColumns.rows.map((row) => String(row.name)));
+			if (!progressColumnNames.has('learner_level')) {
+				await client.execute('ALTER TABLE progress ADD COLUMN learner_level INTEGER NOT NULL DEFAULT 1');
+			}
+			const stageOverrideColumns = await client.execute('PRAGMA table_info(stage_overrides)');
 			const columnNames = new Set(stageOverrideColumns.rows.map((row) => String(row.name)));
 			if (!columnNames.has('custom_words')) {
 				await client.execute('ALTER TABLE stage_overrides ADD COLUMN custom_words TEXT');
@@ -482,6 +489,8 @@ export type ProgressRow = {
 	xp: number;
 	hearts: number;
 	streak: number;
+	learnerLevel: number;
+	levelExp: number;
 	mistakes: number;
 	lastPracticed: string | null;
 	completed: Record<string, number>;
@@ -489,10 +498,10 @@ export type ProgressRow = {
 
 export async function getProgress(userId: number): Promise<ProgressRow> {
 	const client = getDb();
-	if (!client) return { xp: 0, hearts: 5, streak: 0, mistakes: 0, lastPracticed: null, completed: {} };
+	if (!client) return { xp: 0, hearts: 5, streak: 0, learnerLevel: 1, levelExp: 0, mistakes: 0, lastPracticed: null, completed: {} };
 	await init();
 	const progRes = await client.execute({
-		sql: 'SELECT xp, hearts, streak, last_practiced FROM progress WHERE user_id = ?',
+		sql: 'SELECT xp, hearts, streak, last_practiced, learner_level FROM progress WHERE user_id = ?',
 		args: [userId]
 	});
 	const compRes = await client.execute({
@@ -506,14 +515,36 @@ export async function getProgress(userId: number): Promise<ProgressRow> {
 		completed[String(c.lesson_key)] = Number(c.stars);
 	}
 
+	const xp = row ? Number(row.xp) : 0;
+	const learnerLevel = row ? Math.min(MAX_LEARNER_LEVEL, Math.max(1, Number(row.learner_level))) : 1;
 	return {
-		xp: row ? Number(row.xp) : 0,
+		xp,
 		hearts: row ? Number(row.hearts) : 5,
 		streak: row ? Number(row.streak) : 0,
+		learnerLevel,
+		levelExp: Math.min(XP_PER_LEVEL, Math.max(0, xp - (learnerLevel - 1) * XP_PER_LEVEL)),
 		mistakes: 0,
 		lastPracticed: row?.last_practiced ? String(row.last_practiced) : null,
 		completed
 	};
+}
+
+export async function completeBoss(userId: number, expectedLevel: number): Promise<boolean> {
+	const client = getDb();
+	if (!client) return false;
+	await init();
+	if (expectedLevel >= MAX_LEARNER_LEVEL) {
+		const result = await client.execute({
+			sql: 'SELECT xp FROM progress WHERE user_id = ? AND learner_level = ?',
+			args: [userId, expectedLevel]
+		});
+		return Number(result.rows[0]?.xp ?? 0) >= expectedLevel * XP_PER_LEVEL;
+	}
+	const result = await client.execute({
+		sql: 'UPDATE progress SET learner_level = learner_level + 1 WHERE user_id = ? AND learner_level = ? AND xp >= ?',
+		args: [userId, expectedLevel, expectedLevel * XP_PER_LEVEL]
+	});
+	return Number(result.rowsAffected) > 0;
 }
 
 function today(): string {

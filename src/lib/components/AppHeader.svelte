@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { Flame, Heart, Zap, Settings as SettingsIcon, LogIn, LogOut, User, Shield, BarChart2, Award, AlertCircle } from '@lucide/svelte';
+	import { Flame, Heart, Settings as SettingsIcon, LogIn, LogOut, User, Shield, BarChart2, Award, AlertCircle } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { progress } from '$lib/progress.svelte';
+	import { getLearnerStage } from '$lib/gamification';
 	import { apiKey } from '$lib/apiKey.svelte';
 	import { model, MODELS, type ModelId } from '$lib/model.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -27,6 +28,7 @@
 	}
 
 	const user = $derived(page.data.user);
+	const learnerStage = $derived(getLearnerStage(progress.learnerLevel));
 </script>
 
 <header class="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
@@ -93,7 +95,7 @@
 					สถานการณ์จำลอง
 				</a>
 				<a
-					href="/assessment"
+					href="/assessment?type=boss"
 					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/assessment')
 						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
@@ -104,15 +106,33 @@
 				</a>
 			</nav>
 		</div>
-		<div class="flex shrink-0 items-center gap-1.5 text-xs font-semibold sm:gap-3 sm:text-sm">
-			<span class="flex items-center gap-1 text-orange-500">
+		<div class="flex shrink-0 items-center gap-1.5 text-xs font-semibold sm:gap-2">
+			<div
+				class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-2.5 text-orange-600 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-400"
+				title="สตรีคฝึกต่อเนื่อง"
+			>
 				<Flame class="size-4 fill-orange-500" />
-				{progress.streak}
-			</span>
-			<span class="flex items-center gap-1 text-yellow-500">
-				<Zap class="size-4 fill-yellow-400" />
-				{progress.xp}
-			</span>
+				<span class="tabular-nums">{progress.streak}</span>
+			</div>
+			<div
+				class="flex h-9 items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-2.5 text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-300"
+				title={`XP (Experience Points) คือแต้มประสบการณ์ • ${learnerStage.name} • HSK ${learnerStage.hskLevel}`}
+			>
+				<Award class="size-4 shrink-0" />
+				<div class="min-w-0">
+					<div class="max-w-24 truncate text-[11px] font-extrabold leading-tight sm:max-w-32 sm:text-xs">
+						{learnerStage.name}
+					</div>
+					<div class="mt-1 hidden items-center gap-1.5 sm:flex">
+						<div class="h-1.5 w-12 overflow-hidden rounded-full bg-violet-200 dark:bg-violet-900">
+							<div class="h-full rounded-full bg-violet-500 transition-all" style={`width: ${progress.levelProgress}%`}></div>
+						</div>
+						<span class="text-[9px] font-bold tabular-nums text-violet-600/80 dark:text-violet-300/80">
+							{progress.levelExp}/{progress.levelExpRequired} XP
+						</span>
+					</div>
+				</div>
+			</div>
 			<Button variant="ghost" size="icon" onclick={openSettings} aria-label="Settings">
 				<SettingsIcon class="size-5" />
 			</Button>
@@ -222,7 +242,7 @@
 			สถานการณ์จำลอง
 		</a>
 		<a
-			href="/assessment"
+			href="/assessment?type=boss"
 			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/assessment')
 				? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
 				: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"

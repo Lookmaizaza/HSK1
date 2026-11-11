@@ -250,6 +250,7 @@
 	});
 
 	function submitExam() {
+		if (examState !== 'testing') return;
 		stopTimer();
 		examState = 'result';
 		if (examResult.isPassed) {
