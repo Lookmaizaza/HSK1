@@ -32,8 +32,8 @@
 </script>
 
 <header class="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
-	<div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
-		<div class="flex min-w-0 items-center gap-2 sm:gap-3">
+	<div class="mx-auto flex h-14 max-w-7xl items-center justify-between gap-1 px-2 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
+		<div class="flex min-w-0 items-center gap-1 sm:gap-3">
 			<a href="/" class="group flex shrink-0 items-center gap-1.5 font-extrabold tracking-tight sm:gap-2.5">
 				<div class="relative size-9 shrink-0 flex items-center justify-center transition group-hover:scale-110 sm:size-10">
 					<img src="/mascot_avatar.png" alt="น้องช้างน้อย ปากจีน" class="size-full object-contain filter drop-shadow-sm" />
@@ -47,79 +47,21 @@
 				</div>
 			</a>
 
-			<!-- Desktop Nav Links (Clean active states only when selected) -->
-			<nav class="hidden 2xl:flex items-center gap-1 ml-4 border-l pl-4">
-				<a
-					href="/"
-					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname === '/'
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
-						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
-				>
-					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname === '/' ? 'opacity-100' : 'opacity-0'}"></span>
-					หน้าแรก
-				</a>
-				<a
-					href="/flashcard"
-					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/flashcard')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
-						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
-				>
-					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/flashcard') ? 'opacity-100' : 'opacity-0'}"></span>
-					ฝึกชุดคำศัพท์
-				</a>
-				<a
-					href="/quest"
-					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/quest')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
-						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
-				>
-					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/quest') ? 'opacity-100' : 'opacity-0'}"></span>
-					เล่นเป็นด่าน
-				</a>
-				<a
-					href="/exam"
-					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/exam')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
-						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
-				>
-					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/exam') ? 'opacity-100' : 'opacity-0'}"></span>
-					ลองทำข้อสอบจริง
-				</a>
-				<a
-					href="/talk"
-					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/talk')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
-						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
-				>
-					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/talk') ? 'opacity-100' : 'opacity-0'}"></span>
-					สถานการณ์จำลอง
-				</a>
-				<a
-					href="/assessment?type=boss"
-					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname.startsWith('/assessment')
-						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
-						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
-				>
-					<span class="size-1.5 shrink-0 rounded-full bg-rose-500 {page.url.pathname.startsWith('/assessment') ? 'opacity-100' : 'opacity-0'}"></span>
-					<Award class="size-3.5 text-amber-500" />
-					ประเมินผล
-				</a>
-			</nav>
 		</div>
-		<div class="flex shrink-0 items-center gap-1.5 text-xs font-semibold sm:gap-2">
+		<div class="flex shrink-0 items-center gap-1 text-xs font-semibold sm:gap-2">
 			<div
-				class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-2.5 text-orange-600 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-400"
+				class="inline-flex h-9 items-center gap-1 rounded-xl border border-orange-200 bg-orange-50 px-1.5 text-orange-600 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-400 sm:gap-1.5 sm:px-2.5"
 				title="สตรีคฝึกต่อเนื่อง"
 			>
 				<Flame class="size-4 fill-orange-500" />
-				<span class="tabular-nums">{progress.streak}</span>
+				<span class="tabular-nums max-[380px]:hidden">{progress.streak}</span>
 			</div>
 			<div
-				class="flex h-9 items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-2.5 text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-300"
+				class="flex h-9 items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-1.5 text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-300 sm:gap-2 sm:px-2.5"
 				title={`XP (Experience Points) คือแต้มประสบการณ์ • ${learnerStage.name} • HSK ${learnerStage.hskLevel}`}
 			>
 				<Award class="size-4 shrink-0" />
-				<div class="min-w-0">
+				<div class="hidden min-w-0 sm:block">
 					<div class="max-w-24 truncate text-[11px] font-extrabold leading-tight sm:max-w-32 sm:text-xs">
 						{learnerStage.name}
 					</div>
@@ -194,8 +136,8 @@
 		</div>
 	</div>
 
-	<!-- Compact scrollable navigation for mobile and tablet widths -->
-	<div class="flex 2xl:hidden h-11 items-center gap-1.5 overflow-x-auto border-t bg-background/50 px-3 scrollbar-none text-sm sm:px-4">
+	<!-- Keep navigation on its own row so it cannot collide with account controls. -->
+	<nav aria-label="เมนูหลัก" class="flex h-11 items-center gap-1.5 overflow-x-auto border-t bg-background/50 px-3 text-sm scrollbar-none sm:px-4">
 		<a
 			href="/"
 			class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-semibold transition lg:text-sm {page.url.pathname === '/'
@@ -251,7 +193,7 @@
 			<Award class="size-3 text-amber-500" />
 			ประเมินผล
 		</a>
-	</div>
+	</nav>
 </header>
 
 <Dialog.Root bind:open={settingsOpen}>
