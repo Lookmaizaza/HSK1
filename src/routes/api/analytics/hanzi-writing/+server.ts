@@ -1,8 +1,10 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import {
 	recordHanziWritingAttempt,
+	recordLearningEvent,
 	type HanziWritingAttemptRecord
 } from '$lib/server/db';
+import { createSkillXApiStatement } from '$lib/xapi';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -162,6 +164,36 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				mistakeEvents: validatedMistakeEvents
 			}
 		});
+
+		if (locals.user) {
+			try {
+				const xapiStmt = createSkillXApiStatement({
+					userId,
+					username: locals.user.username,
+					eventType: 'hanzi_written',
+					objectId: `hanzi_${character}`,
+					objectNameZh: character,
+					objectNameTh: `${character} (${pinyin})`,
+					scoreRaw: score,
+					scoreMax: strokeCount,
+					success: mistakeCount === 0,
+					durationMs: writingDetails.durationMs,
+					extensions: {
+						'https://hsk.app/xapi/ext/word-id': word,
+						'https://hsk.app/xapi/ext/stroke-count': strokeCount,
+						'https://hsk.app/xapi/ext/mistake-count': mistakeCount
+					}
+				});
+				await recordLearningEvent({
+					userId,
+					eventType: 'hanzi_written',
+					wordId: character,
+					statementId: xapiStmt.id,
+					xapiStatement: xapiStmt,
+					practiceMode: 'word'
+				});
+			} catch {}
+		}
 	}
 
 	return json({ success: true });

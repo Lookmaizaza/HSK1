@@ -1,4 +1,5 @@
 import { extractTargetPhonemes } from '$lib/pronunciation';
+import { computePairedTTest, type PairedTTestResult } from '$lib/analytics/statisticalEngine';
 // libSQL-backed storage. Works against a local file (file:data/hsk.db) in dev
 // and against a remote Turso database (libsql://...) in production.
 
@@ -7,6 +8,7 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { env } from '$env/dynamic/private';
+import { MAX_LEARNER_LEVEL, XP_PER_LEVEL } from '$lib/gamification';
 
 const isServerless = !!(env.VERCEL || env.AWS_LAMBDA_FUNCTION_NAME || env.NETLIFY);
 
@@ -61,7 +63,8 @@ CREATE TABLE IF NOT EXISTS progress (
 	xp INTEGER NOT NULL DEFAULT 0,
 	hearts INTEGER NOT NULL DEFAULT 5,
 	streak INTEGER NOT NULL DEFAULT 0,
-	last_practiced TEXT
+	last_practiced TEXT,
+	learner_level INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS lesson_completions (
@@ -97,6 +100,11 @@ CREATE TABLE IF NOT EXISTS pronunciation_evaluations (
 	phoneme_details TEXT NOT NULL,
 	practice_mode TEXT NOT NULL DEFAULT 'unknown',
 	stage_id TEXT,
+	hesitation_ms INTEGER NOT NULL DEFAULT 0,
+	listen_count INTEGER NOT NULL DEFAULT 0,
+	clarity REAL NOT NULL DEFAULT 0,
+	slope_type TEXT,
+	idempotency_key TEXT,
 	created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pronunciation_evaluations_user ON pronunciation_evaluations(user_id);
@@ -310,6 +318,11 @@ function init(): Promise<void> {
 	if (!initPromise) {
 		initPromise = (async () => {
 			await client.executeMultiple(SCHEMA);
+			const progressColumns = await client.execute('PRAGMA table_info(progress)');
+			const progressColumnNames = new Set(progressColumns.rows.map((row) => String(row.name)));
+			if (!progressColumnNames.has('learner_level')) {
+				await client.execute('ALTER TABLE progress ADD COLUMN learner_level INTEGER NOT NULL DEFAULT 1');
+			}
 const stageOverrideColumns = await client.execute('PRAGMA table_info(stage_overrides)');
 			const columnNames = new Set(stageOverrideColumns.rows.map((row) => String(row.name)));
 			if (!columnNames.has('custom_words')) {
@@ -325,6 +338,21 @@ const stageOverrideColumns = await client.execute('PRAGMA table_info(stage_overr
 			}
 			if (!pronunciationColumnNames.has('stage_id')) {
 				await client.execute('ALTER TABLE pronunciation_evaluations ADD COLUMN stage_id TEXT');
+			}
+			if (!pronunciationColumnNames.has('hesitation_ms')) {
+				await client.execute('ALTER TABLE pronunciation_evaluations ADD COLUMN hesitation_ms INTEGER NOT NULL DEFAULT 0');
+			}
+			if (!pronunciationColumnNames.has('listen_count')) {
+				await client.execute('ALTER TABLE pronunciation_evaluations ADD COLUMN listen_count INTEGER NOT NULL DEFAULT 0');
+			}
+			if (!pronunciationColumnNames.has('clarity')) {
+				await client.execute('ALTER TABLE pronunciation_evaluations ADD COLUMN clarity REAL NOT NULL DEFAULT 0');
+			}
+			if (!pronunciationColumnNames.has('slope_type')) {
+				await client.execute('ALTER TABLE pronunciation_evaluations ADD COLUMN slope_type TEXT');
+			}
+			if (!pronunciationColumnNames.has('idempotency_key')) {
+				await client.execute('ALTER TABLE pronunciation_evaluations ADD COLUMN idempotency_key TEXT');
 			}
 			for (const [table, definitions] of Object.entries({
 				learning_events: ["practice_mode TEXT NOT NULL DEFAULT 'unknown'", 'stage_id TEXT'],
@@ -482,6 +510,8 @@ export type ProgressRow = {
 	xp: number;
 	hearts: number;
 	streak: number;
+	learnerLevel: number;
+	levelExp: number;
 	mistakes: number;
 	lastPracticed: string | null;
 	completed: Record<string, number>;
@@ -489,10 +519,10 @@ export type ProgressRow = {
 
 export async function getProgress(userId: number): Promise<ProgressRow> {
 	const client = getDb();
-	if (!client) return { xp: 0, hearts: 5, streak: 0, mistakes: 0, lastPracticed: null, completed: {} };
+	if (!client) return { xp: 0, hearts: 5, streak: 0, learnerLevel: 1, levelExp: 0, mistakes: 0, lastPracticed: null, completed: {} };
 	await init();
 	const progRes = await client.execute({
-		sql: 'SELECT xp, hearts, streak, last_practiced FROM progress WHERE user_id = ?',
+		sql: 'SELECT xp, hearts, streak, last_practiced, learner_level FROM progress WHERE user_id = ?',
 		args: [userId]
 	});
 	const compRes = await client.execute({
@@ -506,14 +536,36 @@ export async function getProgress(userId: number): Promise<ProgressRow> {
 		completed[String(c.lesson_key)] = Number(c.stars);
 	}
 
+	const xp = row ? Number(row.xp) : 0;
+	const learnerLevel = row ? Math.min(MAX_LEARNER_LEVEL, Math.max(1, Number(row.learner_level))) : 1;
 	return {
-		xp: row ? Number(row.xp) : 0,
+		xp,
 		hearts: row ? Number(row.hearts) : 5,
 		streak: row ? Number(row.streak) : 0,
+		learnerLevel,
+		levelExp: Math.min(XP_PER_LEVEL, Math.max(0, xp - (learnerLevel - 1) * XP_PER_LEVEL)),
 		mistakes: 0,
 		lastPracticed: row?.last_practiced ? String(row.last_practiced) : null,
 		completed
 	};
+}
+
+export async function completeBoss(userId: number, expectedLevel: number): Promise<boolean> {
+	const client = getDb();
+	if (!client) return false;
+	await init();
+	if (expectedLevel >= MAX_LEARNER_LEVEL) {
+		const result = await client.execute({
+			sql: 'SELECT xp FROM progress WHERE user_id = ? AND learner_level = ?',
+			args: [userId, expectedLevel]
+		});
+		return Number(result.rows[0]?.xp ?? 0) >= expectedLevel * XP_PER_LEVEL;
+	}
+	const result = await client.execute({
+		sql: 'UPDATE progress SET learner_level = learner_level + 1 WHERE user_id = ? AND learner_level = ? AND xp >= ?',
+		args: [userId, expectedLevel, expectedLevel * XP_PER_LEVEL]
+	});
+	return Number(result.rowsAffected) > 0;
 }
 
 function today(): string {
@@ -846,10 +898,14 @@ export async function recordPronunciationEvaluation(payload: {
 	user_id: string;
 	word_id: string;
 	pinyin: string;
-	practice_mode?: 'stage' | 'word' | 'assessment' | 'unknown';
+	practice_mode?: 'stage' | 'word' | 'assessment' | 'flashcard' | 'lesson' | 'unknown';
 	stage_id?: string | null;
 	attempt_number?: number;
 	audio_duration_sec?: number;
+	hesitation_ms?: number;
+	listen_count?: number;
+	clarity?: number;
+	slope_type?: string | null;
 	created_at?: number;
 	idempotency_key?: string | null;
 	scores: {
@@ -868,6 +924,10 @@ export async function recordPronunciationEvaluation(payload: {
 	}
 	const createdAt = payload.created_at ? Number(payload.created_at) : Date.now();
 	const idempotencyKey = payload.idempotency_key || `${payload.user_id}_${payload.word_id}_${createdAt}`;
+	const hesitationMs = Math.max(0, Math.round(Number(payload.hesitation_ms ?? 0)));
+	const listenCount = Math.max(0, Math.round(Number(payload.listen_count ?? 0)));
+	const clarity = Number(payload.clarity ?? 0);
+	const slopeType = payload.slope_type ? String(payload.slope_type) : null;
 	const evaluation = {
 		userId: String(payload.user_id),
 		wordId: String(payload.word_id),
@@ -879,7 +939,11 @@ export async function recordPronunciationEvaluation(payload: {
 		toneScore: Number(payload.scores.tone_score ?? 0),
 		phonemeDetails: payload.scores.phoneme_details ?? [],
 		practiceMode,
-		stageId: practiceMode === 'stage' ? stageId : (practiceMode === 'assessment' ? stageId : null),
+		stageId: practiceMode === 'stage' || practiceMode === 'assessment' || practiceMode === 'lesson' ? stageId : null,
+		hesitationMs,
+		listenCount,
+		clarity,
+		slopeType,
 		idempotencyKey,
 		createdAt
 	};
@@ -896,8 +960,8 @@ export async function recordPronunciationEvaluation(payload: {
 
 		await client.execute({
 			sql: `INSERT INTO pronunciation_evaluations
-			      (user_id, word_id, pinyin, attempt_number, audio_duration_sec, gop_overall, per_overall, tone_score, phoneme_details, practice_mode, stage_id, created_at, idempotency_key)
-			      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			      (user_id, word_id, pinyin, attempt_number, audio_duration_sec, gop_overall, per_overall, tone_score, phoneme_details, practice_mode, stage_id, hesitation_ms, listen_count, clarity, slope_type, created_at, idempotency_key)
+			      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			args: [
 				evaluation.userId,
 				evaluation.wordId,
@@ -910,6 +974,10 @@ export async function recordPronunciationEvaluation(payload: {
 				JSON.stringify(evaluation.phonemeDetails),
 				evaluation.practiceMode,
 				evaluation.stageId,
+				evaluation.hesitationMs,
+				evaluation.listenCount,
+				evaluation.clarity,
+				evaluation.slopeType,
 				createdAt,
 				evaluation.idempotencyKey
 			]
@@ -919,7 +987,8 @@ export async function recordPronunciationEvaluation(payload: {
 	try {
 		const recorded = await recordNeonPronunciationEvaluation({
 			evaluationId: randomBytes(16).toString('hex'),
-			...evaluation
+			...evaluation,
+			practiceMode: evaluation.practiceMode === 'stage' || evaluation.practiceMode === 'word' || evaluation.practiceMode === 'assessment' ? evaluation.practiceMode : 'word'
 		});
 		if (!recorded && client) {
 			console.warn('⚠️ [Neon] Pronunciation evaluation not mirrored: DATABASE_URL is not configured.');
@@ -938,10 +1007,14 @@ export async function getPronunciationEvaluations(
 	user_id: string;
 	word_id: string;
 	pinyin: string;
-	practice_mode: 'stage' | 'word' | 'unknown';
+	practice_mode: 'stage' | 'word' | 'assessment' | 'flashcard' | 'lesson' | 'unknown';
 	stage_id: string | null;
 	attempt_number: number;
 	audio_duration_sec: number;
+	hesitation_ms: number;
+	listen_count: number;
+	clarity: number;
+	slope_type: string | null;
 	scores: {
 		gop_overall: number;
 		per_overall: number;
@@ -964,12 +1037,14 @@ export async function getPronunciationEvaluations(
 			args.push(...userIds.map(String));
 		}
 	}
-	if (practiceMode) {
-		conditions.push('practice_mode = ?');
-		args.push(practiceMode);
+	if (practiceMode === 'stage') {
+		conditions.push("practice_mode IN ('stage', 'lesson')");
+	} else if (practiceMode === 'word') {
+		conditions.push("practice_mode IN ('word', 'flashcard', 'assessment', 'unknown')");
 	}
 	const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 	const sql = `SELECT id, user_id, word_id, pinyin, practice_mode, stage_id, attempt_number, audio_duration_sec,
+	                    hesitation_ms, listen_count, clarity, slope_type,
 	                    gop_overall, per_overall, tone_score, phoneme_details, created_at
 	             FROM pronunciation_evaluations
 	             ${whereClause}
@@ -986,15 +1061,27 @@ export async function getPronunciationEvaluations(
 		} catch {
 			phonemeDetails = [];
 		}
+		const rawMode = String(r.practice_mode || 'unknown');
+		const validMode = (['stage', 'word', 'assessment', 'flashcard', 'lesson', 'unknown'].includes(rawMode) ? rawMode : 'unknown') as
+			| 'stage'
+			| 'word'
+			| 'assessment'
+			| 'flashcard'
+			| 'lesson'
+			| 'unknown';
 		return {
 			id: Number(r.id),
 			user_id: String(r.user_id),
 			word_id: String(r.word_id),
 			pinyin: String(r.pinyin),
-			practice_mode: r.practice_mode === 'stage' || r.practice_mode === 'word' ? r.practice_mode : 'unknown',
+			practice_mode: validMode,
 			stage_id: r.stage_id == null ? null : String(r.stage_id),
 			attempt_number: Number(r.attempt_number),
 			audio_duration_sec: Number(r.audio_duration_sec),
+			hesitation_ms: Number(r.hesitation_ms || 0),
+			listen_count: Number(r.listen_count || 0),
+			clarity: Number(r.clarity || 0),
+			slope_type: r.slope_type == null ? null : String(r.slope_type),
 			scores: {
 				gop_overall: Number(r.gop_overall),
 				per_overall: Number(r.per_overall),
@@ -1106,16 +1193,16 @@ export async function getPronunciationPhonemeErrorStats(userId?: string | string
 
 export async function recordLearningEvent(params: {
 	userId: string;
-	eventType: string; // 'pronounced' | 'listened_to_example'
+	eventType: string; // 'pronounced' | 'listened_to_example' | 'hesitated' | 'hanzi_written' | 'flashcard_reviewed' | 'exam_completed' | 'dialogue_completed'
 	wordId: string;
 	statementId: string;
 	xapiStatement: any;
-	practiceMode?: 'stage' | 'word' | 'unknown';
+	practiceMode?: 'stage' | 'word' | 'assessment' | 'flashcard' | 'lesson' | 'unknown';
 	stageId?: string | null;
 }): Promise<void> {
 	const client = getDb();
 	const practiceMode = params.practiceMode ?? 'unknown';
-	const stageId = practiceMode === 'stage' ? params.stageId?.trim() || null : null;
+	const stageId = (practiceMode === 'stage' || practiceMode === 'lesson' || practiceMode === 'assessment') ? params.stageId?.trim() || null : null;
 	if (practiceMode === 'stage' && (!stageId || !/^[a-zA-Z0-9_-]{2,64}$/.test(stageId))) {
 		throw new Error('Quest learning event requires a valid stage ID.');
 	}
@@ -1148,7 +1235,7 @@ export async function recordLearningEvent(params: {
 			wordId: String(params.wordId),
 			statementId: String(params.statementId),
 			xapiStatement: params.xapiStatement,
-			practiceMode,
+			practiceMode: practiceMode === 'stage' || practiceMode === 'word' ? practiceMode : 'word',
 			stageId,
 			createdAt
 		});
@@ -1299,6 +1386,12 @@ export type DiagnosticAnalytics = {
 		sampleWith: number;
 		sampleWithout: number;
 	};
+	hesitationImpact: {
+		avgHesitationMs: number;
+		hesitatedCount: number;
+		withListenAvgHesitationMs: number;
+		withoutListenAvgHesitationMs: number;
+	};
 	phonemeBreakdown: Array<{ phoneme: string; type: string; avgGop: number; totalAttempts: number }>;
 	frequentSubstitutions: Array<{
 		target: string;
@@ -1429,22 +1522,62 @@ export async function getDiagnosticAnalytics(
 		}
 	}
 
-	// LQ5 Analysis: Score with listening vs without listening
+	// LQ5 & LQ6 Analysis: Score and Hesitation with listening vs without listening
 	const pronouncedEvents = events.filter((e) => e.eventType === 'pronounced');
 	const listeningEvents = events.filter((e) => e.eventType === 'listened_to_example');
 
 	const listenedScores: number[] = [];
 	const notListenedScores: number[] = [];
-	for (const p of pronouncedEvents) {
-		const score = Number(p.xapiStatement?.result?.score?.raw ?? 0);
-		const word = p.wordId;
-		const hadListened = listeningEvents.some(
-			(l) => l.wordId === word && Math.abs(l.createdAt - p.createdAt) < 60000
+	let hesitationSumMs = 0;
+	let hesitationSampleCount = 0;
+	let hesitatedCount = 0;
+	let withListenHesitationSum = 0;
+	let withListenHesitationCount = 0;
+	let withoutListenHesitationSum = 0;
+	let withoutListenHesitationCount = 0;
+
+	// Use per-evaluation metrics first
+	for (const ev of evalList) {
+		const details = ev.scores.phoneme_details || [];
+		const hadListenedInDetails = details.some((d: any) => Boolean(d.listenedToExample) || Number(d.exampleListenCount || 0) > 0);
+		const hadListenedEvent = listeningEvents.some(
+			(l) => l.wordId === ev.word_id && Math.abs(l.createdAt - ev.created_at) < 90000
 		);
+		const hadListened = ev.listen_count > 0 || hadListenedInDetails || hadListenedEvent;
 		if (hadListened) {
-			listenedScores.push(score);
+			listenedScores.push(ev.scores.gop_overall);
 		} else {
-			notListenedScores.push(score);
+			notListenedScores.push(ev.scores.gop_overall);
+		}
+
+		const hesMs = ev.hesitation_ms || Number(details[0]?.hesitationLatencyMs || 0);
+		if (hesMs > 0) {
+			hesitationSumMs += hesMs;
+			hesitationSampleCount++;
+			if (hesMs >= 2500) hesitatedCount++;
+			if (hadListened) {
+				withListenHesitationSum += hesMs;
+				withListenHesitationCount++;
+			} else {
+				withoutListenHesitationSum += hesMs;
+				withoutListenHesitationCount++;
+			}
+		}
+	}
+
+	// Fallback if evalList had no listening split but pronouncedEvents exist
+	if (listenedScores.length === 0 && notListenedScores.length === 0) {
+		for (const p of pronouncedEvents) {
+			const score = Number(p.xapiStatement?.result?.score?.raw ?? 0);
+			const word = p.wordId;
+			const hadListened = listeningEvents.some(
+				(l) => l.wordId === word && Math.abs(l.createdAt - p.createdAt) < 60000
+			);
+			if (hadListened) {
+				listenedScores.push(score);
+			} else {
+				notListenedScores.push(score);
+			}
 		}
 	}
 
@@ -1457,6 +1590,13 @@ export async function getDiagnosticAnalytics(
 		withListeningAvg !== null && withoutListeningAvg !== null
 			? Number((withListeningAvg - withoutListeningAvg).toFixed(1))
 			: null;
+
+	const hesitationImpact = {
+		avgHesitationMs: hesitationSampleCount > 0 ? Math.round(hesitationSumMs / hesitationSampleCount) : 0,
+		hesitatedCount,
+		withListenAvgHesitationMs: withListenHesitationCount > 0 ? Math.round(withListenHesitationSum / withListenHesitationCount) : 0,
+		withoutListenAvgHesitationMs: withoutListenHesitationCount > 0 ? Math.round(withoutListenHesitationSum / withoutListenHesitationCount) : 0
+	};
 
 	// Phoneme breakdown, sorted weakest first
 	const phonemeBreakdown = Object.values(phonemeScoresMap)
@@ -1516,6 +1656,7 @@ export async function getDiagnosticAnalytics(
 			sampleWith: listenedScores.length,
 			sampleWithout: notListenedScores.length
 		},
+		hesitationImpact,
 		phonemeBreakdown,
 		frequentSubstitutions,
 		weakPhonemes,
@@ -1552,8 +1693,11 @@ export type ExportableEvaluationRecord = {
 	gopOverall: number;
 	perOverall: number;
 	toneScore: number;
+	clarity: number;
+	slopeType: string | null;
 	attemptNumber: number;
 	audioDurationSec: number;
+	hesitationLatencyMs: number;
 	listenedToExample: boolean;
 	exampleListenCount: number;
 	phonemeErrorsSummary: string;
@@ -1566,6 +1710,7 @@ export async function getAllPronunciationEvaluationsForExport(limit = 10000): Pr
 
 	const result = await client.execute({
 		sql: `SELECT id, user_id, word_id, pinyin, practice_mode, stage_id, attempt_number, audio_duration_sec,
+		             hesitation_ms, listen_count, clarity, slope_type,
 		             gop_overall, per_overall, tone_score, phoneme_details, created_at
 		      FROM pronunciation_evaluations
 		      ORDER BY created_at DESC
@@ -1589,8 +1734,11 @@ export async function getAllPronunciationEvaluationsForExport(limit = 10000): Pr
 
 		let targetTone: number | null = null;
 		let detectedTone: number | null = null;
-		let listenedToExample = false;
-		let exampleListenCount = 0;
+		let listenedToExample = Number(r.listen_count || 0) > 0;
+		let exampleListenCount = Number(r.listen_count || 0);
+		let hesitationLatencyMs = Number(r.hesitation_ms || 0);
+		let clarity = Number(r.clarity || 0);
+		let slopeType: string | null = r.slope_type ? String(r.slope_type) : null;
 		const errorItems: string[] = [];
 
 		for (const d of phonemeDetails) {
@@ -1601,10 +1749,19 @@ export async function getAllPronunciationEvaluationsForExport(limit = 10000): Pr
 				detectedTone = Number(d.detectedTone);
 			}
 			if (d.listenedToExample !== undefined) {
-				listenedToExample = Boolean(d.listenedToExample);
+				listenedToExample = listenedToExample || Boolean(d.listenedToExample);
 			}
-			if (d.exampleListenCount !== undefined) {
+			if (d.exampleListenCount !== undefined && exampleListenCount === 0) {
 				exampleListenCount = Number(d.exampleListenCount);
+			}
+			if (d.hesitationLatencyMs !== undefined && hesitationLatencyMs === 0) {
+				hesitationLatencyMs = Number(d.hesitationLatencyMs);
+			}
+			if (d.avgClarity !== undefined && clarity === 0) {
+				clarity = Number(d.avgClarity);
+			}
+			if (d.slopeType !== undefined && !slopeType) {
+				slopeType = String(d.slopeType);
 			}
 			if (d.status === 'substitution' && d.target && d.recognized) {
 				errorItems.push(`${d.target}->${d.recognized}`);
@@ -1628,13 +1785,176 @@ export async function getAllPronunciationEvaluationsForExport(limit = 10000): Pr
 			gopOverall: Number(r.gop_overall),
 			perOverall: Number(r.per_overall),
 			toneScore: Number(r.tone_score),
+			clarity: Number(clarity.toFixed(3)),
+			slopeType,
 			attemptNumber: Number(r.attempt_number),
 			audioDurationSec: Number(r.audio_duration_sec),
+			hesitationLatencyMs: Math.round(hesitationLatencyMs),
 			listenedToExample,
 			exampleListenCount,
 			phonemeErrorsSummary: errorItems.join(';')
 		};
 	});
+}
+
+export async function getPairedAssessmentExportData(): Promise<Array<{
+	anonymizedUserId: string;
+	preGop: number | null;
+	preToneScore: number | null;
+	prePer: number | null;
+	preCompletedAt: string | null;
+	midGop: number | null;
+	midToneScore: number | null;
+	midPer: number | null;
+	midCompletedAt: string | null;
+	postGop: number | null;
+	postToneScore: number | null;
+	postPer: number | null;
+	postCompletedAt: string | null;
+	deltaGop: number | null;
+	hakeGainG: number | null;
+	toneGainG: number | null;
+}>> {
+	const client = getDb();
+	if (!client) return [];
+	await init();
+
+	const adminIds = await getAdminUserIds();
+	const adminClause = adminIds.length ? `WHERE user_id NOT IN (${adminIds.map(() => '?').join(',')})` : '';
+	const res = await client.execute({
+		sql: `SELECT user_id, test_type, avg_gop, avg_tone_score, avg_per, completed_at
+		      FROM assessment_summaries
+		      ${adminClause}
+		      ORDER BY completed_at DESC`,
+		args: adminIds
+	}).catch(() => ({ rows: [] }));
+
+	const byUser: Record<string, { pre?: any; mid?: any; post?: any }> = {};
+	for (const r of res.rows) {
+		const uid = String(r.user_id);
+		const t = String(r.test_type).toLowerCase() as 'pre' | 'mid' | 'post';
+		if (!['pre', 'mid', 'post'].includes(t)) continue;
+		if (!byUser[uid]) byUser[uid] = {};
+		if (!byUser[uid][t]) byUser[uid][t] = r;
+	}
+
+	return Object.entries(byUser).map(([uid, data]) => {
+		const pre = data.pre;
+		const mid = data.mid;
+		const post = data.post;
+		const target = post ?? mid;
+		const preGop = pre ? Number(Number(pre.avg_gop).toFixed(1)) : null;
+		const preTone = pre ? Number(Number(pre.avg_tone_score).toFixed(1)) : null;
+		const targetGop = target ? Number(Number(target.avg_gop).toFixed(1)) : null;
+		const targetTone = target ? Number(Number(target.avg_tone_score).toFixed(1)) : null;
+
+		const deltaGop = preGop !== null && targetGop !== null ? Number((targetGop - preGop).toFixed(1)) : null;
+		const hakeGainG = preGop !== null && targetGop !== null ? Number(computeHakeGain(preGop, targetGop).toFixed(3)) : null;
+		const toneGainG = preTone !== null && targetTone !== null ? Number(computeHakeGain(preTone, targetTone).toFixed(3)) : null;
+
+		return {
+			anonymizedUserId: anonymizeUserId(uid),
+			preGop,
+			preToneScore: preTone,
+			prePer: pre ? Number(Number(pre.avg_per).toFixed(2)) : null,
+			preCompletedAt: pre?.completed_at ? new Date(Number(pre.completed_at)).toISOString() : null,
+			midGop: mid ? Number(Number(mid.avg_gop).toFixed(1)) : null,
+			midToneScore: mid ? Number(Number(mid.avg_tone_score).toFixed(1)) : null,
+			midPer: mid ? Number(Number(mid.avg_per).toFixed(2)) : null,
+			midCompletedAt: mid?.completed_at ? new Date(Number(mid.completed_at)).toISOString() : null,
+			postGop: post ? Number(Number(post.avg_gop).toFixed(1)) : null,
+			postToneScore: post ? Number(Number(post.avg_tone_score).toFixed(1)) : null,
+			postPer: post ? Number(Number(post.avg_per).toFixed(2)) : null,
+			postCompletedAt: post?.completed_at ? new Date(Number(post.completed_at)).toISOString() : null,
+			deltaGop,
+			hakeGainG,
+			toneGainG
+		};
+	});
+}
+
+export async function getCrossSkillPortfolioExportData(): Promise<Array<{
+	anonymizedUserId: string;
+	phonemeClarityScore: number | null;
+	toneMasteryScore: number | null;
+	hanziWritingScore: number | null;
+	questMasteryScore: number | null;
+	examReadinessScore: number | null;
+	conversationalFluencyScore: number | null;
+	overallAvgScore: number | null;
+	pronunciationAttempts: number;
+	writingAttempts: number;
+	examAttempts: number;
+	chatbotSessions: number;
+	flashcardSetsCompleted: number;
+}>> {
+	const client = getDb();
+	if (!client) return [];
+	await init();
+
+	const adminIds = await getAdminUserIds();
+	const adminSet = new Set(adminIds);
+
+	const [usersRes, evalRes, writeRes, questRes, examRes, chatRes, fcRes] = await Promise.all([
+		client.execute('SELECT id FROM users').catch(() => ({ rows: [] })),
+		client.execute('SELECT user_id, COUNT(*) as cnt, AVG(gop_overall) as avg_gop, AVG(tone_score) as avg_tone FROM pronunciation_evaluations GROUP BY user_id').catch(() => ({ rows: [] })),
+		client.execute('SELECT user_id, COUNT(*) as cnt, AVG(CAST(score AS REAL) / CASE WHEN max_score > 0 THEN max_score ELSE 100 END * 100) as avg_score FROM hanzi_writing_attempts GROUP BY user_id').catch(() => ({ rows: [] })),
+		client.execute('SELECT CAST(user_id AS TEXT) as user_id, SUM(stars) as stars FROM lesson_completions GROUP BY user_id').catch(() => ({ rows: [] })),
+		client.execute('SELECT user_id, COUNT(*) as cnt, AVG(CAST(total_score AS REAL) / CASE WHEN max_score > 0 THEN max_score ELSE 300 END * 100) as avg_score FROM exam_attempts GROUP BY user_id').catch(() => ({ rows: [] })),
+		client.execute('SELECT user_id, COUNT(*) as cnt, AVG(avg_score) as avg_score FROM chatbot_sessions GROUP BY user_id').catch(() => ({ rows: [] })),
+		client.execute('SELECT user_id, COUNT(*) as cnt FROM flashcard_set_completions GROUP BY user_id').catch(() => ({ rows: [] }))
+	]);
+
+	const allUserIds = new Set<string>();
+	for (const r of usersRes.rows) allUserIds.add(String(r.id));
+	for (const r of evalRes.rows) allUserIds.add(String(r.user_id));
+
+	const evalMap = new Map(evalRes.rows.map((r) => [String(r.user_id), r]));
+	const writeMap = new Map(writeRes.rows.map((r) => [String(r.user_id), r]));
+	const questMap = new Map(questRes.rows.map((r) => [String(r.user_id), r]));
+	const examMap = new Map(examRes.rows.map((r) => [String(r.user_id), r]));
+	const chatMap = new Map(chatRes.rows.map((r) => [String(r.user_id), r]));
+	const fcMap = new Map(fcRes.rows.map((r) => [String(r.user_id), r]));
+
+	const rows = [];
+	for (const uid of allUserIds) {
+		if (adminSet.has(uid) || uid === 'anonymous') continue;
+		const ev = evalMap.get(uid);
+		const wr = writeMap.get(uid);
+		const qu = questMap.get(uid);
+		const ex = examMap.get(uid);
+		const ch = chatMap.get(uid);
+		const fc = fcMap.get(uid);
+
+		const phonemeClarityScore = ev ? Math.round(Number(ev.avg_gop || 0)) : null;
+		const toneMasteryScore = ev ? Math.round(Number(ev.avg_tone || 0)) : null;
+		const hanziWritingScore = wr ? Math.round(Number(wr.avg_score || 0)) : null;
+		const questMasteryScore = qu ? Math.min(100, Math.round((Number(qu.stars || 0) / 30) * 100)) : null;
+		const examReadinessScore = ex ? Math.round(Number(ex.avg_score || 0)) : null;
+		const conversationalFluencyScore = ch ? Math.round(Number(ch.avg_score || 0)) : null;
+
+		const nonNull = [phonemeClarityScore, toneMasteryScore, hanziWritingScore, questMasteryScore, examReadinessScore, conversationalFluencyScore].filter(
+			(v): v is number => v !== null
+		);
+		if (nonNull.length === 0) continue;
+
+		rows.push({
+			anonymizedUserId: anonymizeUserId(uid),
+			phonemeClarityScore,
+			toneMasteryScore,
+			hanziWritingScore,
+			questMasteryScore,
+			examReadinessScore,
+			conversationalFluencyScore,
+			overallAvgScore: Math.round(nonNull.reduce((a, b) => a + b, 0) / nonNull.length),
+			pronunciationAttempts: Number(ev?.cnt || 0),
+			writingAttempts: Number(wr?.cnt || 0),
+			examAttempts: Number(ex?.cnt || 0),
+			chatbotSessions: Number(ch?.cnt || 0),
+			flashcardSetsCompleted: Number(fc?.cnt || 0)
+		});
+	}
+	return rows;
 }
 
 export async function getAllLearningEventsForExport(limit = 10000): Promise<any[]> {
@@ -1749,7 +2069,7 @@ export async function recordPhonemeEvaluations(
 		status: string;
 		target: string;
 		recognized: string;
-		practiceMode?: 'stage' | 'word' | 'assessment' | 'unknown';
+		practiceMode?: 'stage' | 'word' | 'assessment' | 'flashcard' | 'lesson' | 'unknown';
 		stageId?: string | null;
 		createdAt?: number;
 	}>
@@ -1762,7 +2082,7 @@ export async function recordPhonemeEvaluations(
 		const id = item.id || randomBytes(16).toString('hex');
 		const now = item.createdAt || Date.now();
 		const practiceMode = item.practiceMode ?? 'unknown';
-		const stageId = practiceMode === 'stage' ? item.stageId?.trim() || null : null;
+		const stageId = (practiceMode === 'stage' || practiceMode === 'lesson' || practiceMode === 'assessment') ? item.stageId?.trim() || null : null;
 		if (practiceMode === 'stage' && (!stageId || !/^[a-zA-Z0-9_-]{2,64}$/.test(stageId))) {
 			throw new Error('Quest phoneme evaluation requires a valid stage ID.');
 		}
@@ -1794,7 +2114,10 @@ export async function recordPhonemeEvaluations(
 			});
 		}
 		try {
-			await recordNeonPhonemeEvaluation(record);
+			await recordNeonPhonemeEvaluation({
+				...record,
+				practiceMode: record.practiceMode === 'stage' || record.practiceMode === 'word' || record.practiceMode === 'assessment' ? record.practiceMode : 'word'
+			});
 		} catch (e) {
 			console.error('⚠️ [Neon] Failed to mirror phoneme evaluation:', e);
 		}
@@ -3068,7 +3391,7 @@ export async function getUserFullDetail(userId: number) {
 	const totalStars = Object.values(completionsMap).reduce((s, v) => s + v, 0);
 
 	const phonemeClarityAxis: RadarAxisDetail = {
-		label: 'ความชัดเจนของโฟนีม',
+		label: 'ความใกล้เคียงเสียงต้นฉบับ (GOP)',
 		score: hasPronunciationEvals ? Math.max(0, Math.min(100, Math.round(Number(pronunciationStats.avgGop || 0)))) : null,
 		classAvg: classRadarBenchmark.phonemeClarity,
 		attempted: hasPronunciationEvals,
@@ -3323,13 +3646,14 @@ export async function getPracticeBreakdown() {
 				unclassified: { attempts: 0, avgScore: null }
 			},
 			stages: [],
-			words: []
+			words: [],
+			hardestWords: []
 		};
 	}
 
 	try {
 		await init();
-		const [summaryResult, stageResult, wordResult] = await Promise.all([
+		const [summaryResult, stageResult, wordResult, hardestWordsResult] = await Promise.all([
 			client.execute(`
 				SELECT practice_mode,
 				       COUNT(*) AS attempts,
@@ -3359,6 +3683,16 @@ export async function getPracticeBreakdown() {
 				GROUP BY word_id
 				ORDER BY attempts DESC
 				LIMIT 20
+			`),
+			client.execute(`
+				SELECT word_id,
+				       COUNT(*) AS attempts,
+				       ROUND(AVG(gop_overall), 1) AS avg_gop
+				FROM pronunciation_evaluations
+				WHERE word_id IS NOT NULL AND TRIM(word_id) != ''
+				GROUP BY word_id
+				ORDER BY avg_gop ASC, attempts DESC
+				LIMIT 30
 			`)
 		]);
 
@@ -3396,6 +3730,11 @@ export async function getPracticeBreakdown() {
 				avgScore: Number(row.avg_gop || 0)
 			})),
 			words: wordResult.rows.map((row) => ({
+				word: String(row.word_id),
+				count: Number(row.attempts || 0),
+				avgScore: Number(row.avg_gop || 0)
+			})),
+			hardestWords: hardestWordsResult.rows.map((row) => ({
 				word: String(row.word_id),
 				count: Number(row.attempts || 0),
 				avgScore: Number(row.avg_gop || 0)
@@ -3657,6 +3996,15 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 				deltaTone: 0,
 				pedagogicalTakeaway: 'ยังไม่มีข้อมูลการบันทึกกิจกรรมการฟังในระบบ'
 			},
+			lq6HesitationAnalytics: {
+				avgHesitationMs: 0,
+				hesitatedAttemptsCount: 0,
+				totalMeasuredAttempts: 0,
+				hesitatedPct: 0,
+				withListenHesitationMs: 0,
+				withoutListenHesitationMs: 0,
+				hesitationByTone: { 1: 0, 2: 0, 3: 0, 4: 0 }
+			},
 			mistakeRepetition: {
 				highFrictionWords: [],
 				spacedRepetitionFunnel: [],
@@ -3758,7 +4106,12 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 
 	const overallDropOffRate = totalAttempts > 0 ? Math.round((totalFailed / totalAttempts) * 100) : 0;
 
-	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB)
+	const modeSqlFilter =
+		practiceMode === 'stage'
+			? "practice_mode IN ('stage', 'lesson')"
+			: "practice_mode IN ('word', 'flashcard', 'assessment', 'unknown')";
+
+	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB, filtered by practiceMode with fallback)
 	const phonemeTargets = ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x'];
 	const matrixData: Record<string, Record<string, number>> = {};
 	for (const t of phonemeTargets) {
@@ -3772,12 +4125,20 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 
 	try {
 		// 1) From phoneme_evaluations table
-		const peRes = await client.execute(`
+		let peRes = await client.execute(`
 			SELECT target, recognized, COUNT(*) as cnt 
 			FROM phoneme_evaluations 
-			WHERE target IS NOT NULL AND recognized IS NOT NULL 
+			WHERE target IS NOT NULL AND recognized IS NOT NULL AND ${modeSqlFilter}
 			GROUP BY target, recognized
 		`);
+		if (peRes.rows.length === 0) {
+			peRes = await client.execute(`
+				SELECT target, recognized, COUNT(*) as cnt 
+				FROM phoneme_evaluations 
+				WHERE target IS NOT NULL AND recognized IS NOT NULL 
+				GROUP BY target, recognized
+			`);
+		}
 		for (const r of peRes.rows) {
 			const t = String(r.target);
 			const rec = String(r.recognized);
@@ -3791,7 +4152,10 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 		}
 
 		// 2) From pronunciation_evaluations phoneme_details
-		const proRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		let proRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter}`);
+		if (proRes.rows.length === 0) {
+			proRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		}
 		for (const r of proRes.rows) {
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
@@ -3855,7 +4219,10 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 	};
 
 	try {
-		const toneRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		let toneRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter}`);
+		if (toneRes.rows.length === 0) {
+			toneRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
+		}
 		for (const r of toneRes.rows) {
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
@@ -3905,31 +4272,66 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 		? `จากการวิเคราะห์ ${totalToneEvaluated} พยางค์ในฐานข้อมูล: เสียงที่ 3 (214) มีอัตราสับสนเป็นเสียงที่ 2 ถึง ${toneMatrix[2].recognizedT2}% และเสียงที่ 4 มีการตัดเสียงเป็นเสียงที่ 3 ถึง ${toneMatrix[3].recognizedT3}%`
 		: 'ยังไม่มีข้อมูลการประเมินเสียงวรรณยุกต์ในระบบ';
 
-	// 4. LQ5 Listening Friction Index (Real Comparison from DB)
+	// 4. LQ5 Listening Friction Index & LQ6 Hesitation Latency (Real Per-Attempt Comparison from DB)
 	let withCount = 0, withGopSum = 0, withToneSum = 0, withPerSum = 0, withPassCount = 0;
 	let withoutCount = 0, withoutGopSum = 0, withoutToneSum = 0, withoutPerSum = 0, withoutPassCount = 0;
 
+	let hesitationSumMs = 0;
+	let hesitationSampleCount = 0;
+	let hesitatedAttemptsCount = 0;
+	let withListenHesSum = 0, withListenHesCount = 0;
+	let withoutListenHesSum = 0, withoutListenHesCount = 0;
+	const hesitationToneSum: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+	const hesitationToneCnt: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+
 	try {
-		const leUsers = await client.execute(`
-			SELECT DISTINCT user_id 
+		const leEventsRes = await client.execute(`
+			SELECT user_id, word_id, created_at 
 			FROM learning_events 
 			WHERE event_type = 'listened_to_example'
 		`);
-		const listeningUserIds = new Set(leUsers.rows.map((r) => String(r.user_id)));
+		const listenEventsByUserWord = new Map<string, number[]>();
+		const listeningUserIds = new Set<string>();
+		for (const r of leEventsRes.rows) {
+			const uid = String(r.user_id);
+			listeningUserIds.add(uid);
+			const key = `${uid}_${r.word_id}`;
+			const arr = listenEventsByUserWord.get(key) ?? [];
+			arr.push(Number(r.created_at || 0));
+			listenEventsByUserWord.set(key, arr);
+		}
 
-		const proRes = await client.execute(`
-			SELECT user_id, gop_overall, per_overall, tone_score 
+		let proRes = await client.execute(`
+			SELECT user_id, word_id, gop_overall, per_overall, tone_score, listen_count, hesitation_ms, phoneme_details, created_at
 			FROM pronunciation_evaluations
+			WHERE ${modeSqlFilter}
 		`);
+		if (proRes.rows.length === 0) {
+			proRes = await client.execute(`
+				SELECT user_id, word_id, gop_overall, per_overall, tone_score, listen_count, hesitation_ms, phoneme_details, created_at
+				FROM pronunciation_evaluations
+			`);
+		}
 
 		for (const r of proRes.rows) {
 			const uid = String(r.user_id);
+			const wid = String(r.word_id);
 			const gop = Number(r.gop_overall || 0);
 			const tone = Number(r.tone_score || 0);
 			const per = Number(r.per_overall || 0);
+			const createdAt = Number(r.created_at || 0);
 			const isPassed = gop >= 70 ? 1 : 0;
 
-			if (listeningUserIds.has(uid)) {
+			let details: any[] = [];
+			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
+
+			const listenCntCol = Number(r.listen_count || 0);
+			const detailsListened = details.some((d: any) => Boolean(d.listenedToExample) || Number(d.exampleListenCount || 0) > 0);
+			const userWordTimestamps = listenEventsByUserWord.get(`${uid}_${wid}`) || [];
+			const eventListenedNear = userWordTimestamps.some((ts) => Math.abs(ts - createdAt) <= 120000);
+			const hadListened = listenCntCol > 0 || detailsListened || eventListenedNear || (userWordTimestamps.length === 0 && listeningUserIds.has(uid) && details.length === 0);
+
+			if (hadListened) {
 				withCount++;
 				withGopSum += gop;
 				withToneSum += tone;
@@ -3942,9 +4344,28 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 				withoutPerSum += per;
 				withoutPassCount += isPassed;
 			}
+
+			const hesMs = Number(r.hesitation_ms || details[0]?.hesitationLatencyMs || 0);
+			if (hesMs > 0 && hesMs < 60000) {
+				hesitationSumMs += hesMs;
+				hesitationSampleCount++;
+				if (hesMs >= 2500) hesitatedAttemptsCount++;
+				if (hadListened) {
+					withListenHesSum += hesMs;
+					withListenHesCount++;
+				} else {
+					withoutListenHesSum += hesMs;
+					withoutListenHesCount++;
+				}
+				const targetTone = Number(details[0]?.targetTone || 0);
+				if (targetTone >= 1 && targetTone <= 4) {
+					hesitationToneSum[targetTone] += hesMs;
+					hesitationToneCnt[targetTone]++;
+				}
+			}
 		}
 	} catch (e) {
-		console.warn('Failed to calculate LQ5 listening friction index from DB:', e);
+		console.warn('Failed to calculate LQ5/LQ6 listening & hesitation index from DB:', e);
 	}
 
 	const withAvgGop = withCount > 0 ? Number((withGopSum / withCount).toFixed(1)) : 0;
@@ -3983,6 +4404,21 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 		deltaGop,
 		deltaTone,
 		pedagogicalTakeaway
+	};
+
+	const lq6HesitationAnalytics = {
+		avgHesitationMs: hesitationSampleCount > 0 ? Math.round(hesitationSumMs / hesitationSampleCount) : 0,
+		hesitatedAttemptsCount,
+		totalMeasuredAttempts: hesitationSampleCount,
+		hesitatedPct: hesitationSampleCount > 0 ? Math.round((hesitatedAttemptsCount / hesitationSampleCount) * 100) : 0,
+		withListenHesitationMs: withListenHesCount > 0 ? Math.round(withListenHesSum / withListenHesCount) : 0,
+		withoutListenHesitationMs: withoutListenHesCount > 0 ? Math.round(withoutListenHesSum / withoutListenHesCount) : 0,
+		hesitationByTone: {
+			1: hesitationToneCnt[1] > 0 ? Math.round(hesitationToneSum[1] / hesitationToneCnt[1]) : 0,
+			2: hesitationToneCnt[2] > 0 ? Math.round(hesitationToneSum[2] / hesitationToneCnt[2]) : 0,
+			3: hesitationToneCnt[3] > 0 ? Math.round(hesitationToneSum[3] / hesitationToneCnt[3]) : 0,
+			4: hesitationToneCnt[4] > 0 ? Math.round(hesitationToneSum[4] / hesitationToneCnt[4]) : 0
+		}
 	};
 
 	// 5. Mistake Repetition Rate (Real Data from DB)
@@ -4111,6 +4547,7 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			keyFinding
 		},
 		lq5ListeningImpact,
+		lq6HesitationAnalytics,
 		mistakeRepetition: {
 			highFrictionWords,
 			spacedRepetitionFunnel,
@@ -4291,32 +4728,124 @@ export async function updateTeacherIntervention(
 	});
 }
 
+function extractHanziToken(raw: string): string {
+	// Extracts the leading Hanzi word before any parentheses or spaces, e.g. "你好 (nǐhǎo)" -> "你好"
+	const trimmed = raw.trim();
+	const beforeParen = trimmed.split('(')[0].trim();
+	const cjkMatch = beforeParen.match(/[\u4e00-\u9fff]+/);
+	return cjkMatch ? cjkMatch[0] : beforeParen;
+}
+
 export async function getTeacherInterventions(userId: string): Promise<any[]> {
 	const client = getDb();
 	if (!client) return [];
 	await init();
-	const res = await client.execute({
-		sql: 'SELECT * FROM teacher_interventions WHERE user_id = ? ORDER BY created_at DESC',
-		args: [userId]
-	});
-	return res.rows.map((r) => ({
-		id: Number(r.id),
-		userId: String(r.user_id),
-		title: String(r.title),
-		message: String(r.message),
-		remedialWords: r.remedial_words ? String(r.remedial_words).split(',').map((s) => s.trim()).filter(Boolean) : [],
-		assignedBy: String(r.assigned_by),
-		isRead: Boolean(r.is_read),
-		status: (r.status as 'pending' | 'improved') || 'pending',
-		createdAt: Number(r.created_at)
+	const [res, evalsRes] = await Promise.all([
+		client.execute({
+			sql: 'SELECT * FROM teacher_interventions WHERE user_id = ? ORDER BY created_at DESC',
+			args: [userId]
+		}),
+		client.execute({
+			sql: 'SELECT word_id, gop_overall, created_at FROM pronunciation_evaluations WHERE user_id = ? ORDER BY created_at DESC',
+			args: [userId]
+		}).catch(() => ({ rows: [] }))
+	]);
+
+	const evalRows = evalsRes.rows.map((e) => ({
+		wordId: String(e.word_id),
+		gop: Number(e.gop_overall || 0),
+		createdAt: Number(e.created_at || 0)
 	}));
+
+	return res.rows.map((r) => {
+		const createdAt = Number(r.created_at);
+		const remedialWords = r.remedial_words
+			? String(r.remedial_words)
+					.split(',')
+					.map((s) => s.trim())
+					.filter(Boolean)
+			: [];
+
+		const wordProgress = remedialWords.map((rawWord) => {
+			const hanzi = extractHanziToken(rawWord);
+			const matchingAfter = evalRows.filter((e) => e.wordId === hanzi && e.createdAt >= createdAt - 60000);
+			const matchingAll = evalRows.filter((e) => e.wordId === hanzi);
+			const relevant = matchingAfter.length > 0 ? matchingAfter : matchingAll;
+			const bestScore = relevant.length > 0 ? Math.round(Math.max(...relevant.map((e) => e.gop))) : null;
+			const passed = matchingAfter.some((e) => e.gop >= 70) || (r.status === 'improved' && (bestScore ?? 0) >= 70);
+			return {
+				raw: rawWord,
+				hanzi,
+				passed,
+				bestScore,
+				attemptsAfterAssign: matchingAfter.length
+			};
+		});
+
+		const completedCount = wordProgress.filter((w) => w.passed).length;
+		const totalWordsCount = wordProgress.length;
+		const progressPct = totalWordsCount > 0 ? Math.round((completedCount / totalWordsCount) * 100) : r.status === 'improved' ? 100 : 0;
+		const effectiveStatus = (totalWordsCount > 0 && completedCount === totalWordsCount) ? 'improved' : ((r.status as 'pending' | 'improved') || 'pending');
+
+		return {
+			id: Number(r.id),
+			userId: String(r.user_id),
+			title: String(r.title),
+			message: String(r.message),
+			remedialWords,
+			wordProgress,
+			completedCount,
+			totalWordsCount,
+			progressPct,
+			assignedBy: String(r.assigned_by),
+			isRead: Boolean(r.is_read),
+			status: effectiveStatus,
+			createdAt
+		};
+	});
 }
 
-/** Marks pending interventions as 'improved' once the learner's average GOP reaches >= 70%. Returns rows updated. */
+/** Marks pending interventions as 'improved' when all assigned remedial words are passed (GOP >= 70) after assignment OR overall average GOP reaches >= 75%. Returns rows updated. */
 export async function checkAndUpdateInterventionStatus(): Promise<number> {
 	const client = getDb();
 	if (!client) return 0;
 	await init();
+
+	let updatedCount = 0;
+	try {
+		const pendingRes = await client.execute("SELECT id, user_id, remedial_words, created_at FROM teacher_interventions WHERE status = 'pending'");
+		for (const row of pendingRes.rows) {
+			const id = Number(row.id);
+			const uid = String(row.user_id);
+			const createdAt = Number(row.created_at || 0);
+			const rawWords = row.remedial_words
+				? String(row.remedial_words)
+						.split(',')
+						.map((s) => extractHanziToken(s))
+						.filter(Boolean)
+				: [];
+
+			if (rawWords.length > 0) {
+				const evalRes = await client.execute({
+					sql: 'SELECT word_id, MAX(gop_overall) as max_gop FROM pronunciation_evaluations WHERE user_id = ? AND created_at >= ? GROUP BY word_id',
+					args: [uid, createdAt - 60000]
+				});
+				const passedSet = new Set(
+					evalRes.rows.filter((r) => Number(r.max_gop || 0) >= 70).map((r) => String(r.word_id))
+				);
+				if (rawWords.every((w) => passedSet.has(w))) {
+					await client.execute({
+						sql: "UPDATE teacher_interventions SET status = 'improved' WHERE id = ?",
+						args: [id]
+					});
+					updatedCount++;
+				}
+			}
+		}
+	} catch (e) {
+		console.warn('Failed per-word intervention status check:', e);
+	}
+
 	const res = await client.execute(`
 		UPDATE teacher_interventions
 		SET status = 'improved'
@@ -4330,28 +4859,76 @@ export async function checkAndUpdateInterventionStatus(): Promise<number> {
 					SELECT user_id, gop_overall AS gop_score FROM assessment_records
 				)
 				GROUP BY user_id
-			) WHERE avg_gop >= 70
+			) WHERE avg_gop >= 75
 		)
 	`);
-	return res.rowsAffected ?? 0;
+	return updatedCount + (res.rowsAffected ?? 0);
 }
 
 export async function getAllTeacherInterventions(): Promise<any[]> {
 	const client = getDb();
 	if (!client) return [];
 	await init();
-	const res = await client.execute('SELECT * FROM teacher_interventions ORDER BY created_at DESC LIMIT 100');
-	return res.rows.map((r) => ({
-		id: Number(r.id),
-		userId: String(r.user_id),
-		title: String(r.title),
-		message: String(r.message),
-		remedialWords: r.remedial_words ? String(r.remedial_words).split(',').map((s) => s.trim()).filter(Boolean) : [],
-		assignedBy: String(r.assigned_by),
-		isRead: Boolean(r.is_read),
-		status: (r.status as 'pending' | 'improved') || 'pending',
-		createdAt: Number(r.created_at)
-	}));
+	const [res, evalsRes] = await Promise.all([
+		client.execute('SELECT * FROM teacher_interventions ORDER BY created_at DESC LIMIT 100'),
+		client.execute('SELECT user_id, word_id, gop_overall, created_at FROM pronunciation_evaluations ORDER BY created_at DESC LIMIT 2500').catch(() => ({ rows: [] }))
+	]);
+
+	const evalsByUser = new Map<string, Array<{ wordId: string; gop: number; createdAt: number }>>();
+	for (const e of evalsRes.rows) {
+		const uid = String(e.user_id);
+		const list = evalsByUser.get(uid) ?? [];
+		list.push({
+			wordId: String(e.word_id),
+			gop: Number(e.gop_overall || 0),
+			createdAt: Number(e.created_at || 0)
+		});
+		evalsByUser.set(uid, list);
+	}
+
+	return res.rows.map((r) => {
+		const userId = String(r.user_id);
+		const createdAt = Number(r.created_at);
+		const userEvals = evalsByUser.get(userId) ?? [];
+		const remedialWords = r.remedial_words ? String(r.remedial_words).split(',').map((s) => s.trim()).filter(Boolean) : [];
+
+		const wordProgress = remedialWords.map((rawWord) => {
+			const hanzi = extractHanziToken(rawWord);
+			const matchingAfter = userEvals.filter((e) => e.wordId === hanzi && e.createdAt >= createdAt - 60000);
+			const matchingAll = userEvals.filter((e) => e.wordId === hanzi);
+			const relevant = matchingAfter.length > 0 ? matchingAfter : matchingAll;
+			const bestScore = relevant.length > 0 ? Math.round(Math.max(...relevant.map((e) => e.gop))) : null;
+			const passed = matchingAfter.some((e) => e.gop >= 70) || (r.status === 'improved' && (bestScore ?? 0) >= 70);
+			return {
+				raw: rawWord,
+				hanzi,
+				passed,
+				bestScore,
+				attemptsAfterAssign: matchingAfter.length
+			};
+		});
+
+		const completedCount = wordProgress.filter((w) => w.passed).length;
+		const totalWordsCount = wordProgress.length;
+		const progressPct = totalWordsCount > 0 ? Math.round((completedCount / totalWordsCount) * 100) : r.status === 'improved' ? 100 : 0;
+		const effectiveStatus = (totalWordsCount > 0 && completedCount === totalWordsCount) ? 'improved' : ((r.status as 'pending' | 'improved') || 'pending');
+
+		return {
+			id: Number(r.id),
+			userId,
+			title: String(r.title),
+			message: String(r.message),
+			remedialWords,
+			wordProgress,
+			completedCount,
+			totalWordsCount,
+			progressPct,
+			assignedBy: String(r.assigned_by),
+			isRead: Boolean(r.is_read),
+			status: effectiveStatus,
+			createdAt
+		};
+	});
 }
 
 export async function getSkillsAnalyticsSummary() {
@@ -4406,7 +4983,9 @@ export async function getSkillsAnalyticsSummary() {
 			normalizedGainG: null as number | null,
 			toneGainG: null as number | null,
 			deltaGop: null as number | null,
-			gainCategory: 'insufficient_data' as 'high' | 'medium' | 'low' | 'insufficient_data'
+			gainCategory: 'insufficient_data' as 'high' | 'medium' | 'low' | 'insufficient_data',
+			pairedTTest: computePairedTTest([], []) as PairedTTestResult,
+			tonePairedTTest: computePairedTTest([], []) as PairedTTestResult
 		},
 		crossFeatureUsage: [] as Array<{
 			key: string;
@@ -4752,6 +5331,10 @@ export async function getSkillsAnalyticsSummary() {
 	let sumGainG = 0;
 	let sumToneGainG = 0;
 	let sumDeltaGop = 0;
+	const pairedPreGops: number[] = [];
+	const pairedPostGops: number[] = [];
+	const pairedPreTones: number[] = [];
+	const pairedPostTones: number[] = [];
 
 	for (const data of Object.values(userSummaries)) {
 		if (!data.pre) continue;
@@ -4759,6 +5342,11 @@ export async function getSkillsAnalyticsSummary() {
 		if (!target) continue;
 
 		pairedCount++;
+		pairedPreGops.push(data.pre.gop);
+		pairedPostGops.push(target.gop);
+		pairedPreTones.push(data.pre.tone);
+		pairedPostTones.push(target.tone);
+
 		const gain = computeHakeGain(data.pre.gop, target.gop);
 		const toneGain = computeHakeGain(data.pre.tone, target.tone);
 		const deltaGop = target.gop - data.pre.gop;
@@ -4767,6 +5355,9 @@ export async function getSkillsAnalyticsSummary() {
 		sumToneGainG += toneGain;
 		sumDeltaGop += deltaGop;
 	}
+
+	const pairedTTest = computePairedTTest(pairedPreGops, pairedPostGops);
+	const tonePairedTTest = computePairedTTest(pairedPreTones, pairedPostTones);
 
 	let normalizedGainG: number | null = null;
 	let toneGainG: number | null = null;
@@ -4900,7 +5491,9 @@ export async function getSkillsAnalyticsSummary() {
 			normalizedGainG,
 			toneGainG,
 			deltaGop,
-			gainCategory
+			gainCategory,
+			pairedTTest,
+			tonePairedTTest
 		},
 		crossFeatureUsage,
 		classRadar6Axis

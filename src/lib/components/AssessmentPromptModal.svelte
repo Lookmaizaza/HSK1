@@ -62,10 +62,10 @@
 					return;
 				}
 				promptType = 'pre';
-				promptTitle = '🎯 ประเมินก่อนเรียน (Pre-assessment)';
-				promptSubtitle = 'เพื่อวัดระดับทักษะการออกเสียงเริ่มต้นของคุณ กรุณาทำแบบประเมินสั้นๆ 20 คำ (ใช้เวลาประมาณ 3 นาที)';
+				promptTitle = 'แบบประเมินก่อนเรียน (Pre-test)';
+				promptSubtitle = 'ประเมินการออกเสียงเบื้องต้น 20 คำ (ประมาณ 3 นาที)';
 				promptBadge = 'ก่อนเริ่มเรียน';
-				promptBadgeColor = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
+				promptBadgeColor = 'bg-muted text-foreground border-border';
 				isOpen = true;
 				return;
 			}
@@ -79,10 +79,10 @@
 					return;
 				}
 				promptType = 'mid';
-				promptTitle = '📊 ประเมินระหว่างเรียน (Mid-assessment)';
-				promptSubtitle = 'คุณฝึกฝนเก็บคะแนนไปได้พอสมควรแล้ว! มาลองประเมินทักษะระหว่างเรียน 20 คำเพื่อดูว่าเสียงเริ่มนิ่งขึ้นหรือไม่';
-				promptBadge = 'ระหว่างการเรียนรู้';
-				promptBadgeColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+				promptTitle = 'แบบประเมินระหว่างเรียน (Mid-test)';
+				promptSubtitle = 'ทำแบบประเมินระหว่างเรียน 20 คำเพื่อเทียบความก้าวหน้า';
+				promptBadge = 'ระหว่างเรียน';
+				promptBadgeColor = 'bg-muted text-foreground border-border';
 				isOpen = true;
 				return;
 			}

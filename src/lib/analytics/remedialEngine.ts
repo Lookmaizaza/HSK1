@@ -8,6 +8,8 @@ export type DiagnosticSummary = {
 	hasData: boolean;
 	weakPhonemes: string[];
 	weakTones: number[];
+	srsWords?: string[];
+	interventionWords?: string[];
 } | null;
 
 export type RemedialCard = {
@@ -17,6 +19,7 @@ export type RemedialCard = {
 	tag: string;
 	reason: string;
 	presetId: string;
+	priorityType?: 'intervention' | 'srs' | 'phoneme_tone';
 };
 
 const RETROFLEX = new Set(['zh', 'ch', 'sh']);
@@ -84,13 +87,26 @@ export function generateRemedialVocab(
 ): RemedialCard[] {
 	if (!diagnostic || !diagnostic.hasData) return [];
 
-	const weakPhonemes = diagnostic.weakPhonemes;
-	const weakTones = diagnostic.weakTones;
-	if (weakPhonemes.length === 0 && weakTones.length === 0) return [];
+	const weakPhonemes = diagnostic.weakPhonemes || [];
+	const weakTones = diagnostic.weakTones || [];
+	const srsSet = new Set((diagnostic.srsWords || []).map((w) => w.trim()).filter(Boolean));
+	const interventionSet = new Set((diagnostic.interventionWords || []).map((w) => w.trim()).filter(Boolean));
 
-	const scored: Array<{ word: TonePreset; phonemeHits: number; toneHits: number; matchedPhoneme: string | null; matchedTone: number | null }> = [];
+	if (weakPhonemes.length === 0 && weakTones.length === 0 && srsSet.size === 0 && interventionSet.size === 0) return [];
+
+	const scored: Array<{
+		word: TonePreset;
+		phonemeHits: number;
+		toneHits: number;
+		isIntervention: boolean;
+		isSrs: boolean;
+		matchedPhoneme: string | null;
+		matchedTone: number | null;
+	}> = [];
 
 	for (const word of vocab) {
+		const isIntervention = interventionSet.has(word.hanzi);
+		const isSrs = srsSet.has(word.hanzi);
 		const initials = (word.syllables && word.syllables.length > 0)
 			? word.syllables.map((s) => extractInitial(s.pinyin)).filter(Boolean)
 			: [extractInitial(word.pinyin)].filter(Boolean);
@@ -120,19 +136,19 @@ export function generateRemedialVocab(
 		const isTone3Sandhi =
 			weakTones.includes(3) && surfaceTones.filter((t) => t === 3).length >= 1 && (word.tonePattern?.includes('3') ?? false);
 
-		if (phonemeHits > 0 || toneHits > 0 || isTone3Sandhi) {
+		if (isIntervention || isSrs || phonemeHits > 0 || toneHits > 0 || isTone3Sandhi) {
 			if (isTone3Sandhi && matchedTone === null) {
 				matchedTone = 3;
 				toneHits = Math.max(toneHits, 1);
 			}
-			scored.push({ word, phonemeHits, toneHits, matchedPhoneme, matchedTone });
+			scored.push({ word, phonemeHits, toneHits, isIntervention, isSrs, matchedPhoneme, matchedTone });
 		}
 	}
 
-	// Strongest matches first: hits count, then words with fewer syllables (easier to drill)
+	// Strongest matches first: Teacher Intervention > SRS Forgetting Curve > Phoneme+Tone hits, then words with fewer syllables
 	scored.sort((a, b) => {
-		const aScore = a.phonemeHits * 2 + a.toneHits;
-		const bScore = b.phonemeHits * 2 + b.toneHits;
+		const aScore = (a.isIntervention ? 10 : 0) + (a.isSrs ? 5 : 0) + a.phonemeHits * 2 + a.toneHits;
+		const bScore = (b.isIntervention ? 10 : 0) + (b.isSrs ? 5 : 0) + b.phonemeHits * 2 + b.toneHits;
 		if (bScore !== aScore) return bScore - aScore;
 		const aLen = a.word.syllables?.length ?? 1;
 		const bLen = b.word.syllables?.length ?? 1;
@@ -149,23 +165,35 @@ export function generateRemedialVocab(
 		}
 	}
 
-	return uniqueScored.slice(0, limit).map(({ word, matchedPhoneme, matchedTone }) => {
+	return uniqueScored.slice(0, limit).map(({ word, matchedPhoneme, matchedTone, isIntervention, isSrs }) => {
 		let tag: string;
-		if (matchedPhoneme && matchedTone === 3) {
+		if (isIntervention) {
+			tag = 'การบ้านจากครู';
+		} else if (isSrs) {
+			tag = 'ถึงรอบทบทวน SRS';
+		} else if (matchedPhoneme && matchedTone === 3) {
 			tag = `/${matchedPhoneme}/ + เสียงที่ 3`;
 		} else if (matchedPhoneme) {
 			tag = `พยัญชนะ /${matchedPhoneme}/`;
 		} else {
-			tag = toneLabel(matchedTone as ToneNumber);
+			tag = toneLabel((matchedTone || word.tone) as ToneNumber);
 		}
+
+		const baseReason = buildReason(word, matchedPhoneme, matchedTone);
+		const reason = isIntervention
+			? `คำศัพท์การบ้านเสริมจุดอ่อนที่ครูมอบหมาย · ${baseReason}`
+			: isSrs
+			? `ความจำเริ่มลดลงตามกราฟลืมเลือน (Forgetting Curve) · ${baseReason}`
+			: baseReason;
 
 		return {
 			hanzi: word.hanzi,
 			pinyin: word.pinyin,
 			thai: word.thai,
 			tag,
-			reason: buildReason(word, matchedPhoneme, matchedTone),
-			presetId: word.id
+			reason,
+			presetId: word.id,
+			priorityType: isIntervention ? 'intervention' : isSrs ? 'srs' : 'phoneme_tone'
 		};
 	});
 }

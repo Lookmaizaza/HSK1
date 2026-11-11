@@ -114,6 +114,9 @@
 	// Listening Behavior Telemetry State
 	let listenCount = $state(0);
 	let listenTimestamps = $state<number[]>([]);
+	let wordReadyAt = $state<number>(Date.now());
+	let wordAttemptCount = $state<number>(0);
+	let lastHesitationMs = $state<number>(0);
 
 	// Pitch Tracker & Speech Recognizer
 	let tracker: RealtimePitchTracker | null = null;
@@ -239,6 +242,8 @@
 	function selectPreset(preset: TonePreset) {
 		listenCount = 0;
 		listenTimestamps = [];
+		wordReadyAt = Date.now();
+		wordAttemptCount = 0;
 		selectedPreset = preset;
 		resetAnalysis();
 	}
@@ -289,61 +294,61 @@
 		{
 			tone: 1,
 			name: 'เสียง 1 (阴平)',
-			pitchLabel: 'ระดับ 55 (สูงราบ)',
+			pitchLabel: 'ระดับ 55 · สูงราบ',
 			hanzi: '妈',
 			pinyin: 'mā',
 			meaning: 'แม่',
 			desc: 'ระดับเสียงสูงคงที่ สม่ำเสมอ ไม่ตกลงมา',
-			accentBorder: 'border-emerald-500/40 hover:border-emerald-500',
-			accentBg: 'from-emerald-500/10 via-emerald-500/5 to-transparent',
-			textColor: 'text-emerald-600 dark:text-emerald-400',
-			badgeColor: 'bg-emerald-500 text-white',
+			accentBorder: 'border-border hover:border-slate-300 dark:hover:border-slate-700',
+			accentBg: '',
+			textColor: 'text-foreground',
+			badgeColor: 'bg-muted text-foreground border border-border',
 			strokeColor: '#10b981',
 			curveSvg: 'M 10 20 L 90 20'
 		},
 		{
 			tone: 2,
 			name: 'เสียง 2 (阳平)',
-			pitchLabel: 'ระดับ 35 (ไต่ขึ้น)',
+			pitchLabel: 'ระดับ 35 · ไต่ขึ้น',
 			hanzi: '麻',
 			pinyin: 'má',
 			meaning: 'ป่าน / ชา',
 			desc: 'เริ่มจากระดับกลางแล้วไต่ขึ้นไปสูง เหมือนถาม "หือ?"',
-			accentBorder: 'border-sky-500/40 hover:border-sky-500',
-			accentBg: 'from-sky-500/10 via-sky-500/5 to-transparent',
-			textColor: 'text-sky-600 dark:text-sky-400',
-			badgeColor: 'bg-sky-500 text-white',
+			accentBorder: 'border-border hover:border-slate-300 dark:hover:border-slate-700',
+			accentBg: '',
+			textColor: 'text-foreground',
+			badgeColor: 'bg-muted text-foreground border border-border',
 			strokeColor: '#0ea5e9',
 			curveSvg: 'M 10 52 Q 50 42 90 15'
 		},
 		{
 			tone: 3,
 			name: 'เสียง 3 (上声)',
-			pitchLabel: 'ระดับ 214 (ต่ำตก-ช้อนขึ้น)',
+			pitchLabel: 'ระดับ 214 · ต่ำช้อนขึ้น',
 			hanzi: '马',
 			pinyin: 'mǎ',
 			meaning: 'ม้า',
 			desc: 'กดเสียงลงต่ำสุดในลำคอแล้วช้อนขึ้นเบาๆ',
-			accentBorder: 'border-purple-500/40 hover:border-purple-500',
-			accentBg: 'from-purple-500/10 via-purple-500/5 to-transparent',
-			textColor: 'text-purple-600 dark:text-purple-400',
-			badgeColor: 'bg-purple-500 text-white',
+			accentBorder: 'border-border hover:border-slate-300 dark:hover:border-slate-700',
+			accentBg: '',
+			textColor: 'text-foreground',
+			badgeColor: 'bg-muted text-foreground border border-border',
 			strokeColor: '#a855f7',
 			curveSvg: 'M 10 35 Q 45 68 90 22'
 		},
 		{
 			tone: 4,
 			name: 'เสียง 4 (去声)',
-			pitchLabel: 'ระดับ 51 (ตกลงเร็ว)',
+			pitchLabel: 'ระดับ 51 · ตกลงเร็ว',
 			hanzi: '骂',
 			pinyin: 'mà',
 			meaning: 'ด่า / ว่า',
 			desc: 'เริ่มจากระดับสูงสุดแล้วปล่อยตกลงมาเร็วและหนักแน่น',
-			accentBorder: 'border-rose-500/40 hover:border-rose-500',
-			accentBg: 'from-rose-500/10 via-rose-500/5 to-transparent',
-			textColor: 'text-rose-600 dark:text-rose-400',
-			badgeColor: 'bg-rose-500 text-white',
-			strokeColor: '#f43f5e',
+			accentBorder: 'border-border hover:border-slate-300 dark:hover:border-slate-700',
+			accentBg: '',
+			textColor: 'text-foreground',
+			badgeColor: 'bg-muted text-foreground border border-border',
+			strokeColor: '#dc2626',
 			curveSvg: 'M 10 14 Q 45 35 90 62'
 		}
 	];
@@ -410,6 +415,8 @@
 	}
 
 	async function startRecording() {
+		wordAttemptCount++;
+		lastHesitationMs = Math.max(0, Date.now() - wordReadyAt);
 		resetAnalysis();
 		errorMessage = null;
 		hasVoicedSpeech = false;
@@ -633,6 +640,12 @@
 				progress.addXp(15);
 			}
 
+			const voicedFrames = recorded.filter((p) => p.f0 > 0 && p.clarity > 0.25);
+			const avgClarity =
+				voicedFrames.length > 0
+					? Number((voicedFrames.reduce((s, p) => s + p.clarity, 0) / voicedFrames.length).toFixed(3))
+					: 0;
+
 			// Telemetry & Error Tracking
 			const telemetryPayload = {
 				eventType: 'pronunciation_evaluation',
@@ -650,7 +663,9 @@
 				behavior: {
 					listenedToExample: listenCount > 0,
 					listenCount: listenCount,
-					listenTimestamps: [...listenTimestamps]
+					listenTimestamps: [...listenTimestamps],
+					hesitationLatencyMs: lastHesitationMs,
+					attemptNumber: wordAttemptCount
 				},
 				assessment: {
 					isPassed: isPassed,
@@ -673,7 +688,8 @@
 					})),
 					acoustics: {
 						avgF0: res.avgF0,
-						totalDurationMs: res.totalDurationMs
+						totalDurationMs: res.totalDurationMs,
+						avgClarity
 					},
 					overallFeedback: res.overallFeedback
 				}
@@ -726,100 +742,87 @@
 </script>
 
 <svelte:head>
-	<title>語 ปากจีน — สตูดิโอเทียบเสียงและผันวรรณยุกต์ HSK</title>
+	<title>ปากจีน — ฝึกออกเสียงและผันวรรณยุกต์ HSK 1–3</title>
 </svelte:head>
 
 <AppHeader />
 
-<main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-4">
-	<!-- 1. HERO BANNER (ธีมคลีน แดง-ขาว-ทอง พร้อมมาสคอตช้างน้อยสีฟ้า ไร้กรอบ) -->
-	<section class="relative overflow-hidden rounded-3xl bg-card border border-rose-200/60 dark:border-rose-950 p-6 sm:p-8 md:px-6 md:py-10 xl:p-10 shadow-lg shadow-rose-500/5 mb-8">
-		<!-- Radiant soft ambient glow -->
-		<div class="pointer-events-none absolute -left-20 -top-20 size-80 rounded-full bg-rose-500/10 blur-3xl"></div>
-		<div class="pointer-events-none absolute -right-20 -bottom-20 size-80 rounded-full bg-amber-500/10 blur-3xl"></div>
-
-		<div class="relative z-10 grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 items-center">
+<main class="mx-auto max-w-7xl 2xl:max-w-[1540px] px-4 sm:px-6 lg:px-8 pb-32 pt-6">
+	<!-- 1. HERO BANNER (Minimalist Clean + Brand Red) -->
+	<section class="relative overflow-hidden rounded-2xl bg-card border border-border p-6 sm:p-8 md:px-8 md:py-10 xl:p-12 mb-10">
+		<div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-center">
 			<!-- Left Column: Headline & Action CTAs -->
 			<div class="xl:col-span-8 flex min-w-0 flex-col justify-center text-left">
 				<div class="flex flex-wrap items-center gap-2 mb-4">
-					<span class="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 px-3.5 py-1 text-xs sm:text-sm font-bold text-sky-600 dark:text-sky-400">
-						🐘 ห้องเรียนช้างน้อย ปากจีน
-					</span>
-					<span class="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400">
-						📚 คลังคำศัพท์และบทเรียน HSK 1–3
+					<span class="inline-flex items-center rounded-md border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+						ปากจีน · HSK 1–3
 					</span>
 				</div>
 
-				<h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-[3.2rem] font-black tracking-tight text-foreground leading-tight">
+				<h1 class="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground leading-tight">
 					ห้องเรียนช้างน้อย<br />
-					<span class="bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 bg-clip-text text-transparent">
-						เรียนภาษาจีนออนไลน์
-					</span>
+					<span class="text-primary">เรียนภาษาจีน HSK 1–3</span>
 				</h1>
 
-				<p class="mt-4 w-full text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed">
-					เริ่มต้นเรียนรู้ภาษาจีนตั้งแต่พื้นฐานจนนำไปใช้งานได้จริง ฝึกออกเสียงผันวรรณยุกต์<br />
-					เทียบเสียงเจ้าของภาษา คัดลำดับขีดอักษรจีน และคลังคำศัพท์ HSK 1–3 ครบวงจร
+				<p class="mt-4 max-w-2xl text-sm sm:text-base text-muted-foreground leading-relaxed">
+					ฝึกคำศัพท์ ฟังเสียงเจ้าของภาษา และเทียบกราฟวรรณยุกต์ 4 เสียง พร้อมแบบฝึกคัดลายมือ
 				</p>
 
 				<!-- Action Buttons -->
 				<div class="mt-7 flex flex-wrap items-center gap-3">
 					<a
 						href="/flashcard"
-						class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 px-7 py-3.5 text-sm sm:text-base font-black text-white transition hover:scale-105 active:scale-95 shadow-xl shadow-rose-600/25 cursor-pointer"
+						class="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 px-6 py-3 text-sm font-semibold text-primary-foreground transition cursor-pointer"
 					>
-						<BookOpen class="size-5" />
-						<span>ฝึกคำศัพท์และคัดลายมือ</span>
+						<BookOpen class="size-4.5" />
+						<span>ฝึกคำศัพท์</span>
 					</a>
 
 					<button
 						type="button"
 						onclick={scrollToStudio}
-						class="inline-flex items-center gap-2 rounded-2xl bg-white dark:bg-card border-2 border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/20 px-5 py-3 text-sm sm:text-base font-bold text-rose-600 dark:text-rose-400 transition active:scale-95 shadow-sm cursor-pointer"
+						class="inline-flex items-center gap-2 rounded-xl bg-card border border-border hover:bg-muted px-5 py-3 text-sm font-semibold text-foreground transition cursor-pointer"
 					>
-						<Mic class="size-5" />
-						<span>สตูดิโอเทียบเสียงวรรณยุกต์</span>
+						<Mic class="size-4.5 text-primary" />
+						<span>เทียบเสียงวรรณยุกต์</span>
 					</button>
 
 					<a
 						href="/exam"
-						class="inline-flex items-center gap-1.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-4 py-3 text-sm font-bold text-amber-700 dark:text-amber-400 transition active:scale-95"
+						class="inline-flex items-center gap-1.5 rounded-xl bg-card hover:bg-muted border border-border px-4 py-3 text-sm font-medium text-foreground transition"
 					>
-						<FileText class="size-4" />
-						<span>ข้อสอบจริง HSK</span>
+						<FileText class="size-4 text-muted-foreground" />
+						<span>ลองทำข้อสอบ</span>
 					</a>
 				</div>
 			</div>
 
-			<!-- Right Column: Frameless Blue Elephant Mascot (เอาแค่ตัวช้างสีฟ้าและคำไว้เลย ไม่มีกรอบ) -->
+			<!-- Right Column: Mascot -->
 			<div class="xl:col-span-4 flex min-w-0 flex-col items-center justify-center text-center py-2">
 				<div class="flex flex-col items-center group">
-					<!-- Mascot Image: Frameless standing Blue Elephant with natural subtle shadow -->
-					<div class="relative size-60 sm:size-72 transition duration-300 group-hover:scale-105">
+					<div class="relative size-56 sm:size-64 transition duration-300 group-hover:scale-105">
 						<img
 							src="/mascot.png"
-							alt="น้องช้างน้อย ปากจีน"
-							class="size-full object-contain filter drop-shadow-[0_16px_28px_rgba(56,189,248,0.22)]"
+							alt="ช้างน้อย ปากจีน"
+							class="size-full object-contain"
 						/>
 					</div>
 
-					<!-- Clean Text beneath the Mascot (No border card) -->
 					<div class="mt-2 text-center">
-						<h3 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-							ห้องเรียนช้างน้อย <span class="text-rose-600">ปากจีน</span>
+						<h3 class="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+							ปากจีน <span class="text-primary">HSK 1–3</span>
 						</h3>
-						<p class="text-xs text-muted-foreground mt-0.5">ฝึกฟัง พูด อ่าน เขียน HSK ครบในที่เดียว</p>
+						<p class="text-xs text-muted-foreground mt-1">ฟัง พูด อ่าน เขียน ครบในระบบเดียว</p>
 
-						<!-- Simple pill badges underneath -->
-						<div class="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
-							<span class="rounded-full bg-rose-500/10 px-3 py-1 font-bold text-rose-600">
+						<div class="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-xs">
+							<span class="rounded-md border border-border bg-muted px-2.5 py-0.5 font-medium text-foreground">
 								1,000+ คำศัพท์
 							</span>
-							<span class="rounded-full bg-amber-500/10 px-3 py-1 font-bold text-amber-700">
-								ลำดับขีดอักษรจีน
+							<span class="rounded-md border border-border bg-muted px-2.5 py-0.5 font-medium text-foreground">
+								คัดลำดับขีด
 							</span>
-							<span class="rounded-full bg-sky-500/10 px-3 py-1 font-bold text-sky-700">
-								ผัน 4 วรรณยุกต์
+							<span class="rounded-md border border-border bg-muted px-2.5 py-0.5 font-medium text-foreground">
+								เทียบ 4 วรรณยุกต์
 							</span>
 						</div>
 					</div>
@@ -828,33 +831,31 @@
 		</div>
 	</section>
 
-	<!-- 2. INTERACTIVE 4-TONE SOUNDBOARD (ma: 妈, 麻, 马, 骂) อยู่ล่างแบนเนอร์ -->
-	<section class="mb-10">
-		<div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-			<div>
-				<div class="flex items-center gap-2">
-					<AudioLines class="size-5 text-emerald-500" />
-					<h2 class="text-xl sm:text-2xl font-black tracking-tight text-foreground">
-						ฝึกผัน 4 วรรณยุกต์พื้นฐาน (mā, má, mǎ, mà)
-					</h2>
-				</div>
-				<p class="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:text-lg">
-					กดฟังเสียงต้นแบบเจ้าของภาษา และสังเกตทิศทางของระดับเสียง เพื่อเตรียมพร้อมก่อนเริ่มฝึกออกเสียง
-				</p>
+	<!-- 2. INTERACTIVE 4-TONE SOUNDBOARD -->
+	<section class="mb-12">
+		<div class="mb-5">
+			<div class="flex items-center gap-2">
+				<AudioLines class="size-5 text-primary" />
+				<h2 class="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+					4 วรรณยุกต์พื้นฐาน (mā, má, mǎ, mà)
+				</h2>
 			</div>
+			<p class="mt-1 max-w-3xl text-sm text-muted-foreground sm:text-base">
+				กดฟังเสียงตัวอย่างและสังเกตทิศทางระดับเสียงก่อนฝึกพูด
+			</p>
 		</div>
 
 		<!-- 4-Tone Interactive Cards Grid -->
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 			{#each FOUR_TONES_SHOWCASE as t}
 				{@const isPlaying = playingHanzi === t.hanzi}
-				<div class="group relative overflow-hidden rounded-3xl border-2 bg-gradient-to-br {t.accentBg} {t.accentBorder} p-5 shadow-xs transition-all hover:shadow-md hover:-translate-y-1">
+				<div class="group relative overflow-hidden rounded-2xl border bg-card {t.accentBorder} p-5 transition-colors">
 					<!-- Top Row: Tone Badge & Pitch Label -->
 					<div class="flex items-center justify-between mb-3">
-						<span class="rounded-full px-2.5 py-0.5 text-xs font-black {t.badgeColor} shadow-xs">
+						<span class="rounded-md px-2.5 py-0.5 text-xs font-semibold {t.badgeColor}">
 							{t.name}
 						</span>
-						<span class="text-xs font-mono font-bold {t.textColor}">
+						<span class="text-xs font-mono text-muted-foreground">
 							{t.pitchLabel}
 						</span>
 					</div>
@@ -863,16 +864,16 @@
 					<div class="flex items-center justify-between gap-3 my-2">
 						<div>
 							<div class="flex items-baseline gap-2">
-								<span class="text-4xl font-black text-foreground">{t.hanzi}</span>
-								<span class="text-2xl font-bold font-mono {t.textColor}">{t.pinyin}</span>
+								<span class="text-4xl font-bold text-foreground">{t.hanzi}</span>
+								<span class="text-xl font-semibold font-mono text-muted-foreground">{t.pinyin}</span>
 							</div>
-							<div class="mt-1 text-sm font-medium text-muted-foreground sm:text-base">
+							<div class="mt-1 text-sm font-medium text-muted-foreground">
 								{t.meaning}
 							</div>
 						</div>
 
 						<!-- Pitch Contour Mini Curve -->
-						<div class="relative size-18 rounded-2xl bg-card border border-border/80 shadow-xs p-2 flex items-center justify-center shrink-0">
+						<div class="relative size-18 rounded-xl bg-background border border-border p-2 flex items-center justify-center shrink-0">
 							<svg viewBox="0 0 100 80" class="w-full h-full">
 								<line x1="10" y1="20" x2="90" y2="20" stroke="rgba(148, 163, 184, 0.25)" stroke-dasharray="2 2" stroke-width="1" />
 								<line x1="10" y1="50" x2="90" y2="50" stroke="rgba(148, 163, 184, 0.2)" stroke-dasharray="2 2" stroke-width="1" />
@@ -880,27 +881,27 @@
 									d={t.curveSvg}
 									fill="none"
 									stroke={t.strokeColor}
-									stroke-width="5"
+									stroke-width="4.5"
 									stroke-linecap="round"
 									class="transition-all {isPlaying ? 'animate-pulse' : ''}"
 								/>
 							</svg>
 							{#if isPlaying}
-								<span class="absolute -top-1 -right-1 flex size-3">
-									<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-									<span class="relative inline-flex rounded-full size-3 bg-emerald-500"></span>
+								<span class="absolute -top-1 -right-1 flex size-2.5">
+									<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+									<span class="relative inline-flex rounded-full size-2.5 bg-primary"></span>
 								</span>
 							{/if}
 						</div>
 					</div>
 
 					<!-- Description -->
-					<p class="my-3 line-clamp-2 text-sm leading-relaxed text-foreground/80 sm:text-base">
+					<p class="my-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
 						{t.desc}
 					</p>
 
-					<!-- Bottom Actions: Listen & Studio Practice -->
-					<div class="flex items-center gap-2 pt-2 border-t border-border/50">
+					<!-- Bottom Actions -->
+					<div class="flex items-center gap-2 pt-3 border-t border-border">
 						<button
 							type="button"
 							onclick={() => playToneAudio(t.hanzi)}
@@ -926,13 +927,13 @@
 		</div>
 	</section>
 
-	<!-- 3. PRONUNCIATION PRACTICE STUDIO (ห้องฝึกออกเสียงคำศัพท์) -->
+	<!-- 3. PRONUNCIATION PRACTICE STUDIO -->
 	<section id="practice-studio" class="scroll-mt-20">
-		<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
+		<div class="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
 			<div class="min-w-0 flex-1">
-				<h2 class="text-xl sm:text-2xl font-black text-foreground flex items-center gap-2">
-					<Sparkles class="size-5 text-emerald-500" />
-					<span>ห้องฝึกออกเสียงคำศัพท์ภาษาจีน</span>
+				<h2 class="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+					<Mic class="size-5 text-primary" />
+					<span>ฝึกออกเสียงคำศัพท์</span>
 				</h2>
 			</div>
 
@@ -940,9 +941,9 @@
 				<button
 					type="button"
 					onclick={() => setLevel(currentLevel)}
-					class="flex items-center gap-1.5 rounded-2xl px-4 py-2 text-xs font-extrabold transition shadow-sm cursor-pointer {activeStudioTab === 'hsk'
-						? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md'
-						: 'bg-card border text-muted-foreground hover:bg-muted'}"
+					class="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition cursor-pointer {activeStudioTab === 'hsk'
+						? 'bg-primary text-primary-foreground'
+						: 'bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground'}"
 				>
 					<BookOpen class="size-4" />
 					<span>คลังคำศัพท์ HSK</span>
@@ -950,17 +951,17 @@
 				<button
 					type="button"
 					onclick={setTonesMasterMode}
-					class="flex items-center gap-1.5 rounded-2xl px-4 py-2 text-xs font-extrabold transition shadow-sm cursor-pointer {activeStudioTab === 'master_tones'
-						? 'bg-emerald-600 text-white shadow-emerald-500/30 shadow-md'
-						: 'bg-card border text-muted-foreground hover:bg-muted'}"
+					class="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition cursor-pointer {activeStudioTab === 'master_tones'
+						? 'bg-primary text-primary-foreground'
+						: 'bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground'}"
 				>
 					<Volume2 class="size-4" />
-					<span>ฝึก 4 เสียงพื้นฐาน (mā, má, mǎ, mà)</span>
+					<span>ฝึก 4 เสียงพื้นฐาน</span>
 				</button>
 			</div>
 		</div>
-		<p class="mb-5 text-sm leading-relaxed text-muted-foreground sm:text-base lg:whitespace-nowrap">
-			เลือกคำศัพท์เพื่อดูพินอินและคำแปล เปิดไมโครโฟน แล้วพูดออกเสียงเพื่อเทียบกราฟระดับเสียงกับเจ้าของภาษา
+		<p class="mb-5 text-sm text-muted-foreground sm:text-base">
+			เลือกคำศัพท์เพื่อดูพินอินและคำแปล แล้วกดปุ่มไมค์เพื่อเทียบกราฟระดับเสียง
 		</p>
 
 	<!-- 3. MAIN WIDESCREEN 2-COLUMN STUDIO -->
@@ -974,13 +975,13 @@
 						<button
 							type="button"
 							onclick={() => setLevel(lvl)}
-							class="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-extrabold transition-all cursor-pointer {currentLevel === lvl
-								? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
-								: 'bg-muted/40 border border-border/80 text-muted-foreground hover:bg-muted'}"
+							class="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer {currentLevel === lvl
+								? 'bg-foreground text-background'
+								: 'bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground'}"
 						>
 							<span>HSK {lvl}</span>
 							{#if currentLevel === lvl}
-								<span class="text-[10px] opacity-80">({vocabList.length} คำ)</span>
+								<span class="text-[11px] opacity-80">({vocabList.length})</span>
 							{/if}
 						</button>
 					{/each}
@@ -988,62 +989,62 @@
 			{/if}
 
 			<!-- Progress Tracker Summary Card -->
-			<section class="rounded-3xl border bg-card p-4 sm:p-5 shadow-sm">
+			<section class="rounded-2xl border border-border bg-card p-4 sm:p-5">
 				<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 					<div class="flex items-center gap-3">
-						<div class="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-							<span class="text-base font-black">{progressPercent}%</span>
+						<div class="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted border border-border text-foreground">
+							<span class="text-sm font-bold tabular-nums">{progressPercent}%</span>
 						</div>
 						<div>
-							<div class="text-xs sm:text-sm font-extrabold text-foreground">
+							<div class="text-xs sm:text-sm font-semibold text-foreground">
 								ผ่านแล้ว {passedWordsCount} / {totalWordsCount} คำ
 							</div>
-							<div class="mt-1 h-2 w-44 overflow-hidden rounded-full bg-muted">
+							<div class="mt-1.5 h-1.5 w-44 overflow-hidden rounded-full bg-muted">
 								<div
-									class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
+									class="h-full rounded-full bg-primary transition-all duration-300"
 									style="width: {progressPercent}%"
 								></div>
 							</div>
 						</div>
 					</div>
 
-					<div class="flex items-center gap-2 text-[11px] font-bold">
+					<div class="flex items-center gap-2 text-xs font-medium">
 						<span class="text-emerald-600 dark:text-emerald-400">ถูก: {passedWordsCount}</span>
-						<span>•</span>
-						<span class="text-rose-600 dark:text-rose-400">ผิด: {strugglingWordsCount}</span>
-						<span>•</span>
-						<span class="text-muted-foreground">รอฝึก: {unlearnedWordsCount}</span>
+						<span class="text-muted-foreground">·</span>
+						<span class="text-primary">ผิด: {strugglingWordsCount}</span>
+						<span class="text-muted-foreground">·</span>
+						<span class="text-muted-foreground">เหลือ: {unlearnedWordsCount}</span>
 					</div>
 				</div>
 
 				<!-- Status Filter Pills -->
-				<div class="mt-3 pt-3 border-t flex flex-wrap items-center gap-1.5 text-xs">
+				<div class="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-1.5 text-xs">
 					<button
 						type="button"
 						onclick={() => (statusFilter = 'all')}
-						class="rounded-full px-2.5 py-0.5 font-bold transition cursor-pointer {statusFilter === 'all'
-							? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-							: 'bg-muted text-muted-foreground'}"
+						class="rounded-md px-2.5 py-1 font-medium transition cursor-pointer {statusFilter === 'all'
+							? 'bg-foreground text-background'
+							: 'bg-muted text-muted-foreground hover:text-foreground'}"
 					>
 						ทั้งหมด ({totalWordsCount})
 					</button>
 					<button
 						type="button"
 						onclick={() => (statusFilter = 'passed')}
-						class="rounded-full px-2.5 py-0.5 font-bold transition cursor-pointer {statusFilter === 'passed'
+						class="rounded-md px-2.5 py-1 font-medium transition cursor-pointer {statusFilter === 'passed'
 							? 'bg-emerald-600 text-white'
-							: 'bg-muted text-emerald-700 dark:text-emerald-400'}"
+							: 'bg-muted text-muted-foreground hover:text-foreground'}"
 					>
 						ผ่านแล้ว ({passedWordsCount})
 					</button>
 					<button
 						type="button"
 						onclick={() => (statusFilter = 'struggling')}
-						class="rounded-full px-2.5 py-0.5 font-bold transition cursor-pointer {statusFilter === 'struggling'
-							? 'bg-rose-600 text-white'
-							: 'bg-muted text-rose-700 dark:text-rose-400'}"
+						class="rounded-md px-2.5 py-1 font-medium transition cursor-pointer {statusFilter === 'struggling'
+							? 'bg-primary text-primary-foreground'
+							: 'bg-muted text-muted-foreground hover:text-foreground'}"
 					>
-						ควรฝึกซ้ำ ({strugglingWordsCount})
+						ต้องฝึกซ้ำ ({strugglingWordsCount})
 					</button>
 				</div>
 			</section>
@@ -1141,43 +1142,37 @@
 								<button
 									type="button"
 									onclick={() => selectPreset(preset)}
-									class="group relative flex flex-col items-center justify-center min-h-[118px] rounded-2xl border-2 p-3 sm:p-3.5 text-center transition-all cursor-pointer {isSelected
-										? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 shadow-md ring-2 ring-emerald-500/40'
+									class="group relative flex flex-col items-center justify-center min-h-[116px] rounded-xl border p-3 sm:p-3.5 text-center transition cursor-pointer {isSelected
+										? 'border-primary bg-primary/[0.04] ring-1 ring-primary'
 										: stat?.status === 'passed'
-											? 'border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/25 hover:border-emerald-500'
+											? 'border-emerald-300 dark:border-emerald-800 bg-card hover:border-emerald-500'
 											: stat?.status === 'struggling'
-												? 'border-rose-300 dark:border-rose-800/60 bg-rose-50/25 hover:border-rose-500'
-												: 'border-border/80 bg-background hover:border-emerald-400/60 hover:-translate-y-0.5'}"
+												? 'border-red-200 dark:border-red-900 bg-card hover:border-primary'
+												: 'border-border bg-card hover:border-slate-300 dark:hover:border-slate-700'}"
 								>
 									<!-- Status Badge -->
 									{#if stat?.status === 'passed'}
-										<span class="absolute top-2 left-2 flex items-center justify-center size-5 rounded-full bg-emerald-500 text-white shadow-xs" title="ออกเสียงถูกต้องแล้ว">
-											<Check class="size-3 stroke-[3]" />
+										<span class="absolute top-2 left-2 flex items-center justify-center size-4.5 rounded-full bg-emerald-600 text-white" title="ผ่านแล้ว">
+											<Check class="size-2.5 stroke-[3]" />
 										</span>
 									{:else if stat?.status === 'struggling'}
-										<span class="absolute top-2 left-2 flex items-center justify-center size-5 rounded-full bg-rose-500 text-white shadow-xs" title="ออกเสียงผิด {stat.wrongCount} ครั้ง">
-											<AlertCircle class="size-3 stroke-[2.5]" />
+										<span class="absolute top-2 left-2 flex items-center justify-center size-4.5 rounded-full bg-primary text-primary-foreground" title="ผิด {stat.wrongCount} ครั้ง">
+											<AlertCircle class="size-2.5 stroke-[2.5]" />
 										</span>
 									{/if}
 
 									<!-- Tone Badge -->
-									<span class="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[9px] font-bold {preset.tone === 1
-										? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-										: preset.tone === 2
-											? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-											: preset.tone === 3
-												? 'bg-fuchsia-100 dark:bg-fuchsia-950 text-fuchsia-700 dark:text-fuchsia-300'
-												: 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'}">
+									<span class="absolute top-2 right-2 rounded px-1.5 py-0.5 text-[10px] font-medium border border-border bg-muted text-muted-foreground">
 										เสียง {preset.tone}
 									</span>
 
 									<!-- Hanzi Character -->
-									<span class="mt-2 text-3xl sm:text-4xl font-extrabold tracking-normal text-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+									<span class="mt-2 text-3xl sm:text-4xl font-bold tracking-normal text-foreground group-hover:text-primary transition-colors">
 										{preset.hanzi}
 									</span>
 
 									<!-- Pinyin -->
-									<span class="mt-1 font-mono text-sm font-bold text-sky-600 dark:text-sky-400 break-words max-w-full">
+									<span class="mt-1 font-mono text-sm font-semibold text-muted-foreground break-words max-w-full">
 										{preset.pinyin}
 									</span>
 
@@ -1203,28 +1198,28 @@
 			{/if}
 
 			<!-- Target Word Practice Card -->
-			<section id="target-practice-card" class="rounded-3xl border bg-card p-5 sm:p-6 shadow-sm">
+			<section id="target-practice-card" class="rounded-2xl border border-border bg-card p-5 sm:p-6">
 				<div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
 					<!-- Word Info -->
 					<div class="md:col-span-7 flex items-start gap-4 sm:gap-5">
-						<div class="mt-1 flex w-16 shrink-0 flex-col items-center gap-1">
+						<div class="mt-1 flex w-16 shrink-0 flex-col items-center gap-1.5">
 							<button
 								type="button"
 								onclick={playAudio}
-								class="group flex size-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25 transition active:scale-95 hover:shadow-lg hover:scale-105 cursor-pointer"
-								title="กดฟังเสียงต้นแบบเจ้าของภาษา"
+								class="group flex size-14 items-center justify-center rounded-xl border border-border bg-background hover:bg-muted text-foreground transition cursor-pointer"
+								title="ฟังเสียงตัวอย่าง"
 							>
-								<Volume2 class="size-8 transition-transform group-hover:scale-110" />
+								<Volume2 class="size-6 text-primary transition-transform group-hover:scale-105" />
 							</button>
-							<span class="whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-bold leading-none text-white shadow {listenCount > 0 ? 'bg-emerald-600' : 'bg-slate-900'}">
-								{listenCount > 0 ? `ฟังแล้ว ${listenCount} ครั้ง` : 'กดฟังเสียง'}
+							<span class="whitespace-nowrap rounded-md border border-border px-2 py-0.5 text-[11px] font-medium leading-none {listenCount > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}">
+								{listenCount > 0 ? `ฟังแล้ว ${listenCount}` : 'ฟังเสียง'}
 							</span>
 						</div>
 
 						<div class="min-w-0 flex-1">
 							<div class="flex flex-wrap items-baseline gap-3">
-								<span class="text-4xl sm:text-5xl font-black tracking-wide text-foreground">{selectedPreset.hanzi}</span>
-								<span class="text-2xl sm:text-3xl font-bold text-sky-600 dark:text-sky-400 font-mono">{selectedPreset.pinyin}</span>
+								<span class="text-4xl sm:text-5xl font-bold tracking-wide text-foreground">{selectedPreset.hanzi}</span>
+								<span class="text-2xl sm:text-3xl font-semibold text-primary font-mono">{selectedPreset.pinyin}</span>
 							</div>
 							<div class="mt-1 text-sm sm:text-base font-medium text-foreground">
 								{selectedPreset.thai}
@@ -1235,8 +1230,8 @@
 
 							<!-- Target Tone Info -->
 							<div class="mt-3 flex flex-wrap items-center gap-2">
-								<span class="inline-flex items-center gap-1.5 rounded-xl border bg-muted/60 px-3 py-1 text-xs font-extrabold text-foreground shadow-xs">
-									<span class="size-2 rounded-full {selectedPreset.tone === 1 ? 'bg-emerald-500' : selectedPreset.tone === 2 ? 'bg-blue-500' : selectedPreset.tone === 3 ? 'bg-fuchsia-500' : 'bg-rose-500'}"></span>
+								<span class="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+									<span class="size-2 rounded-full {selectedPreset.tone === 1 ? 'bg-emerald-500' : selectedPreset.tone === 2 ? 'bg-sky-500' : selectedPreset.tone === 3 ? 'bg-purple-500' : 'bg-red-600'}"></span>
 									<span>
 										{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
 											รูปแบบเสียง {selectedPreset.tonePattern || selectedPreset.syllables.map((s) => s.surfaceTone).join('+')}
@@ -1245,9 +1240,9 @@
 										{/if}
 									</span>
 								</span>
-								<span class="rounded-xl border bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800/40 px-2.5 py-1 font-mono text-xs font-bold text-sky-700 dark:text-sky-300">
+								<span class="rounded-md border border-border bg-card px-2.5 py-1 font-mono text-xs text-muted-foreground">
 									{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
-										{selectedPreset.syllables.map((s) => `${s.hanzi}: เสียง ${s.surfaceTone}`).join(' • ')}
+										{selectedPreset.syllables.map((s) => `${s.hanzi}: เสียง ${s.surfaceTone}`).join(' · ')}
 									{:else}
 										ระดับเสียง: {TONE_PROFILES[selectedPreset.tone]?.chaoPitch || '--'}
 									{/if}
@@ -1257,23 +1252,23 @@
 					</div>
 
 					<!-- Mic & Navigation Controls -->
-					<div class="md:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-muted/40 border border-border/80">
-						<div class="flex items-center justify-between w-full mb-3 pb-2.5 border-b border-border/50">
+					<div class="md:col-span-5 flex flex-col items-center justify-center p-4 rounded-xl bg-background border border-border">
+						<div class="flex items-center justify-between w-full mb-3 pb-2.5 border-b border-border">
 							<button
 								type="button"
 								onclick={goToPrevWord}
-								class="flex size-8 items-center justify-center rounded-lg border bg-background hover:bg-muted text-foreground transition active:scale-95 shadow-xs cursor-pointer"
+								class="flex size-8 items-center justify-center rounded-lg border border-border bg-card hover:bg-muted text-foreground transition cursor-pointer"
 								title="คำก่อนหน้า"
 							>
 								<ChevronLeft class="size-4" />
 							</button>
 
-							<span class="text-[11px] font-bold text-muted-foreground">บันทึกเสียงออกเสียง</span>
+							<span class="text-xs font-medium text-muted-foreground">บันทึกเสียงพูด</span>
 
 							<button
 								type="button"
 								onclick={goToNextWord}
-								class="flex h-8 items-center gap-1 rounded-lg border bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-2.5 text-[11px] font-extrabold hover:opacity-90 transition active:scale-95 shadow-xs cursor-pointer"
+								class="flex h-8 items-center gap-1 rounded-lg border border-border bg-card hover:bg-muted text-foreground px-2.5 text-xs font-medium transition cursor-pointer"
 								title="คำถัดไป"
 							>
 								<span>ถัดไป</span>
@@ -1285,24 +1280,24 @@
 						<button
 							type="button"
 							onclick={toggleRecording}
-							class="group relative flex size-18 items-center justify-center rounded-full text-white shadow-lg transition-all active:scale-95 cursor-pointer {isRecording
-								? 'bg-rose-500 shadow-rose-500/50 ring-4 ring-rose-300 animate-pulse'
-								: 'bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 shadow-emerald-500/40 hover:scale-105'}"
-							title={isRecording ? 'กดเพื่อหยุดบันทึก' : 'เริ่มบันทึกเสียง'}
+							class="group relative flex size-16 items-center justify-center rounded-full text-primary-foreground transition cursor-pointer {isRecording
+								? 'bg-primary ring-4 ring-primary/25 animate-pulse'
+								: 'bg-primary hover:bg-primary/90'}"
+							title={isRecording ? 'หยุดบันทึก' : 'เริ่มบันทึกเสียง'}
 						>
 							{#if isRecording}
-								<Square class="size-7 fill-current" />
+								<Square class="size-6 fill-current" />
 							{:else}
-								<Mic class="size-8 transition-transform group-hover:scale-110" />
+								<Mic class="size-7" />
 							{/if}
 						</button>
 
 						<div class="text-center mt-2.5">
-							<div class="text-xs font-black {isRecording ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}">
-								{isRecording ? 'กำลังรับฟังเสียง... (พูดแล้วแตะหยุด)' : `แตะไมค์แล้วออกเสียง "${selectedPreset.hanzi}"`}
+							<div class="text-xs font-semibold {isRecording ? 'text-primary' : 'text-foreground'}">
+								{isRecording ? 'กำลังฟังเสียง (แตะเพื่อหยุด)' : `กดไมค์แล้วพูด "${selectedPreset.hanzi}"`}
 							</div>
-							<div class="text-[10px] text-muted-foreground mt-0.5">
-								ระบบตรวจจับระดับเสียงและเส้นวรรณยุกต์ทันที
+							<div class="text-xs text-muted-foreground mt-0.5">
+								ตรวจจับระดับเสียงอัตโนมัติ
 							</div>
 						</div>
 					</div>
@@ -1310,24 +1305,18 @@
 
 				<!-- Syllables Breakdown Pills -->
 				{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
-					<div class="mt-4 pt-3 border-t flex flex-wrap items-center gap-2">
-						<span class="text-xs font-extrabold text-foreground flex items-center gap-1">
-							<Layers class="size-3.5 text-sky-600" /> แยกตรวจสอบรายพยางค์ ({selectedPreset.syllables.length} พยางค์):
+					<div class="mt-4 pt-3 border-t border-border flex flex-wrap items-center gap-2">
+						<span class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+							<Layers class="size-3.5 text-muted-foreground" /> แยกรายพยางค์ ({selectedPreset.syllables.length}):
 						</span>
 						<div class="flex flex-wrap items-center gap-2">
 							{#each selectedPreset.syllables as syl, sIdx (sIdx)}
 								{@const prof = TONE_PROFILES[syl.surfaceTone] || TONE_PROFILES[1]}
-								<div class="flex items-center gap-1.5 rounded-xl border bg-background/80 px-3 py-1.5 text-xs shadow-sm">
-									<span class="text-muted-foreground text-[10px] font-mono font-bold">{sIdx + 1}.</span>
-									<span class="text-base font-black text-foreground">{syl.hanzi}</span>
-									<span class="font-mono text-sky-600 dark:text-sky-400 font-extrabold">{syl.pinyin}</span>
-									<span class="rounded-full px-2 py-0.5 text-[10px] font-black {syl.surfaceTone === 1
-										? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-										: syl.surfaceTone === 2
-											? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-											: syl.surfaceTone === 3
-												? 'bg-fuchsia-100 dark:bg-fuchsia-950 text-fuchsia-700 dark:text-fuchsia-300'
-												: 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'}">
+								<div class="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-xs">
+									<span class="text-muted-foreground font-mono">{sIdx + 1}.</span>
+									<span class="text-sm font-bold text-foreground">{syl.hanzi}</span>
+									<span class="font-mono text-primary font-medium">{syl.pinyin}</span>
+									<span class="rounded px-1.5 py-0.5 text-[11px] bg-muted text-muted-foreground">
 										{prof.thaiName} ({prof.chaoPitch})
 									</span>
 								</div>
@@ -1338,17 +1327,16 @@
 
 				<!-- Tone Tip Box -->
 				{#if selectedPreset.description || TONE_PROFILES[selectedPreset.tone]}
-					<div class="mt-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/50 p-3 text-xs text-sky-900 dark:text-sky-200 flex items-start gap-2.5">
-						<Lightbulb class="size-4 text-amber-500 shrink-0 mt-0.5" />
+					<div class="mt-4 rounded-xl bg-background border border-border p-3 text-xs text-muted-foreground flex items-start gap-2.5">
+						<Lightbulb class="size-4 text-muted-foreground shrink-0 mt-0.5" />
 						<div>
 							{#if selectedPreset.description}
-								<div class="font-bold text-sky-800 dark:text-sky-200 flex items-center gap-1.5">
-									<Bookmark class="size-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
-									<span><strong>ข้อควรรู้การออกเสียง:</strong> {selectedPreset.description}</span>
+								<div class="text-foreground flex items-center gap-1.5">
+									<span><strong class="font-semibold">หมายเหตุ:</strong> {selectedPreset.description}</span>
 								</div>
 							{/if}
 							<div class="mt-0.5">
-								<strong>เทคนิคการออกเสียง:</strong> {TONE_PROFILES[selectedPreset.tone]?.thaiTip || 'ออกเสียงต่อเนื่องตามลำดับวรรณยุกต์'}
+								<strong class="font-semibold text-foreground">วิธีออกเสียง:</strong> {TONE_PROFILES[selectedPreset.tone]?.thaiTip || 'ออกเสียงต่อเนื่องตามลำดับวรรณยุกต์'}
 							</div>
 						</div>
 					</div>
@@ -1389,46 +1377,46 @@
 
 			<!-- 5. ANALYSIS RESULTS & SCORE CARD -->
 			{#if analysisResult}
-				<div class="overflow-hidden rounded-3xl border-2 {analysisResult.isPassed ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20'} p-6 shadow-md transition-all">
-					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/50 pb-4">
+				<div class="overflow-hidden rounded-2xl border bg-card {analysisResult.isPassed ? 'border-emerald-300 dark:border-emerald-800' : 'border-red-300 dark:border-red-900'} p-6 transition-all">
+					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
 						<div class="flex items-center gap-3">
 							{#if analysisResult.isPassed}
-								<div class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow">
-									<CheckCircle2 class="size-7" />
+								<div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+									<CheckCircle2 class="size-6" />
 								</div>
 								<div>
-									<div class="text-xl font-extrabold text-emerald-900 dark:text-emerald-200">
+									<div class="text-lg font-bold text-foreground">
 										{#if analysisResult.isAllMatch}
-											ยอดเยี่ยมมาก! ออกเสียงคำและวรรณยุกต์ถูกต้องครบถ้วน (ผ่าน)
+											ผ่าน — ออกเสียงและวรรณยุกต์ตรงเป้าหมาย
 										{:else}
-											ผ่านเกณฑ์! พูดคำศัพท์ถูกต้อง (แนะนำปรับวรรณยุกต์ตามกราฟ)
+											ผ่านเกณฑ์ — คำศัพท์ถูกต้อง
 										{/if}
 									</div>
-									<div class="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+									<div class="text-xs text-muted-foreground mt-0.5">
 										{#if analysisResult.recognizedWord}
-											ระบบได้ยินคำว่า: <strong>"{analysisResult.recognizedWord}"</strong> •
+											ได้ยินคำว่า <strong class="text-foreground">"{analysisResult.recognizedWord}"</strong> ·
 										{/if}
 										{analysisResult.syllableResults.length > 1
 											? `วรรณยุกต์ตรง ${analysisResult.syllableResults.filter((s) => s.isMatch).length}/${analysisResult.syllableResults.length} พยางค์`
-											: `วรรณยุกต์ที่ตรวจพบ: ${TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`}`}
+											: `ตรวจพบ ${TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`}`}
 									</div>
 								</div>
 							{:else}
-								<div class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow">
-									<AlertCircle class="size-7" />
+								<div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+									<AlertCircle class="size-6" />
 								</div>
 								<div>
-									<div class="text-xl font-extrabold text-amber-900 dark:text-amber-200">
-										ยังไม่ตรงเป้าหมาย (ต้องฝึกเพิ่ม)
+									<div class="text-lg font-bold text-foreground">
+										ยังไม่ตรงเป้าหมาย · ลองใหม่อีกครั้ง
 									</div>
-									<div class="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+									<div class="text-xs text-muted-foreground mt-0.5">
 										{#if analysisResult.recognizedWord}
-											ระบบได้ยินเป็น: <strong>"{analysisResult.recognizedWord}"</strong> (ต้องการ: "{selectedPreset.hanzi}") •
+											ได้ยิน <strong class="text-foreground">"{analysisResult.recognizedWord}"</strong> (เป้าหมาย "{selectedPreset.hanzi}") ·
 										{/if}
 										{#if analysisResult.syllableResults.length > 1}
-											วรรณยุกต์ผ่าน {analysisResult.syllableResults.filter((s) => s.isMatch).length}/${analysisResult.syllableResults.length} พยางค์
+											วรรณยุกต์ตรง {analysisResult.syllableResults.filter((s) => s.isMatch).length}/${analysisResult.syllableResults.length} พยางค์
 										{:else}
-											วรรณยุกต์: {TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`} (ต้องการ: {TONE_PROFILES[selectedPreset.tone]?.thaiName})
+											ตรวจพบ {TONE_PROFILES[analysisResult.syllableResults[0]?.detectedTone]?.thaiName || `เสียง ${analysisResult.syllableResults[0]?.detectedTone}`} (เป้าหมาย {TONE_PROFILES[selectedPreset.tone]?.thaiName})
 										{/if}
 									</div>
 								</div>
@@ -1437,8 +1425,8 @@
 
 						<div class="flex items-center gap-3">
 							<div class="text-right">
-								<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">คะแนนรวมความถูกต้อง</div>
-								<div class="text-3xl font-black {analysisResult.overallScore >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
+								<div class="text-xs font-medium text-muted-foreground">คะแนน</div>
+								<div class="text-3xl font-bold tabular-nums {analysisResult.overallScore >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary'}">
 									{analysisResult.overallScore}%
 								</div>
 							</div>
@@ -1447,46 +1435,46 @@
 
 					<!-- Dual Check Status Badges -->
 					<div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-						<div class="flex items-center justify-between rounded-2xl border bg-background/80 px-3.5 py-2 text-xs shadow-sm">
+						<div class="flex items-center justify-between rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs">
 							<div class="flex items-center gap-2">
-								<Target class="size-4 text-emerald-500 shrink-0" />
+								<Target class="size-4 text-muted-foreground shrink-0" />
 								<div>
-									<span class="text-muted-foreground text-[10px] block">การตรวจคำศัพท์</span>
-									<span class="font-extrabold text-foreground">
-										{analysisResult.recognizedWord ? `ได้ยิน: "${analysisResult.recognizedWord}"` : `เป้าหมาย: "${selectedPreset.hanzi}"`}
+									<span class="text-muted-foreground text-[11px] block">การตรวจคำศัพท์</span>
+									<span class="font-semibold text-foreground">
+										{analysisResult.recognizedWord ? `ได้ยิน "${analysisResult.recognizedWord}"` : `เป้าหมาย "${selectedPreset.hanzi}"`}
 									</span>
 								</div>
 							</div>
-							<span class="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold {analysisResult.isWordMatch
-								? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-								: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'}">
+							<span class="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium {analysisResult.isWordMatch
+								? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300'
+								: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-300'}">
 								{#if analysisResult.isWordMatch}
-									<Check class="size-3 stroke-[3]" />
-									<span>คำศัพท์ถูกต้อง</span>
+									<Check class="size-3 stroke-[2.5]" />
+									<span>ตรงคำ</span>
 								{:else}
-									<span>คำยังไม่ชัดเจน</span>
+									<span>ยังไม่ชัด</span>
 								{/if}
 							</span>
 						</div>
 
-						<div class="flex items-center justify-between rounded-2xl border bg-background/80 px-3.5 py-2 text-xs shadow-sm">
+						<div class="flex items-center justify-between rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs">
 							<div class="flex items-center gap-2">
-								<AudioLines class="size-4 text-sky-500 shrink-0" />
+								<AudioLines class="size-4 text-muted-foreground shrink-0" />
 								<div>
-									<span class="text-muted-foreground text-[10px] block">การตรวจวรรณยุกต์</span>
-									<span class="font-extrabold text-foreground">
+									<span class="text-muted-foreground text-[11px] block">การตรวจวรรณยุกต์</span>
+									<span class="font-semibold text-foreground">
 										{#if selectedPreset.syllables && selectedPreset.syllables.length > 1}
-											{selectedPreset.syllables.map((s) => `${s.hanzi}: เสียง ${s.surfaceTone}`).join(' • ')}
+											{selectedPreset.syllables.map((s) => `${s.hanzi}: เสียง ${s.surfaceTone}`).join(' · ')}
 										{:else}
 											{TONE_PROFILES[selectedPreset.tone]?.thaiName || `เสียง ${selectedPreset.tone}`}
 										{/if}
 									</span>
 								</div>
 							</div>
-							<span class="rounded-full px-2.5 py-0.5 text-[10px] font-black {analysisResult.isAllMatch
-								? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-								: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'}">
-								{analysisResult.isAllMatch ? '✓ วรรณยุกต์ตรงเป๊ะ' : 'แนะนำปรับระดับเสียง'}
+							<span class="rounded-md px-2 py-0.5 text-[11px] font-medium {analysisResult.isAllMatch
+								? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300'
+								: 'bg-muted text-muted-foreground border border-border'}">
+								{analysisResult.isAllMatch ? 'ตรงโทน' : 'ปรับโทนเพิ่ม'}
 							</span>
 						</div>
 					</div>
@@ -1495,12 +1483,12 @@
 					{#if analysisResult.syllableResults && analysisResult.syllableResults.length >= 1}
 						<div class="mt-4 pt-2">
 							<div class="mb-2.5 flex items-center justify-between">
-								<span class="text-xs font-extrabold text-foreground flex items-center gap-1.5">
-									<Layers class="size-4 text-primary" />
+								<span class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+									<Layers class="size-4 text-muted-foreground" />
 									{#if analysisResult.syllableResults.length > 1}
-										ผลการวิเคราะห์แยกทีละพยางค์ ({analysisResult.syllableResults.length} พยางค์):
+										ผลแยกรายพยางค์ ({analysisResult.syllableResults.length}):
 									{:else}
-										ผลการวิเคราะห์วรรณยุกต์รายพยางค์:
+										ผลวิเคราะห์วรรณยุกต์:
 									{/if}
 								</span>
 							</div>
@@ -1509,9 +1497,9 @@
 								{#each analysisResult.syllableResults as syl (syl.syllableIndex)}
 									{@const targetProf = TONE_PROFILES[syl.targetTone] || TONE_PROFILES[1]}
 									{@const detectedProf = TONE_PROFILES[syl.detectedTone] || TONE_PROFILES[1]}
-									<div class="flex flex-col justify-between rounded-2xl border-2 p-3.5 transition-all {syl.isMatch
-										? 'border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/30'
-										: 'border-rose-300 dark:border-rose-800/60 bg-rose-50/40 dark:bg-rose-950/30'}">
+									<div class="flex flex-col justify-between rounded-xl border p-3.5 transition-all bg-background {syl.isMatch
+										? 'border-emerald-300 dark:border-emerald-800'
+										: 'border-red-300 dark:border-red-800'}">
 										<div>
 											<div class="flex items-center justify-between mb-2">
 												<span class="text-[11px] font-extrabold text-muted-foreground">

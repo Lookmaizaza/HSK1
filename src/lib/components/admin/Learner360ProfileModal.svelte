@@ -1366,7 +1366,46 @@
 							{item.message}
 						</p>
 
-						{#if item.remedial_words}
+						{#if typeof item.totalWordsCount === 'number' && item.totalWordsCount > 0}
+							<div class="space-y-1.5 pt-1">
+								<div class="flex items-center justify-between text-[11px] font-semibold">
+									<span class="text-foreground">ความคืบหน้าการฝึกซ่อมเสริมรายคำ (Closed-Loop Remediation):</span>
+									<span class="font-mono font-bold {item.progressPct >= 100 ? 'text-emerald-600' : 'text-indigo-600'}">
+										ผ่านแล้ว {item.completedCount || 0} / {item.totalWordsCount} คำ ({item.progressPct || 0}%)
+									</span>
+								</div>
+								<div class="h-2 w-full rounded-full bg-muted overflow-hidden">
+									<div
+										class="h-full rounded-full transition-all duration-500 {item.progressPct >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}"
+										style="width: {Math.min(100, item.progressPct || 0)}%"
+									></div>
+								</div>
+							</div>
+						{/if}
+
+						{#if Array.isArray(item.wordProgress) && item.wordProgress.length > 0}
+							<div class="pt-2 flex flex-wrap items-center gap-1.5">
+								<span class="text-[11px] font-bold text-foreground">สถานะรายคำ:</span>
+								{#each item.wordProgress as wp (wp.word)}
+									<button
+										type="button"
+										onclick={() => playWord(wp.word)}
+										class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono font-bold transition cursor-pointer {wp.passed
+											? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+											: 'bg-background text-foreground hover:bg-muted'}"
+									>
+										<span>{wp.word}</span>
+										{#if wp.passed}
+											<span class="text-[10px] font-sans font-extrabold text-emerald-600">✓ {wp.bestGop}%</span>
+										{:else if wp.attemptsAfterAssigned > 0}
+											<span class="text-[10px] font-sans text-amber-600">ฝึก {wp.attemptsAfterAssigned} ครั้ง ({wp.bestGop}%)</span>
+										{:else}
+											<span class="text-[10px] font-sans text-muted-foreground">รอฝึก</span>
+										{/if}
+									</button>
+								{/each}
+							</div>
+						{:else if item.remedial_words}
 							<div class="pt-2 flex flex-wrap items-center gap-1.5">
 								<span class="text-[11px] font-bold text-foreground">คำศัพท์:</span>
 								{#each item.remedial_words.split(',').map((w: string) => w.trim()).filter(Boolean) as rw}

@@ -44,6 +44,13 @@
 	let retriesCount = 0;
 	let stageCompleted = false;
 
+	// Per-challenge Listening & Hesitation Telemetry (LQ5 & LQ6)
+	let challengeListenCount = $state(0);
+	let challengeListenTimestamps = $state<number[]>([]);
+	let challengeReadyAt = $state<number>(Date.now());
+	let challengeAttemptCount = $state<number>(0);
+	let lastHesitationMs = $state<number>(0);
+
 	function sendStageTelemetry(eventType: 'view' | 'attempt' | 'pass' | 'fail' | 'hint' | 'listen', score = 0) {
 		if (!stageId || typeof window === 'undefined') return;
 		const timeSpentMs = Date.now() - stageStartTime;
@@ -125,6 +132,8 @@
 	function playAudio() {
 		clearAudioTimer();
 		listenCount++;
+		challengeListenCount++;
+		challengeListenTimestamps = [...challengeListenTimestamps, Date.now()];
 		sendStageTelemetry('listen');
 		if (currentChallenge) {
 			if (currentChallenge.type === 'sentence_build' && currentChallenge.sentenceHanzi) {
@@ -138,6 +147,10 @@
 	function playAudioIfListenSpeak(target?: Challenge) {
 		clearAudioTimer();
 		showHint = false; // Reset hint for new challenge
+		challengeListenCount = 0;
+		challengeListenTimestamps = [];
+		challengeReadyAt = Date.now();
+		challengeAttemptCount = 0;
 		const challengeToPlay = target ?? currentChallenge;
 		if (challengeToPlay?.type === 'listen_speak') {
 			// รอ 0.5 วินาที (500 ms) ก่อนเริ่มเล่นเสียง
@@ -185,6 +198,8 @@
 
 	async function startRecording() {
 		retriesCount++;
+		challengeAttemptCount++;
+		lastHesitationMs = Math.max(0, Date.now() - challengeReadyAt);
 		sendStageTelemetry('attempt');
 		clearAudioTimer();
 		if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -382,6 +397,11 @@
 				const isPassed = isWordCorrect && isToneReasonable;
 				const finalScore = isPassed ? Math.max(res.overallScore, 75) : Math.min(res.overallScore, 50);
 
+				const avgClarity =
+					voicedFrames.length > 0
+						? Number((voicedFrames.reduce((s, p) => s + p.clarity, 0) / voicedFrames.length).toFixed(3))
+						: 0;
+
 				// Research telemetry
 				const telemetryPayload = {
 					eventType: 'pronunciation_evaluation',
@@ -396,9 +416,11 @@
 						expectedTone: currentChallenge.word.tone
 					},
 					behavior: {
-						listenedToExample: currentChallenge.type === 'listen_speak' || showHint,
-						listenCount: currentChallenge.type === 'listen_speak' ? 1 : 0,
-						listenTimestamps: []
+						listenedToExample: challengeListenCount > 0 || currentChallenge.type === 'listen_speak' || showHint,
+						listenCount: Math.max(challengeListenCount, currentChallenge.type === 'listen_speak' ? 1 : 0),
+						listenTimestamps: [...challengeListenTimestamps],
+						hesitationLatencyMs: lastHesitationMs,
+						attemptNumber: challengeAttemptCount
 					},
 					assessment: {
 						isPassed,
@@ -421,7 +443,8 @@
 						})),
 						acoustics: {
 							avgF0: res.avgF0 || 0,
-							totalDurationMs: res.totalDurationMs || 0
+							totalDurationMs: res.totalDurationMs || 0,
+							avgClarity
 						}
 					}
 				};

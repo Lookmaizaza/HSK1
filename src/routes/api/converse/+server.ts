@@ -5,19 +5,22 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { findScenario } from '$lib/data/scenarios';
-import { recordChatbotSession } from '$lib/server/db';
+import { recordChatbotSession, recordLearningEvent } from '$lib/server/db';
+import { createSkillXApiStatement } from '$lib/xapi';
 import type { RequestHandler } from './$types';
 
 type Turn = {
 	role: 'ai' | 'user';
 	hanzi?: string;
 	said?: string;
+	score?: number;
 };
 
 type ConverseRequest = {
 	scenarioId: string;
 	turns: Turn[];
 	userSaid?: string;
+	sessionScores?: number[];
 	model?: 'gemini-2.5-flash' | 'pathumma-thaillm';
 	apiKey?: string;
 };
@@ -392,6 +395,64 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 		}
 	}
 
+	const computeSessionMetrics = (finalTurnScore: number) => {
+		const priorScores = Array.isArray(body.sessionScores)
+			? body.sessionScores.filter((s) => typeof s === 'number' && s > 0)
+			: (body.turns ?? [])
+					.filter((t) => t.role === 'user' && typeof t.score === 'number' && t.score > 0)
+					.map((t) => Number(t.score));
+		const allScores = [...priorScores, finalTurnScore].filter((s) => s > 0);
+		const userTurnsCount = Math.max(1, (body.turns ?? []).filter((t) => t.role === 'user').length + (body.userSaid ? 1 : 0));
+		const avgScore = allScores.length > 0
+			? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+			: finalTurnScore;
+		const totalXp = allScores.length > 0
+			? allScores.reduce((sum, s) => sum + Math.max(5, Math.round(s / 8)), 0)
+			: Math.max(10, Math.round(finalTurnScore / 5) * userTurnsCount);
+		return { turnsCount: (body.turns?.length || 0) + 1, userTurnsCount, avgScore, totalXp };
+	};
+
+	const logCompletedDialogue = async (finalScore: number) => {
+		if (!locals.user || locals.user.isAdmin || locals.user.isImpersonated) return;
+		const userId = String(locals.user.id);
+		const metrics = computeSessionMetrics(finalScore);
+		await recordChatbotSession({
+			userId,
+			scenarioId: scenario.id,
+			scenarioTitle: scenario.title,
+			turnsCount: metrics.turnsCount,
+			avgScore: metrics.avgScore,
+			totalXp: metrics.totalXp
+		}).catch(() => {});
+
+		try {
+			const xapiStmt = createSkillXApiStatement({
+				userId,
+				username: locals.user.username,
+				eventType: 'dialogue_completed',
+				objectId: `scenario_${scenario.id}`,
+				objectNameTh: scenario.title,
+				scoreRaw: metrics.avgScore,
+				scoreMax: 100,
+				success: metrics.avgScore >= 70,
+				extensions: {
+					'https://hsk.app/xapi/ext/turns-count': metrics.turnsCount,
+					'https://hsk.app/xapi/ext/user-turns-count': metrics.userTurnsCount,
+					'https://hsk.app/xapi/ext/total-xp': metrics.totalXp
+				}
+			});
+			await recordLearningEvent({
+				userId,
+				eventType: 'dialogue_completed',
+				wordId: scenario.id,
+				statementId: xapiStmt.id,
+				xapiStatement: xapiStmt,
+				practiceMode: 'stage',
+				stageId: `talk_${scenario.id}`
+			});
+		} catch {}
+	};
+
 	if (usedLLM && content) {
 		try {
 			const jsonStr = extractJsonObject(content);
@@ -401,15 +462,8 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 					parsed.score = parsed.score ?? 85;
 					parsed.endScenario = parsed.endScenario ?? false;
 					parsed.feedback = parsed.feedback ?? null;
-					if (parsed.endScenario && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
-						recordChatbotSession({
-							userId: String(locals.user.id),
-							scenarioId: scenario.id,
-							scenarioTitle: scenario.title,
-							turnsCount: (body.turns?.length || 0) + 1,
-							avgScore: parsed.score,
-							totalXp: Math.round(parsed.score / 10)
-						}).catch(() => {});
+					if (parsed.endScenario) {
+						logCompletedDialogue(parsed.score).catch(() => {});
 					}
 					return json(parsed);
 				}
@@ -421,15 +475,8 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 
 	// Smart Offline Dialogue Engine (No API key required!)
 	const smartResponse = generateSmartDialogueResponse(scenario, body.turns ?? [], body.userSaid);
-	if (smartResponse.endScenario && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
-		recordChatbotSession({
-			userId: String(locals.user.id),
-			scenarioId: scenario.id,
-			scenarioTitle: scenario.title,
-			turnsCount: (body.turns?.length || 0) + 1,
-			avgScore: smartResponse.score,
-			totalXp: Math.round(smartResponse.score / 10)
-		}).catch(() => {});
+	if (smartResponse.endScenario) {
+		logCompletedDialogue(smartResponse.score).catch(() => {});
 	}
 	return json(smartResponse);
 };

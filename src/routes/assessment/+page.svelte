@@ -3,8 +3,12 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { ASSESSMENT_VOCAB, type AssessmentWord } from '$lib/data/assessmentVocab';
+	import { getFlashcardSets } from '$lib/data/flashcardData';
+	import { getBossAssessmentConfig, getLearnerStage, MAX_LEARNER_LEVEL, XP_PER_LEVEL } from '$lib/gamification';
+	import { progress } from '$lib/progress.svelte';
 	import { RealtimePitchTracker, analyzeToneContour, type PitchPoint } from '$lib/pitch';
 	import { initToneNeuralNetwork, predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
+	import { computeDeterministicAcousticMetrics } from '$lib/analytics/statisticalEngine';
 	import { 
 		Mic, 
 		Square, 
@@ -26,10 +30,10 @@
 	let { data } = $props();
 
 	// Test configuration
-	let testType = $state<'pre' | 'mid' | 'post'>('pre');
+	let testType = $state<'pre' | 'mid' | 'post' | 'boss'>('pre');
 	$effect(() => {
 		if (data?.requestedType) {
-			testType = data.requestedType as 'pre' | 'mid' | 'post';
+			testType = data.requestedType;
 		}
 	});
 	const typeLabels: Record<string, { label: string; desc: string; badgeColor: string }> = {
@@ -47,12 +51,72 @@
 			label: 'หลังเรียน (Post-test)', 
 			desc: 'วัดผลสัมฤทธิ์ทางการศึกษาหลังผ่านการฝึกฝนครบถ้วน', 
 			badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' 
+		},
+		boss: {
+			label: 'ด่านบอสเลื่อนเลเวล',
+			desc: 'ประเมินการออกเสียงคำศัพท์ตามระดับ HSK ของคุณ',
+			badgeColor: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30'
 		}
 	};
 
+	const learnerLevel = $derived(data?.learnerLevel ?? 1);
+	const levelExp = $derived(data?.levelExp ?? 0);
+	const bossConfig = $derived(getBossAssessmentConfig(learnerLevel));
+	function buildBossWords(level: number): AssessmentWord[] {
+		const config = getBossAssessmentConfig(level);
+		const stage = getLearnerStage(level);
+		const distributions = config.hskLevel === 1
+			? [{ level: 1 as const, count: config.questionCount }]
+			: config.hskLevel === 2
+				? [{ level: 1 as const, count: 5 }, { level: 2 as const, count: config.questionCount - 5 }]
+				: [{ level: 1 as const, count: 5 }, { level: 2 as const, count: 5 }, { level: 3 as const, count: config.questionCount - 10 }];
+		const selected: AssessmentWord[] = [];
+		const selectedIds = new Set<string>();
+
+		for (const { level: hskLevel, count } of distributions) {
+			const sets = getFlashcardSets(hskLevel);
+			const stageSets = hskLevel === config.hskLevel
+				? sets.slice(
+					Math.floor((sets.length * (stage.subLevel - 1)) / 3),
+					Math.floor((sets.length * stage.subLevel) / 3)
+				)
+				: sets;
+			const pool = stageSets
+				.flatMap((set) => set.words)
+				.filter((word) =>
+					Array.from(word.hanzi).length === 1 &&
+					(word.syllables?.length ?? 1) === 1 &&
+					word.tone >= 1 &&
+					word.tone <= 4 &&
+					!selectedIds.has(word.id)
+				);
+			for (let i = 0; i < Math.min(count, pool.length); i++) {
+				const word = pool[Math.floor(((i + 0.5) * pool.length) / Math.min(count, pool.length))];
+				if (!word || selectedIds.has(word.id)) continue;
+				selectedIds.add(word.id);
+				selected.push({
+					id: word.id,
+					hanzi: word.hanzi,
+					pinyin: word.pinyin,
+					tone: word.tone as AssessmentWord['tone'],
+					thai: word.thai,
+					hskLevel: word.level,
+					initial: '',
+					final: ''
+				});
+			}
+		}
+
+		return selected;
+	}
+
+	const assessmentWords = $derived(
+		testType === 'boss' ? buildBossWords(learnerLevel) : ASSESSMENT_VOCAB
+	);
+
 	// State
 	let currentIndex = $state(0);
-	const currentWord = $derived<AssessmentWord>(ASSESSMENT_VOCAB[currentIndex] || ASSESSMENT_VOCAB[0]);
+	const currentWord = $derived<AssessmentWord>(assessmentWords[currentIndex] || assessmentWords[0]);
 	let isRecording = $state(false);
 	let isEvaluating = $state(false);
 	let hasAnsweredCurrent = $state(false);
@@ -77,6 +141,11 @@
 	}>>([]);
 
 	let isCompleted = $state(false);
+	let bossPassed = $state(false);
+	let bossLevelUp = $state(false);
+	let bossError = $state<string | null>(null);
+	let wordPresentedAt = $state<number>(Date.now());
+	let lastHesitationMs = $state<number>(0);
 
 	// Audio & AI Tracker
 	let tracker: RealtimePitchTracker | null = null;
@@ -87,6 +156,7 @@
 	let maxDurationTimeout: any = null;
 
 	onMount(async () => {
+		wordPresentedAt = Date.now();
 		try {
 			await initToneNeuralNetwork();
 		} catch (e) {
@@ -104,6 +174,7 @@
 	});
 
 	async function startRecording() {
+		lastHesitationMs = Math.max(0, Date.now() - wordPresentedAt);
 		errorMessage = null;
 		currentResult = null;
 		hasAnsweredCurrent = false;
@@ -178,25 +249,35 @@
 				return;
 			}
 
-			// 1. Run AI Tone Classifier
+			// 1. Run AI Tone Classifier + Geometric Contour Analysis
 			let detectedTone: number = currentWord.tone;
 			let toneConfidence = 0.8;
 			let toneScore = 75;
 
+			const geom = analyzeToneContour(pitchPoints, currentWord.tone as any);
 			const aiResult = await predictToneNeuralNetwork(pitchPoints);
 			if (aiResult && aiResult.detectedTone !== undefined) {
 				detectedTone = Number(aiResult.detectedTone);
 				toneConfidence = aiResult.confidence;
 			} else {
-				// Fallback to geometric pitch contour analysis
-				const geom = analyzeToneContour(pitchPoints, currentWord.tone as any);
 				detectedTone = Number(geom.detectedTone) || currentWord.tone;
 			}
 
+			// Deterministic Research-Grade Acoustic Metrics (No Math.random())
+			const metrics = computeDeterministicAcousticMetrics({
+				points: pitchPoints,
+				targetTone: currentWord.tone,
+				detectedTone,
+				aiConfidence: toneConfidence,
+				geomScore: geom.score
+			});
+
 			const isCorrect = detectedTone === currentWord.tone;
-			toneScore = isCorrect ? Math.round(80 + toneConfidence * 20) : Math.round(30 + toneConfidence * 20);
-			const gop = isCorrect ? Math.round(75 + Math.random() * 20) : Math.round(35 + Math.random() * 25);
-			const per = isCorrect ? 0.0 : 0.5;
+			toneScore = isCorrect
+				? Math.max(78, Math.round(metrics.gopScore * 0.6 + (80 + toneConfidence * 20) * 0.4))
+				: Math.min(60, Math.round(metrics.gopScore * 0.6 + (30 + toneConfidence * 20) * 0.4));
+			const gop = metrics.gopScore;
+			const per = metrics.perScore;
 
 			currentResult = {
 				detectedTone,
@@ -233,7 +314,11 @@
 					toneConfidence,
 					toneScore,
 					gopOverall: gop,
-					perOverall: per
+					perOverall: per,
+					hesitationLatencyMs: lastHesitationMs,
+					clarity: metrics.avgClarity,
+					audioDurationSec: metrics.durationSec,
+					slopeType: metrics.slopeType
 				})
 			}).catch((err) => console.warn('Failed to save assessment word:', err));
 
@@ -269,8 +354,9 @@
 		hasAnsweredCurrent = false;
 		errorMessage = null;
 
-		if (currentIndex < ASSESSMENT_VOCAB.length - 1) {
+		if (currentIndex < assessmentWords.length - 1) {
 			currentIndex++;
+			wordPresentedAt = Date.now();
 		} else {
 			await finishAssessment();
 		}
@@ -278,14 +364,27 @@
 
 	async function finishAssessment() {
 		isCompleted = true;
-		const totalWords = answers.length || 20;
+		const totalWords = assessmentWords.length;
 		const correctTones = answers.filter((a) => a.isCorrect).length;
 		const avgToneScore = answers.reduce((sum, a) => sum + a.toneScore, 0) / totalWords;
 		const avgGop = answers.reduce((sum, a) => sum + a.gop, 0) / totalWords;
 		const avgPer = answers.reduce((sum, a) => sum + a.per, 0) / totalWords;
 
+		if (testType === 'boss') {
+			bossPassed = levelExp >= XP_PER_LEVEL && scorePercent >= bossConfig.passPercent;
+			if (bossPassed) {
+				try {
+					bossLevelUp = await progress.completeBoss(learnerLevel);
+					if (!bossLevelUp) bossError = 'ยังไม่สามารถบันทึกการเลื่อนเลเวลได้ กรุณาลองใหม่';
+				} catch (error) {
+					console.error('Failed to complete assessment boss stage:', error);
+					bossError = 'บันทึกการเลื่อนเลเวลไม่สำเร็จ กรุณาลองใหม่';
+				}
+			}
+		}
+
 		try {
-			await fetch('/api/assessment', {
+			const response = await fetch('/api/assessment', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -298,6 +397,7 @@
 					avgPer
 				})
 			});
+			if (!response.ok) throw new Error(`Failed to save assessment summary (${response.status})`);
 		} catch (err) {
 			console.warn('Error saving assessment summary:', err);
 		}
@@ -307,19 +407,23 @@
 	const scorePercent = $derived(
 		answers.length > 0 ? Math.round((answers.filter((a) => a.isCorrect).length / answers.length) * 100) : 0
 	);
-	const tone1Correct = $derived(answers.filter((a) => a.word.tone === 1 && a.isCorrect).length);
-	const tone2Correct = $derived(answers.filter((a) => a.word.tone === 2 && a.isCorrect).length);
-	const tone3Correct = $derived(answers.filter((a) => a.word.tone === 3 && a.isCorrect).length);
-	const tone4Correct = $derived(answers.filter((a) => a.word.tone === 4 && a.isCorrect).length);
+	const tone1Answers = $derived(answers.filter((a) => a.word.tone === 1));
+	const tone2Answers = $derived(answers.filter((a) => a.word.tone === 2));
+	const tone3Answers = $derived(answers.filter((a) => a.word.tone === 3));
+	const tone4Answers = $derived(answers.filter((a) => a.word.tone === 4));
+	const tone1Correct = $derived(tone1Answers.filter((a) => a.isCorrect).length);
+	const tone2Correct = $derived(tone2Answers.filter((a) => a.isCorrect).length);
+	const tone3Correct = $derived(tone3Answers.filter((a) => a.isCorrect).length);
+	const tone4Correct = $derived(tone4Answers.filter((a) => a.isCorrect).length);
 </script>
 
 <svelte:head>
-	<title>ประเมินทักษะการออกเสียง — {typeLabels[testType]?.label || 'การประเมิน'}</title>
+	<title>{testType === 'boss' ? `Boss Stage HSK ${bossConfig.hskLevel}` : 'ประเมินทักษะการออกเสียง'} — ประเมินผล</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-b from-background via-muted/20 to-background text-foreground flex flex-col">
+<div class="min-h-screen bg-background text-foreground flex flex-col">
 	<!-- Top Navigation -->
-	<header class="border-b bg-background/80 backdrop-blur sticky top-0 z-20">
+	<header class="border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
 		<div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
 			<Button variant="ghost" size="sm" href="/" class="gap-1.5 text-muted-foreground hover:text-foreground">
 				<ArrowLeft class="size-4" />
@@ -327,36 +431,75 @@
 			</Button>
 
 			<div class="flex items-center gap-2">
-				<span class="text-xs font-bold px-2.5 py-1 rounded-full border {typeLabels[testType]?.badgeColor}">
+				<span class="text-xs font-medium px-2.5 py-0.5 rounded-md border border-border bg-muted text-foreground">
 					{typeLabels[testType]?.label}
 				</span>
 			</div>
 
-			<span class="text-xs font-bold text-muted-foreground">
-				ข้อที่ {currentIndex + 1} / {ASSESSMENT_VOCAB.length}
-			</span>
+			{#if testType === 'boss'}
+				<span class="text-xs font-semibold text-primary">
+					{bossConfig.stageName} · HSK {bossConfig.hskLevel}.{bossConfig.subLevel}
+				</span>
+			{:else}
+				<span class="text-xs font-medium text-muted-foreground">
+					ข้อที่ {currentIndex + 1} / {assessmentWords.length}
+				</span>
+			{/if}
 		</div>
 
 		<!-- Progress Bar -->
-		<div class="w-full h-1.5 bg-muted overflow-hidden">
+		<div class="w-full h-1 bg-muted overflow-hidden">
 			<div 
-				class="h-full bg-emerald-500 transition-all duration-300"
-				style="width: {((currentIndex + (hasAnsweredCurrent ? 1 : 0)) / ASSESSMENT_VOCAB.length) * 100}%"
+				class="h-full bg-primary transition-all duration-300"
+				style="width: {((currentIndex + (hasAnsweredCurrent ? 1 : 0)) / assessmentWords.length) * 100}%"
 			></div>
 		</div>
 	</header>
 
 	<main class="flex-1 max-w-xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
-		{#if !isCompleted}
+		{#if testType === 'boss' && levelExp < XP_PER_LEVEL}
+			<div class="rounded-2xl border border-border bg-card p-7 text-center">
+				<div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-border bg-background text-primary">
+					<ShieldCheck class="size-7" />
+				</div>
+				<h1 class="text-2xl font-bold">ด่านบอสยังไม่พร้อม</h1>
+				<p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+					สะสม XP ในเลเวลปัจจุบันให้ครบ {XP_PER_LEVEL} ก่อน แล้วกลับมาทำแบบประเมินจากระดับ {bossConfig.stageName}
+					(HSK {bossConfig.hskLevel}.{bossConfig.subLevel})
+				</p>
+				<div class="mx-auto mt-5 max-w-xs">
+					<div class="mb-1.5 flex justify-between text-xs font-medium text-muted-foreground">
+						<span>XP</span><span>{levelExp}/{XP_PER_LEVEL}</span>
+					</div>
+					<div class="h-1.5 overflow-hidden rounded-full bg-muted">
+						<div class="h-full rounded-full bg-primary" style={`width: ${Math.min(100, (levelExp / XP_PER_LEVEL) * 100)}%`}></div>
+					</div>
+				</div>
+				<Button href="/flashcard" class="mt-6 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90">
+					ไปฝึกคำศัพท์สะสม XP
+				</Button>
+			</div>
+		{:else if !isCompleted}
 			<!-- Testing Card -->
-			<div class="bg-card border rounded-3xl p-6 sm:p-8 shadow-xl text-center relative overflow-hidden flex flex-col items-center">
+			<div class="bg-card border border-border rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden flex flex-col items-center">
+				{#if testType === 'boss'}
+					<div class="mb-5 w-full rounded-xl border border-border bg-background p-3 text-left">
+						<div class="flex items-center justify-between gap-2 text-xs font-semibold text-foreground">
+							<span>ด่านบอส · {bossConfig.stageName} · HSK {bossConfig.hskLevel}.{bossConfig.subLevel}</span>
+							<span class="text-primary">ผ่านที่ {bossConfig.passPercent}%</span>
+						</div>
+						<p class="mt-1 text-xs text-muted-foreground">
+							HSK {bossConfig.hskLevel}.{bossConfig.subLevel} · {assessmentWords.length} ข้อ · ผ่านอย่างน้อย {Math.ceil(assessmentWords.length * bossConfig.passPercent / 100)} ข้อ
+						</p>
+					</div>
+				{/if}
 				<!-- Word Type Header -->
 				<div class="flex items-center gap-2 mb-4">
-					<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-muted text-muted-foreground">
+					<span class="text-xs font-medium px-2.5 py-0.5 rounded-md border border-border bg-muted text-muted-foreground">
 						HSK {currentWord.hskLevel}
 					</span>
-					<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-primary/10 text-primary">
-						วรรณยุกต์เสียงที่ {currentWord.tone}
+					<span class="text-xs font-medium px-2.5 py-0.5 rounded-md bg-primary/10 text-primary">
+						เสียงที่ {currentWord.tone}
 					</span>
 				</div>
 
@@ -467,14 +610,34 @@
 				</div>
 
 				<span class="text-xs font-bold px-3 py-1 rounded-full border mb-3 inline-block {typeLabels[testType]?.badgeColor}">
-					{typeLabels[testType]?.label} สำเร็จแล้ว
+					{testType === 'boss' ? `Boss Stage • HSK ${bossConfig.hskLevel}` : `${typeLabels[testType]?.label} สำเร็จแล้ว`}
 				</span>
 
 				<h2 class="text-2xl sm:text-3xl font-black tracking-tight mb-2">
-					บันทึกผลการประเมินเรียบร้อย!
+					{#if testType === 'boss'}
+						{#if bossLevelUp}
+							{learnerLevel >= MAX_LEARNER_LEVEL
+								? `พิชิตบอสสูงสุดสำเร็จ! จบเส้นทาง ${bossConfig.stageName}`
+								: `พิชิตบอสสำเร็จ! เลื่อนเป็น ${getLearnerStage(progress.learnerLevel).name} แล้ว`}
+						{:else if bossPassed}
+							{bossError ?? 'คะแนนผ่านเกณฑ์ แต่เลื่อนเลเวลไม่สำเร็จ'}
+						{:else}
+							ยังไม่ผ่านด่านบอส
+						{/if}
+					{:else}
+						บันทึกผลการประเมินเรียบร้อย!
+					{/if}
 				</h2>
 				<p class="text-sm text-muted-foreground mb-6">
-					ข้อมูลสัทศาสตร์ของคุณได้รับการจัดเก็บเข้าสู่ฐานข้อมูลงานวิจัยเรียบร้อยแล้ว
+					{#if testType === 'boss'}
+						{bossLevelUp
+							? learnerLevel >= MAX_LEARNER_LEVEL
+								? `คุณผ่านเกณฑ์ ${bossConfig.passPercent}% ของข้อสอบ HSK ${bossConfig.hskLevel}.${bossConfig.subLevel} และจบเส้นทางผู้เรียนแล้ว`
+								: `คุณผ่านเกณฑ์ ${bossConfig.passPercent}% ของข้อสอบ HSK ${bossConfig.hskLevel}.${bossConfig.subLevel} และปลดล็อกด่านถัดไปแล้ว`
+							: `ต้องได้อย่างน้อย ${bossConfig.passPercent}% เพื่อเลื่อนเลเวล ลองฝึกเพิ่มแล้วกลับมาท้าทายอีกครั้ง`}
+					{:else}
+						ข้อมูลสัทศาสตร์ของคุณได้รับการจัดเก็บเข้าสู่ฐานข้อมูลงานวิจัยเรียบร้อยแล้ว
+					{/if}
 				</p>
 
 				<!-- Score Highlight Grid -->
@@ -506,19 +669,19 @@
 					<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
 						<div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
 							<div>เสียง 1 (55)</div>
-							<div class="text-lg font-black mt-0.5">{tone1Correct} / 5</div>
+							<div class="text-lg font-black mt-0.5">{tone1Correct} / {tone1Answers.length}</div>
 						</div>
 						<div class="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
 							<div>เสียง 2 (35)</div>
-							<div class="text-lg font-black mt-0.5">{tone2Correct} / 5</div>
+							<div class="text-lg font-black mt-0.5">{tone2Correct} / {tone2Answers.length}</div>
 						</div>
 						<div class="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
 							<div>เสียง 3 (214)</div>
-							<div class="text-lg font-black mt-0.5">{tone3Correct} / 5</div>
+							<div class="text-lg font-black mt-0.5">{tone3Correct} / {tone3Answers.length}</div>
 						</div>
 						<div class="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
 							<div>เสียง 4 (51)</div>
-							<div class="text-lg font-black mt-0.5">{tone4Correct} / 5</div>
+							<div class="text-lg font-black mt-0.5">{tone4Correct} / {tone4Answers.length}</div>
 						</div>
 					</div>
 				</div>
@@ -526,11 +689,11 @@
 				<!-- Navigation Actions -->
 				<div class="flex flex-col sm:flex-row gap-3">
 					<Button 
-						href="/" 
+						href={testType === 'boss' && !bossLevelUp ? '/assessment?type=boss' : '/'}
 						class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 py-6 rounded-2xl"
 					>
 						<Home class="size-5" />
-						กลับสู่หน้าหลักเพื่อเริ่มฝึกฝน
+						{testType === 'boss' && !bossLevelUp ? 'กลับไปท้าทายบอสอีกครั้ง' : 'กลับสู่หน้าหลักเพื่อเริ่มฝึกฝน'}
 					</Button>
 					<Button 
 						variant="outline" 

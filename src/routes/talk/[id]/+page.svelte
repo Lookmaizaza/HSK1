@@ -29,6 +29,7 @@
 	let error = $state<string | null>(null);
 	let totalScore = $state(0);
 	let totalXp = $state(0);
+	let sessionTurnScores = $state<number[]>([]);
 	let supported = $state(true);
 	let activeListener: ReturnType<typeof listen> | null = null;
 	let scrollEl: HTMLDivElement;
@@ -56,6 +57,7 @@
 					scenarioId: scenario.id,
 					turns: turns.map((t) => ({ role: t.role, hanzi: t.hanzi, said: t.said })),
 					userSaid: userSaid ?? undefined,
+					sessionScores: [...sessionTurnScores],
 					model: model.id,
 					apiKey: apiKey.value || undefined
 				})
@@ -75,6 +77,7 @@
 				turns[turns.length - 1].score = data.score;
 				if (typeof data.score === 'number') {
 					totalScore += data.score;
+					sessionTurnScores = [...sessionTurnScores, data.score];
 					const earned = Math.round(data.score / 10);
 					totalXp += earned;
 					progress.addXp(earned);

@@ -11,6 +11,8 @@
 	import DialogueFluencyView from '$lib/components/admin/skills/DialogueFluencyView.svelte';
 	import ExamDiagnosticsView from '$lib/components/admin/skills/ExamDiagnosticsView.svelte';
 	import FlashcardAnalyticsView from '$lib/components/admin/skills/FlashcardAnalyticsView.svelte';
+	import FrontendActionBanner from '$lib/components/admin/FrontendActionBanner.svelte';
+	import HardestWordsAnalyticsCard from '$lib/components/admin/skills/HardestWordsAnalyticsCard.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import {
 		Users,
@@ -81,7 +83,7 @@
 	let isSidebarOpen = $state(true);
 	let mobileSidebarOpen = $state(false);
 
-	// Navigation Tabs (Dasher Navigation Groups)
+	// Navigation Tabs (8 Core Product Analytics Tabs + 3 Header Utilities)
 	type AdminTab =
 		| 'dashboard'
 		| 'users'
@@ -98,6 +100,7 @@
 		| 'audit'
 		| 'export';
 	let activeTab = $state<AdminTab>('dashboard');
+	let pronunciationSubTab = $state<'words_tones' | 'listening'>('words_tones');
 	// OmniRoute Quick Nav & Quick Actions
 	let quickNavOpen = $state(false);
 	let quickNavQuery = $state('');
@@ -414,6 +417,65 @@
 	let phonemeTargets = $derived(activeLearningAnalytics?.phonemeSubstitutionMatrix?.targets || ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x']);
 	let phonemeMatrix = $derived(activeLearningAnalytics?.phonemeSubstitutionMatrix?.matrix || {});
 
+	// =========================================================================
+	// Actionable Insights Engine for Frontend / Product Team Meetings
+	// =========================================================================
+	let frontendInsights = $derived.by(() => {
+		const stagesList = (data.stages || []) as any[];
+		const sortedByLowViews = [...stagesList].sort((a, b) => (a.stats?.totalViews ?? 0) - (b.stats?.totalViews ?? 0));
+		const sortedByDrop = [...stagesList]
+			.filter((s) => (s.stats?.totalViews ?? 0) > 0)
+			.sort((a, b) => (b.stats?.dropRate ?? 0) - (a.stats?.dropRate ?? 0));
+		const lowestStage = sortedByLowViews[0] ?? null;
+		const hardestStage = sortedByDrop[0] ?? null;
+
+		const fcSets = (data.flashcardAnalytics?.setStats || []) as any[];
+		const sortedFcByLowCount = [...fcSets].sort((a, b) => (a.completionCount ?? 0) - (b.completionCount ?? 0));
+		const lowestFcSet = sortedFcByLowCount[0] ?? null;
+		const fcLevels = [1, 2, 3].map((lvl) => ({
+			lvl,
+			...(data.flashcardAnalytics?.byLevel?.[lvl] || { totalCompletions: 0, avgMasteryRatePct: 0 })
+		}));
+		const lowestFcLevel = [...fcLevels].sort((a, b) => a.totalCompletions - b.totalCompletions)[0];
+
+		const wordsList = (data.practiceBreakdown?.hardestWords || data.practiceBreakdown?.words || []) as Array<{ word: string; count: number; avgScore: number }>;
+		const sortedWordsLowPass = [...wordsList].filter((w) => w.count > 0).sort((a, b) => a.avgScore - b.avgScore);
+		const hardestWord = sortedWordsLowPass[0] ?? null;
+
+		const crossFeatures = (data.skillsAnalytics?.crossFeatureUsage || []) as Array<{ label: string; totalEvents: number; sharePct: number }>;
+		const leastFeature = [...crossFeatures].sort((a, b) => a.totalEvents - b.totalEvents)[0] ?? null;
+		const topFeature = [...crossFeatures].sort((a, b) => b.totalEvents - a.totalEvents)[0] ?? null;
+
+		const examSummary = (data.skillsAnalytics?.exam || {}) as Record<string, any>;
+		const examSkills = [
+			{ name: 'การฟัง (Listening)', val: Number(examSummary.avgListening ?? 0) },
+			{ name: 'การอ่าน (Reading)', val: Number(examSummary.avgReading ?? 0) },
+			{ name: 'การเขียน (Writing)', val: Number(examSummary.avgWriting ?? 0) }
+		].sort((a, b) => a.val - b.val);
+		const weakestExamSkill = examSkills[0];
+
+		const weakChars = (data.skillsAnalytics?.writing?.weakCharacters || []) as any[];
+		const topWeakChar = weakChars[0] ?? null;
+
+		const scenarios = (data.skillsAnalytics?.chatbot?.byScenario || []) as any[];
+		const leastScenario = [...scenarios].sort((a, b) => (a.sessionsCount ?? 0) - (b.sessionsCount ?? 0))[0] ?? null;
+		const lowestScoreScenario = [...scenarios].sort((a, b) => (a.avgScore ?? 0) - (b.avgScore ?? 0))[0] ?? null;
+
+		return {
+			lowestStage,
+			hardestStage,
+			lowestFcSet,
+			lowestFcLevel,
+			hardestWord,
+			leastFeature,
+			topFeature,
+			weakestExamSkill,
+			topWeakChar,
+			leastScenario,
+			lowestScoreScenario
+		};
+	});
+
 	function showAnalyticsToast(message: string, type: 'success' | 'info' = 'success') {
 		analyticsToast = { type, message };
 		setTimeout(() => {
@@ -584,18 +646,18 @@
 	let auditSearchQuery = $state('');
 	let auditActionFilter = $state<string>('all');
 	const AUDIT_ACTION_MAP: Record<string, { label: string; color: string }> = {
-		admin_login: { label: 'เข้าสู่ระบบ', color: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },
-		save_stage: { label: 'บันทึกแก้ไขด่าน', color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
-		toggle_stage: { label: 'เปิด/ปิดด่าน', color: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30' },
-		reset_stage: { label: 'รีเซ็ตด่าน', color: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30' },
-		impersonate_user: { label: 'สวมบทบาท', color: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30' },
-		stop_impersonate: { label: 'ออกสวมบทบาท', color: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30' },
-		assign_teacher_intervention: { label: 'มอบหมายชุดฝึก', color: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30' },
-		update_teacher_intervention: { label: 'อัปเดตคำแนะนำ', color: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30' },
-		update_listening_policy: { label: 'เปลี่ยนนโยบายฟัง', color: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30' },
-		update_pitch_sensitivity: { label: 'ปรับความไวเสียง', color: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30' },
-		delete_mock_learners: { label: 'ลบผู้เรียนจำลอง', color: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30' },
-		export_audit_logs: { label: 'ส่งออก Audit Logs', color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' }
+		admin_login: { label: 'เข้าสู่ระบบ', color: 'bg-muted text-foreground border-border' },
+		save_stage: { label: 'บันทึกด่าน', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
+		toggle_stage: { label: 'เปิด/ปิดด่าน', color: 'bg-muted text-foreground border-border' },
+		reset_stage: { label: 'รีเซ็ตด่าน', color: 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 border-red-200 dark:border-red-800' },
+		impersonate_user: { label: 'สลับดูมุมมองผู้เรียน', color: 'bg-muted text-foreground border-border' },
+		stop_impersonate: { label: 'กลับสู่มุมมองผู้ดูแล', color: 'bg-muted text-muted-foreground border-border' },
+		assign_teacher_intervention: { label: 'มอบหมายชุดฝึก', color: 'bg-muted text-foreground border-border' },
+		update_teacher_intervention: { label: 'อัปเดตคำแนะนำ', color: 'bg-muted text-foreground border-border' },
+		update_listening_policy: { label: 'ตั้งค่าเสียงฟัง', color: 'bg-muted text-foreground border-border' },
+		update_pitch_sensitivity: { label: 'ปรับความไวเสียง', color: 'bg-muted text-foreground border-border' },
+		delete_mock_learners: { label: 'ลบข้อมูลจำลอง', color: 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 border-red-200 dark:border-red-800' },
+		export_audit_logs: { label: 'ส่งออก Audit Logs', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' }
 	};
 
 	const filteredAuditLogs = $derived.by(() => {
@@ -763,18 +825,18 @@
 
 {#if data.needsLogin}
 	<main class="mx-auto flex min-h-[calc(100svh-64px)] max-w-md items-center px-4 pb-12 pt-6">
-		<div class="w-full rounded-3xl border bg-card p-6 shadow-xl">
+		<div class="w-full rounded-2xl border border-border bg-card p-6">
 			<div class="mb-5 flex flex-col items-center text-center">
 				<div class="mb-3 relative size-16 shrink-0 flex items-center justify-center">
-					<img src="/mascot_avatar.png" alt="น้องช้างน้อย ปากจีน" class="size-full object-contain filter drop-shadow-md" />
+					<img src="/mascot_avatar.png" alt="ปากจีน" class="size-full object-contain" />
 				</div>
 				<div class="flex items-center gap-2">
-					<span class="rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-xs font-bold text-sky-600 dark:text-sky-400">ช้างน้อย 🐘</span>
-					<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-primary/10 text-primary border border-primary/20">ผู้ดูแลระบบ 🛡️</span>
+					<span class="rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-foreground">ปากจีน</span>
+					<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">Admin</span>
 				</div>
-				<h1 class="mt-2 text-2xl font-black">เข้าสู่ระบบ ปากจีน Admin</h1>
+				<h1 class="mt-2 text-2xl font-bold">เข้าสู่ระบบผู้ดูแล</h1>
 				<p class="mt-1 text-xs text-muted-foreground">
-					ห้องเรียนภาษาจีน HSK · เฉพาะบัญชีผู้ดูแลระบบที่ได้รับอนุญาต
+					เฉพาะบัญชีผู้ดูแลระบบที่ได้รับอนุญาต
 				</p>
 			</div>
 
@@ -844,246 +906,187 @@
 {:else}
 
 <!-- DASHER UI LAYOUT STRUCTURE -->
-<div class="min-h-screen bg-muted/15 flex">
-	<!-- 1. LEFT SIDEBAR (Dasher UI Sidebar Architecture) -->
+<div class="min-h-screen bg-background flex">
+	<!-- 1. LEFT SIDEBAR -->
 	<aside
-		class="fixed inset-y-0 left-0 z-40 w-64 border-r bg-card flex flex-col justify-between transition-transform duration-200 lg:translate-x-0 {mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
+		class="fixed inset-y-0 left-0 z-40 w-64 border-r border-border bg-card flex flex-col justify-between transition-transform duration-200 lg:translate-x-0 {mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
 	>
 		<div>
 			<!-- Brand Logo -->
-			<div class="h-16 flex items-center gap-3 px-5 border-b">
-				<div class="relative size-10 shrink-0 flex items-center justify-center">
-					<img src="/mascot_avatar.png" alt="น้องช้างน้อย ปากจีน" class="size-full object-contain filter drop-shadow-xs" />
+			<div class="h-16 flex items-center gap-3 px-5 border-b border-border">
+				<div class="relative size-9 shrink-0 flex items-center justify-center">
+					<img src="/mascot_avatar.png" alt="ปากจีน" class="size-full object-contain" />
 				</div>
 				<div class="min-w-0 leading-tight">
 					<div class="flex items-center gap-1.5">
-						<span class="text-base font-black tracking-tight text-foreground">ปากจีน</span>
-						<span class="rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400">ช้างน้อย 🐘</span>
+						<span class="text-base font-bold tracking-tight text-foreground">ปากจีน</span>
+						<span class="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-foreground">Admin</span>
 					</div>
-					<div class="text-[11px] text-muted-foreground font-medium truncate">ห้องเรียนภาษาจีน HSK (ผู้ดูแล 🛡️)</div>
+					<div class="text-xs text-muted-foreground font-medium truncate">จัดการระบบและสถิติ</div>
 				</div>
 			</div>
 
-			<!-- Sidebar Navigation Groups (Dasher Categories) -->
-			<div class="p-4 space-y-6 overflow-y-auto max-h-[calc(100vh-140px)]">
-				<!-- Group 1: แดชบอร์ด & ภาพรวม -->
+			<!-- Sidebar Navigation -->
+			<div class="p-3.5 space-y-5 overflow-y-auto max-h-[calc(100vh-140px)]">
+				<!-- Group 1 -->
 				<div class="space-y-1">
-					<div class="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-						แดชบอร์ด & ภาพรวม
+					<div class="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+						ภาพรวมและผู้ใช้
 					</div>
+					<!-- Tab 1: Overview -->
 					<button
 						onclick={() => { activeTab = 'dashboard'; mobileSidebarOpen = false; }}
-						class="w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition {activeTab === 'dashboard' ? 'bg-primary text-primary-foreground shadow-xs font-black' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'dashboard' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 					>
 						<div class="flex items-center gap-2.5">
-							<LayoutDashboard class="size-4" />
-							<span>ภาพรวมทั้งระบบ (Overview)</span>
+							<LayoutDashboard class="size-4 shrink-0" />
+							<span>1. ภาพรวม</span>
 						</div>
 					</button>
-				</div>
 
-				<!-- Group 2: ตรวจสอบและจัดการผู้ใช้งาน (แยก Section ผู้เรียน และ แอดมิน เด็ดขาด) -->
-				<div class="space-y-1">
-					<div class="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-						ตรวจสอบผู้ใช้งาน (แยกระดับสิทธิ์)
-					</div>
-					<!-- 1. ผู้เรียนทั้งหมด -->
+					<!-- Tab 2: Users -->
 					<button
 						onclick={() => { activeTab = 'users'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'users' ? 'bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'users' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 					>
-						<div class="flex items-start gap-2.5">
-							<Users class="size-4 mt-0.5 text-rose-600 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">ผู้เรียนทั้งหมด (Learners)</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">ตรวจสอบพัฒนาการและกลุ่มที่ต้องดูแล</div>
-							</div>
+						<div class="flex items-center gap-2.5">
+							<Users class="size-4 shrink-0" />
+							<span>2. ผู้เรียน</span>
 						</div>
-						<span class="rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
+						<span class="rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold {activeTab === 'users' ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-foreground'}">
 							{data.stats.totalLearners}
 						</span>
 					</button>
-
-					<!-- 2. แอดมินทั้งหมด (แยก Section และคนละเมนู) -->
-					<button
-						onclick={() => { activeTab = 'admins'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'admins' ? 'bg-primary/15 border border-primary/30 text-primary font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<Shield class="size-4 mt-0.5 text-primary shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">แอดมินทั้งหมด (Admins)</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">สิทธิ์ผู้ดูแลระบบ และ Audit Logs</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							{data.stats.totalAdmins}
-						</span>
-					</button>
 				</div>
 
-				<!-- Group 2.5: วิเคราะห์ทักษะเฉพาะด้าน (8 หัวข้อย่อย Focus mode) -->
+				<!-- Group 2 -->
 				<div class="space-y-1">
-					<div class="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-						วิเคราะห์ทักษะเฉพาะด้าน (5 ทักษะ)
+					<div class="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+						สถิติรายโหมด
 					</div>
 
-					<!-- 1. วรรณยุกต์และระดับเสียง -->
+					<!-- Tab 3: Quest Stages -->
+					<button
+						onclick={() => { activeTab = 'stages'; mobileSidebarOpen = false; }}
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'stages' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+					>
+						<div class="flex items-center gap-2.5">
+							<Layers class="size-4 shrink-0" />
+							<span>3. ด่านฝึกคำศัพท์</span>
+						</div>
+						<span class="rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold {activeTab === 'stages' ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-foreground'}">
+							{data.stages.length}
+						</span>
+					</button>
+
+					<!-- Tab 4: Flashcards -->
+					<button
+						onclick={() => { activeTab = 'flashcards'; mobileSidebarOpen = false; }}
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'flashcards' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+					>
+						<div class="flex items-center gap-2.5">
+							<BookOpen class="size-4 shrink-0" />
+							<span>4. แฟลชการ์ด</span>
+						</div>
+						<span class="rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold {activeTab === 'flashcards' ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-foreground'}">
+							{data.flashcardAnalytics?.summary?.totalCompletions ?? 0}
+						</span>
+					</button>
+
+					<!-- Tab 5: Pronunciation & Words -->
 					<button
 						onclick={() => { activeTab = 'tone_analytics'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'tone_analytics' ? 'bg-purple-500/15 border border-purple-500/30 text-purple-700 dark:text-purple-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'tone_analytics' || activeTab === 'listening_analytics' || activeTab === 'learning' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 					>
-						<div class="flex items-start gap-2.5">
-							<Activity class="size-4 mt-0.5 text-purple-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">วรรณยุกต์และระดับเสียง</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">Tone Matrix & Pitch Contour</div>
-							</div>
+						<div class="flex items-center gap-2.5">
+							<Mic class="size-4 shrink-0" />
+							<span>5. ออกเสียง & คำศัพท์</span>
 						</div>
-						<span class="rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
+						<span class="rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold {activeTab === 'tone_analytics' || activeTab === 'listening_analytics' ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-foreground'}">
 							Tone
 						</span>
 					</button>
 
-					<!-- 2. การฟังและผลกระทบเสียงตัวอย่าง -->
-					<button
-						onclick={() => { activeTab = 'listening_analytics'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'listening_analytics' ? 'bg-blue-500/15 border border-blue-500/30 text-blue-700 dark:text-blue-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<Volume2 class="size-4 mt-0.5 text-blue-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">การฟัง & Audio Gate</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">ผลกระทบ LQ5 & Policy</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							LQ5
-						</span>
-					</button>
-
-					<!-- 3. การเขียนลำดับขีดอักษรจีน -->
-					<button
-						onclick={() => { activeTab = 'hanzi_writing'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'hanzi_writing' ? 'bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<Edit3 class="size-4 mt-0.5 text-rose-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">ลำดับขีดอักษรจีน</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">สถิติตัวอักษรและจุดเขียนผิด</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							Hanzi
-						</span>
-					</button>
-
-					<!-- 4. สนทนาตามสถานการณ์จริง -->
-					<button
-						onclick={() => { activeTab = 'ai_dialogue'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'ai_dialogue' ? 'bg-violet-500/15 border border-violet-500/30 text-violet-700 dark:text-violet-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-start gap-2.5">
-							<MessageSquare class="size-4 mt-0.5 text-violet-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">สนทนาสถานการณ์จริง</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">การสนทนาโต้ตอบตามบริบท</div>
-							</div>
-						</div>
-						<span class="rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							Talk
-						</span>
-					</button>
-
-					<!-- 5. การสอบวัดระดับ HSK -->
+					<!-- Tab 6: HSK Exams -->
 					<button
 						onclick={() => { activeTab = 'mock_exams'; mobileSidebarOpen = false; }}
-						class="w-full flex items-start justify-between rounded-xl p-2.5 text-left transition {activeTab === 'mock_exams' ? 'bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold shadow-2xs' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'mock_exams' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 					>
-						<div class="flex items-start gap-2.5">
-							<Award class="size-4 mt-0.5 text-amber-500 shrink-0" />
-							<div>
-								<div class="text-xs font-extrabold leading-tight text-foreground">การสอบวัดระดับ HSK</div>
-								<div class="text-[10px] text-muted-foreground mt-0.5">การประเมินผลสอบ HSK 1–3</div>
-							</div>
+						<div class="flex items-center gap-2.5">
+							<Award class="size-4 shrink-0" />
+							<span>6. ข้อสอบ HSK</span>
 						</div>
-						<span class="rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
+						<span class="rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold {activeTab === 'mock_exams' ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-foreground'}">
 							{data.skillsAnalytics?.exam?.totalAttempts ?? 0}
 						</span>
 					</button>
-				</div>
 
-				<!-- Group 3: แบบฝึกหัด & ด่าน -->
-				<div class="space-y-1">
-					<div class="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-						แบบฝึกหัด & ด่าน
-					</div>
+					<!-- Tab 7: Hanzi Writing -->
 					<button
-						onclick={() => { activeTab = 'stages'; mobileSidebarOpen = false; }}
-						class="w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition {activeTab === 'stages' ? 'bg-primary text-primary-foreground shadow-xs font-black' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+						onclick={() => { activeTab = 'hanzi_writing'; mobileSidebarOpen = false; }}
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'hanzi_writing' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 					>
 						<div class="flex items-center gap-2.5">
-							<Layers class="size-4" />
-							<span>จัดการด่าน & เส้นทางเรียนรู้ ({data.stages.length})</span>
+							<Edit3 class="size-4 shrink-0" />
+							<span>7. คัดอักษรจีน</span>
 						</div>
-						<span class="rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							Funnel
+						<span class="rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold {activeTab === 'hanzi_writing' ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-foreground'}">
+							{data.skillsAnalytics?.writing?.totalAttempts ?? 0}
 						</span>
 					</button>
 
+					<!-- Tab 8: Talk -->
 					<button
-						onclick={() => { activeTab = 'flashcards'; mobileSidebarOpen = false; }}
-						class="w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition {activeTab === 'flashcards' ? 'bg-primary text-primary-foreground shadow-xs font-black' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
+						onclick={() => { activeTab = 'ai_dialogue'; mobileSidebarOpen = false; }}
+						class="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition cursor-pointer {activeTab === 'ai_dialogue' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 					>
 						<div class="flex items-center gap-2.5">
-							<BookOpen class="size-4 text-emerald-500" />
-							<span>การฝึกชุดคำศัพท์ (Flashcards)</span>
+							<MessageSquare class="size-4 shrink-0" />
+							<span>8. สนทนา</span>
 						</div>
-						<span class="rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] px-1.5 py-0.5 font-bold font-mono">
-							{data.flashcardAnalytics?.summary?.totalCompletions ?? 0}
+						<span class="rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold {activeTab === 'ai_dialogue' ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-foreground'}">
+							{data.skillsAnalytics?.chatbot?.totalSessions ?? 0}
 						</span>
-					</button>
-				</div>
-
-				<!-- Group 4: ระบบและข้อมูล -->
-				<div class="space-y-1">
-					<div class="px-3 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-						ระบบและข้อมูล (System)
-					</div>
-					<button
-						onclick={() => { activeTab = 'audit'; mobileSidebarOpen = false; }}
-						class="w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition {activeTab === 'audit' ? 'bg-primary text-primary-foreground shadow-xs font-black' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-center gap-2.5">
-							<History class="size-4" />
-							<span>ประวัติ Audit Logs</span>
-						</div>
-						<span class="rounded-full bg-primary/15 text-primary text-[10px] px-2 py-0.5 font-mono font-bold {activeTab === 'audit' ? 'bg-primary-foreground/20 text-primary-foreground' : ''}">
-							{(data.auditLogs || []).length}
-						</span>
-					</button>
-
-					<button
-						onclick={() => { activeTab = 'export'; mobileSidebarOpen = false; }}
-						class="w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition {activeTab === 'export' ? 'bg-primary text-primary-foreground shadow-xs font-black' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-					>
-						<div class="flex items-center gap-2.5">
-							<Download class="size-4" />
-							<span>ชุดข้อมูลวิจัย PDPA</span>
-						</div>
 					</button>
 				</div>
 			</div>
 		</div>
 
-		<!-- OmniRoute Sidebar Bottom Action Buttons (Dual Buttons: Web Home & Shutdown/Logout) -->
-		<div class="p-4 border-t bg-muted/10 space-y-2">
-			<div class="grid grid-cols-2 gap-2">
+		<!-- Bottom Quick System Utilities -->
+		<div class="p-3.5 border-t bg-muted/10 space-y-2">
+			<div class="grid grid-cols-3 gap-1.5 text-[10.5px]">
+				<button
+					type="button"
+					onclick={() => { activeTab = 'admins'; mobileSidebarOpen = false; }}
+					class="flex items-center justify-center gap-1 rounded-lg border py-1.5 font-bold transition cursor-pointer {activeTab === 'admins' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-background hover:bg-muted text-muted-foreground'}"
+					title="จัดการสิทธิ์แอดมิน"
+				>
+					<Shield class="size-3" />
+					<span>แอดมิน</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => { activeTab = 'audit'; mobileSidebarOpen = false; }}
+					class="flex items-center justify-center gap-1 rounded-lg border py-1.5 font-bold transition cursor-pointer {activeTab === 'audit' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-background hover:bg-muted text-muted-foreground'}"
+					title="ประวัติ Audit Logs"
+				>
+					<History class="size-3" />
+					<span>ประวัติ</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => { activeTab = 'export'; mobileSidebarOpen = false; }}
+					class="flex items-center justify-center gap-1 rounded-lg border py-1.5 font-bold transition cursor-pointer {activeTab === 'export' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-background hover:bg-muted text-muted-foreground'}"
+					title="ส่งออกข้อมูลวิจัย"
+				>
+					<Download class="size-3" />
+					<span>Export</span>
+				</button>
+			</div>
+			<div class="grid grid-cols-2 gap-1.5">
 				<a
 					href="/"
-					class="flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-background hover:bg-muted py-2 text-xs font-bold text-foreground transition shadow-2xs cursor-pointer"
-					title="กลับสู่หน้าเว็บหลักของผู้เรียน"
+					class="flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-background hover:bg-muted py-1.5 text-xs font-bold text-foreground transition cursor-pointer"
 				>
 					<ExternalLink class="size-3.5 text-primary" />
 					<span>หน้าหลัก</span>
@@ -1091,16 +1094,12 @@
 				<form method="POST" action="/logout?redirectTo=/admin" class="contents">
 					<button
 						type="submit"
-						class="flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/30 hover:bg-rose-100 text-rose-600 dark:text-rose-400 py-2 text-xs font-bold transition shadow-2xs cursor-pointer"
-						title="ออกจากระบบแอดมิน"
+						class="flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/30 hover:bg-rose-100 text-rose-600 dark:text-rose-400 py-1.5 text-xs font-bold transition cursor-pointer"
 					>
 						<LogOut class="size-3.5" />
 						<span>ออกระบบ</span>
 					</button>
 				</form>
-			</div>
-			<div class="text-center text-[10px] text-muted-foreground font-medium">
-				ปากจีน · ห้องเรียนภาษาจีน HSK
 			</div>
 		</div>
 	</aside>
@@ -1169,21 +1168,18 @@
 					<span class="hidden md:inline">ดูหน้าเว็บหลัก</span>
 				</a>
 
-				<!-- OmniRoute Top Nav Bar Controls (Quick nav Ctrl+K, Language/Theme, Exit) -->
 				<div class="flex items-center gap-2">
 					<!-- Quick Nav Ctrl+K pill -->
 					<button
 						type="button"
 						onclick={() => (quickNavOpen = true)}
-						class="hidden sm:flex items-center gap-2 rounded-xl border border-border/70 bg-muted/30 hover:bg-muted/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition shadow-2xs"
-						title="ค้นหาเมนู ด่าน หรือผู้เรียนอย่างรวดเร็ว (Ctrl+K)"
+						class="hidden sm:flex items-center gap-2 rounded-lg border border-border bg-background hover:bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground transition cursor-pointer"
+						title="ค้นหาเมนู ด่าน หรือผู้เรียน (Ctrl+K)"
 					>
 						<Search class="size-3.5 text-muted-foreground" />
-						<span>Quick nav</span>
-						<kbd class="rounded border bg-background px-1.5 py-0.5 text-[10px] font-mono text-foreground font-bold">⌘K</kbd>
+						<span>ค้นหาด่วน</span>
+						<kbd class="rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-mono text-foreground font-semibold">⌘K</kbd>
 					</button>
-
-
 
 					<!-- Theme Mode Toggle -->
 					<button
@@ -1193,29 +1189,29 @@
 								document.documentElement.classList.toggle('dark');
 							}
 						}}
-						class="rounded-xl border border-border/70 bg-muted/30 hover:bg-muted p-2 text-muted-foreground hover:text-foreground transition shadow-2xs"
-						title="สลับโหมดมืด / สว่าง (Dark / Light Mode)"
+						class="rounded-lg border border-border bg-background hover:bg-muted px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition cursor-pointer"
+						title="สลับโหมดมืด / สว่าง"
 					>
-						<span class="text-sm">🌙</span>
+						ธีม
 					</button>
 
 					<!-- Admin Profile Avatar -->
-					<div class="flex items-center gap-2 pl-2 border-l">
-						<div class="flex size-8 items-center justify-center rounded-full bg-primary font-black text-xs text-primary-foreground shadow-xs">
+					<div class="flex items-center gap-2 pl-2 border-l border-border">
+						<div class="flex size-8 items-center justify-center rounded-full bg-primary font-semibold text-xs text-primary-foreground">
 							{data.adminUsername.charAt(0).toUpperCase()}
 						</div>
 						<div class="hidden md:block text-left text-xs leading-tight">
-							<div class="font-extrabold text-foreground">@{data.adminUsername}</div>
-							<div class="text-[10px] text-muted-foreground font-semibold">Administrator</div>
+							<div class="font-semibold text-foreground">@{data.adminUsername}</div>
+							<div class="text-[11px] text-muted-foreground">Administrator</div>
 						</div>
 					</div>
 
-					<!-- OmniRoute Minimal Exit Button (Icon [->) -->
+					<!-- Exit Button -->
 					<form method="POST" action="/logout?redirectTo=/admin" class="contents">
 						<button
 							type="submit"
-							class="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/30 hover:bg-rose-100 text-rose-600 dark:text-rose-400 p-2 transition shadow-2xs cursor-pointer"
-							title="ออกจากระบบ (Exit)"
+							class="rounded-lg border border-border bg-background hover:bg-muted text-primary p-2 transition cursor-pointer"
+							title="ออกจากระบบ"
 						>
 							<LogOut class="size-4" />
 						</button>
@@ -1224,124 +1220,140 @@
 			</div>
 		</header>
 
-		<!-- 3. PAGE CONTENT (Dasher Layout Canvas) -->
+		<!-- 3. PAGE CONTENT -->
 		<div class="p-4 sm:p-6 space-y-4 max-w-7xl w-full mx-auto">
 			{#if activeTab === 'dashboard'}
+				<FrontendActionBanner
+					tabTitle="1. ภาพรวม"
+					headline={frontendInsights.leastFeature
+						? `ฟีเจอร์ที่มีการเข้าใช้น้อยสุดคือ "${frontendInsights.leastFeature.label}" (${frontendInsights.leastFeature.totalEvents} ครั้ง)`
+						: 'ภาพรวมการใช้งานและสถิติผู้เรียน'}
+					bullets={[
+						frontendInsights.lowestFcLevel
+							? `แฟลชการ์ด HSK ${frontendInsights.lowestFcLevel.lvl} มีรอบฝึกน้อยสุด (${frontendInsights.lowestFcLevel.totalCompletions} รอบ)`
+							: 'กำลังเก็บสถิติแฟลชการ์ด',
+						frontendInsights.lowestStage
+							? `ด่านคนเข้าน้อยสุด: ${frontendInsights.lowestStage.title} (${frontendInsights.lowestStage.stats?.totalViews ?? 0} ครั้ง)`
+							: 'กำลังเก็บสถิติด่านเรียน',
+						frontendInsights.hardestWord
+							? `คำศัพท์คะแนนเฉลี่ยต่ำสุด: "${frontendInsights.hardestWord.word}" (GOP ${frontendInsights.hardestWord.avgScore}%)`
+							: 'กำลังเก็บสถิติคำศัพท์'
+					]}
+					chips={[
+						{ label: 'Active วันนี้', value: `${data.stats.activeToday}/${data.stats.totalLearners}`, tone: 'emerald' },
+						{ label: 'กลุ่มเสี่ยง GOP<70', value: `${atRiskUsers.length} คน`, tone: atRiskUsers.length > 0 ? 'rose' : 'emerald' },
+						{ label: 'GOP เฉลี่ย', value: `${data.classPhonemeStats.avgGop || 0}%`, tone: 'blue' }
+					]}
+					onCopied={(m) => showAnalyticsToast(m, 'success')}
+				/>
 				<!-- ============================================================== -->
 				<!-- ZONE 1: EXECUTIVE KPI COCKPIT (HERO BENTO CARDS)              -->
 				<!-- ============================================================== -->
-				<section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" aria-label="ภาพรวมสถิติสำคัญระดับบริหาร">
-					<!-- KPI 1: ผู้เรียนที่เข้าเรียนวันนี้ -->
-					<div class="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.07] via-card to-card p-4 sm:p-5 shadow-xs flex flex-col justify-between relative overflow-hidden group">
+				<section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" aria-label="สถิติภาพรวม">
+					<!-- KPI 1: Active Today -->
+					<div class="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col justify-between">
 						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-bold text-muted-foreground">เข้าเรียนวันนี้ (Active Today)</span>
-							<span class="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+							<span class="text-xs font-semibold text-muted-foreground">เข้าเรียนวันนี้</span>
+							<span class="p-2 rounded-lg border border-border bg-background text-emerald-600 dark:text-emerald-400">
 								<Users class="size-4" />
 							</span>
 						</div>
 						<div class="mt-3">
 							<div class="flex items-baseline gap-2">
-								<span class="font-mono tabular-nums text-3xl font-black text-foreground">{data.stats.activeToday}</span>
-								<span class="text-xs font-semibold text-muted-foreground">/ {data.stats.totalLearners} ผู้เรียน</span>
+								<span class="font-mono tabular-nums text-3xl font-bold text-foreground">{data.stats.activeToday}</span>
+								<span class="text-xs font-medium text-muted-foreground">/ {data.stats.totalLearners} คน</span>
 							</div>
-							<div class="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
-								<span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-								<span>อัตราความตื่นตัว {data.stats.totalLearners > 0 ? Math.round((data.stats.activeToday / data.stats.totalLearners) * 100) : 0}%</span>
+							<div class="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+								<span class="size-1.5 rounded-full bg-emerald-500"></span>
+								<span>อัตราใช้งาน {data.stats.totalLearners > 0 ? Math.round((data.stats.activeToday / data.stats.totalLearners) * 100) : 0}%</span>
 							</div>
 						</div>
 					</div>
 
-					<!-- KPI 2: นักเรียนกลุ่มต้องดูแล (At-Risk GOP < 70) -->
+					<!-- KPI 2: At-Risk Learners -->
 					<button
 						type="button"
 						onclick={() => { activeTab = 'users'; userFilterStatus = 'at_risk'; userRoleFilter = 'learner'; }}
-						class="rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.08] via-card to-card p-4 sm:p-5 text-left shadow-xs transition hover:border-amber-500/50 hover:shadow-sm cursor-pointer flex flex-col justify-between relative overflow-hidden group"
+						class="rounded-2xl border border-border bg-card p-4 sm:p-5 text-left transition hover:border-primary/50 cursor-pointer flex flex-col justify-between group"
 					>
 						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-bold text-muted-foreground">กลุ่มต้องดูแล (At-Risk)</span>
-							<span class="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
+							<span class="text-xs font-semibold text-muted-foreground">กลุ่มเสี่ยง (GOP &lt; 70%)</span>
+							<span class="p-2 rounded-lg border border-border bg-background text-primary">
 								<AlertTriangle class="size-4" />
 							</span>
 						</div>
 						<div class="mt-3">
 							<div class="flex items-baseline gap-2">
-								<span class="font-mono tabular-nums text-3xl font-black text-amber-600 dark:text-amber-400">{atRiskUsers.length}</span>
-								<span class="text-xs font-semibold text-muted-foreground">คน (GOP &lt; 70%)</span>
+								<span class="font-mono tabular-nums text-3xl font-bold text-primary">{atRiskUsers.length}</span>
+								<span class="text-xs font-medium text-muted-foreground">คน</span>
 							</div>
-							<div class="mt-2 flex items-center justify-between text-[11px] text-amber-700 dark:text-amber-300 font-bold">
-								<span>คลิกเพื่อดูและส่งชุดซ่อมเสริม</span>
+							<div class="mt-2 flex items-center justify-between text-xs text-primary font-medium">
+								<span>ดูรายชื่อและมอบหมายชุดฝึก</span>
 								<span class="group-hover:translate-x-0.5 transition-transform">→</span>
 							</div>
 						</div>
 					</button>
 
-					<!-- KPI 3: คะแนนความแม่นยำ GOP & PER รวม -->
-					<div class="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/[0.07] via-card to-card p-4 sm:p-5 shadow-xs flex flex-col justify-between relative overflow-hidden">
+					<!-- KPI 3: Acoustic Health -->
+					<div class="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col justify-between">
 						<div class="flex items-center justify-between gap-2">
-							<span class="text-xs font-bold text-muted-foreground">คุณภาพเสียงรวม (Acoustic Health)</span>
-							<span class="p-2 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400">
+							<span class="text-xs font-semibold text-muted-foreground">คะแนนเฉลี่ยรวม</span>
+							<span class="p-2 rounded-lg border border-border bg-background text-foreground">
 								<Sparkles class="size-4" />
 							</span>
 						</div>
 						<div class="mt-3">
 							<div class="flex items-baseline gap-3">
 								<div class="flex items-baseline gap-1">
-									<span class="font-mono tabular-nums text-3xl font-black text-blue-600 dark:text-blue-400">{data.classPhonemeStats.totalAttempts ? data.classPhonemeStats.avgGop + '%' : '—'}</span>
-									<span class="text-[10px] font-bold text-muted-foreground">GOP</span>
+									<span class="font-mono tabular-nums text-3xl font-bold text-foreground">{data.classPhonemeStats.totalAttempts ? data.classPhonemeStats.avgGop + '%' : '—'}</span>
+									<span class="text-[11px] font-medium text-muted-foreground">GOP</span>
 								</div>
-								<div class="flex items-baseline gap-1 border-l pl-3">
-									<span class="font-mono tabular-nums text-xl font-extrabold text-foreground">{data.classPhonemeStats.totalAttempts ? data.classPhonemeStats.avgPer + '%' : '—'}</span>
-									<span class="text-[10px] font-bold text-muted-foreground">PER</span>
+								<div class="flex items-baseline gap-1 border-l border-border pl-3">
+									<span class="font-mono tabular-nums text-xl font-bold text-foreground">{data.classPhonemeStats.totalAttempts ? data.classPhonemeStats.avgPer + '%' : '—'}</span>
+									<span class="text-[11px] font-medium text-muted-foreground">PER</span>
 								</div>
 							</div>
-							<div class="mt-2 text-[11px] text-muted-foreground font-medium">
-								{data.classPhonemeStats.totalAttempts ? 'ประเมินสะสม ' + data.classPhonemeStats.totalAttempts.toLocaleString() + ' ครั้ง' : 'ยังไม่มีผลประเมิน'}
+							<div class="mt-2 text-xs text-muted-foreground">
+								{data.classPhonemeStats.totalAttempts ? 'ประเมินสะสม ' + data.classPhonemeStats.totalAttempts.toLocaleString() + ' ครั้ง' : 'ยังไม่มีข้อมูล'}
 							</div>
 						</div>
 					</div>
 
-					<!-- KPI 4: ดัชนีความสับสนวรรณยุกต์ 2 vs 3 (แจกแจง 2 ทิศทาง 2→3 และ 3→2) -->
-					<div class="rounded-2xl border border-rose-500/20 bg-gradient-to-br from-rose-500/[0.07] via-card to-card p-4 sm:p-5 shadow-xs flex flex-col justify-between relative overflow-hidden">
+					<!-- KPI 4: Tone 2 vs 3 Confusion -->
+					<div class="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col justify-between">
 						<div class="flex items-center justify-between gap-2">
 							<div class="flex items-center gap-1.5">
-								<span class="text-xs font-bold text-muted-foreground">สับสนวรรณยุกต์ 2 vs 3</span>
-								<span class="rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 text-[10px] font-mono font-bold">2 ↔ 3</span>
+								<span class="text-xs font-semibold text-muted-foreground">สับสนเสียง 2 กับ 3</span>
+								<span class="rounded border border-border bg-muted text-foreground px-1.5 py-0.5 text-[10px] font-mono">2 ↔ 3</span>
 							</div>
-							<span class="p-1.5 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400">
+							<span class="p-1.5 rounded-lg border border-border bg-background text-primary">
 								<Activity class="size-4" />
 							</span>
 						</div>
 						<div class="mt-2.5">
-							<!-- 2 Separate Direction Columns: 2->3 and 3->2 side-by-side -->
-							<div class="grid grid-cols-2 gap-2 pb-2 border-b border-border/50">
+							<div class="grid grid-cols-2 gap-2 pb-2 border-b border-border">
 								<div class="space-y-0.5">
-									<div class="text-[10px] font-bold text-foreground flex items-center gap-1">
-										<span class="size-1.5 rounded-full bg-amber-500 inline-block"></span>
-										<span>เสียง 2 → 3</span>
-									</div>
-									<div class="font-mono tabular-nums text-2xl font-black text-rose-600 dark:text-rose-400 leading-tight">
+									<div class="text-[11px] font-medium text-muted-foreground">เสียง 2 → 3</div>
+									<div class="font-mono tabular-nums text-2xl font-bold text-primary leading-tight">
 										{tone23Stats.t2AsT3Pct === null ? '—' : tone23Stats.t2AsT3Pct + '%'}
 									</div>
-									<div class="text-[9.5px] text-muted-foreground font-mono">
+									<div class="text-[10px] text-muted-foreground font-mono">
 										{tone23Stats.t2AsT3Count}/{tone23Stats.samples2} ครั้ง
 									</div>
 								</div>
-								<div class="space-y-0.5 border-l border-border/50 pl-2.5">
-									<div class="text-[10px] font-bold text-foreground flex items-center gap-1">
-										<span class="size-1.5 rounded-full bg-indigo-500 inline-block"></span>
-										<span>เสียง 3 → 2</span>
-									</div>
-									<div class="font-mono tabular-nums text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-tight">
+								<div class="space-y-0.5 border-l border-border pl-2.5">
+									<div class="text-[11px] font-medium text-muted-foreground">เสียง 3 → 2</div>
+									<div class="font-mono tabular-nums text-2xl font-bold text-foreground leading-tight">
 										{tone23Stats.t3AsT2Pct === null ? '—' : tone23Stats.t3AsT2Pct + '%'}
 									</div>
-									<div class="text-[9.5px] text-muted-foreground font-mono">
-										{tone23Stats.t3AsT2Count}/{tone23Stats.samples3} ครั้ง (Sandhi)
+									<div class="text-[10px] text-muted-foreground font-mono">
+										{tone23Stats.t3AsT2Count}/{tone23Stats.samples3} ครั้ง
 									</div>
 								</div>
 							</div>
-							<div class="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground font-medium">
-								<span>รวมสับสนสลับกัน <strong class="text-foreground font-mono">{tone23Stats.confusionRate === null ? '—' : tone23Stats.confusionRate + '%'}</strong></span>
-								<span class="font-mono font-bold text-foreground">N = {tone23Stats.samples}</span>
+							<div class="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+								<span>รวมสับสน <strong class="text-foreground font-mono">{tone23Stats.confusionRate === null ? '—' : tone23Stats.confusionRate + '%'}</strong></span>
+								<span class="font-mono font-semibold text-foreground">N = {tone23Stats.samples}</span>
 							</div>
 						</div>
 					</div>
@@ -1535,91 +1547,91 @@
 						</div>
 
 						<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-							<!-- Tone 1: ฟ้าอ่อน -->
-							<div class="rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.08] via-card to-card p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-3">
+							<!-- Tone 1 -->
+							<div class="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col justify-between space-y-3">
 								<div class="flex items-center justify-between">
-									<span class="rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-400 font-bold px-2 py-0.5 text-xs">
+									<span class="rounded border border-border bg-muted text-foreground font-semibold px-2 py-0.5 text-xs">
 										เสียง 1 · 阴平
 									</span>
-									<span class="text-[11px] font-mono text-muted-foreground">สูงราบ 55</span>
+									<span class="text-xs font-mono text-muted-foreground">สูงราบ 55</span>
 								</div>
 								<div>
-									<div class="text-3xl font-black font-mono text-sky-600 dark:text-sky-400">
+									<div class="text-3xl font-bold font-mono text-foreground tabular-nums">
 										{toneSamples[0] ? tone1Accuracy + '%' : '—'}
 									</div>
-									<div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-										<div class="h-full bg-sky-500 rounded-full transition-all duration-700" style="width: {toneSamples[0] ? tone1Accuracy : 0}%;"></div>
+									<div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+										<div class="h-full bg-emerald-500 rounded-full transition-all duration-700" style="width: {toneSamples[0] ? tone1Accuracy : 0}%;"></div>
 									</div>
 								</div>
-								<div class="text-[11px] text-muted-foreground border-t pt-2 flex items-center justify-between font-medium">
+								<div class="text-xs text-muted-foreground border-t border-border pt-2 flex items-center justify-between">
 									<span>เช่น mā (妈)</span>
-									<span class="font-mono">{toneSamples[0] || 0} ตัวอย่าง</span>
+									<span class="font-mono">{toneSamples[0] || 0} ครั้ง</span>
 								</div>
 							</div>
 
-							<!-- Tone 2: เขียว -->
-							<div class="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.08] via-card to-card p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-3">
+							<!-- Tone 2 -->
+							<div class="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col justify-between space-y-3">
 								<div class="flex items-center justify-between">
-									<span class="rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 text-xs">
+									<span class="rounded border border-border bg-muted text-foreground font-semibold px-2 py-0.5 text-xs">
 										เสียง 2 · 阳平
 									</span>
-									<span class="text-[11px] font-mono text-muted-foreground">เสียงขึ้น 35</span>
+									<span class="text-xs font-mono text-muted-foreground">เสียงขึ้น 35</span>
 								</div>
 								<div>
-									<div class="text-3xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+									<div class="text-3xl font-bold font-mono text-foreground tabular-nums">
 										{toneSamples[1] ? tone2Accuracy + '%' : '—'}
 									</div>
-									<div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-										<div class="h-full bg-emerald-500 rounded-full transition-all duration-700" style="width: {toneSamples[1] ? tone2Accuracy : 0}%;"></div>
+									<div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+										<div class="h-full bg-sky-500 rounded-full transition-all duration-700" style="width: {toneSamples[1] ? tone2Accuracy : 0}%;"></div>
 									</div>
 								</div>
-								<div class="text-[11px] text-muted-foreground border-t pt-2 flex items-center justify-between font-medium">
+								<div class="text-xs text-muted-foreground border-t border-border pt-2 flex items-center justify-between">
 									<span>เช่น má (麻)</span>
-									<span class="font-mono">{toneSamples[1] || 0} ตัวอย่าง</span>
+									<span class="font-mono">{toneSamples[1] || 0} ครั้ง</span>
 								</div>
 							</div>
 
-							<!-- Tone 3: ส้มทอง -->
-							<div class="rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.08] via-card to-card p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-3">
+							<!-- Tone 3 -->
+							<div class="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col justify-between space-y-3">
 								<div class="flex items-center justify-between">
-									<span class="rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold px-2 py-0.5 text-xs">
+									<span class="rounded border border-border bg-muted text-foreground font-semibold px-2 py-0.5 text-xs">
 										เสียง 3 · 上声
 									</span>
-									<span class="text-[11px] font-mono text-muted-foreground">ลงแล้วขึ้น 214</span>
+									<span class="text-xs font-mono text-muted-foreground">ลงช้อนขึ้น 214</span>
 								</div>
 								<div>
-									<div class="text-3xl font-black font-mono text-amber-600 dark:text-amber-400">
+									<div class="text-3xl font-bold font-mono text-foreground tabular-nums">
 										{toneSamples[2] ? tone3Accuracy + '%' : '—'}
 									</div>
-									<div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-										<div class="h-full bg-amber-500 rounded-full transition-all duration-700" style="width: {toneSamples[2] ? tone3Accuracy : 0}%;"></div>
+									<div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+										<div class="h-full bg-purple-500 rounded-full transition-all duration-700" style="width: {toneSamples[2] ? tone3Accuracy : 0}%;"></div>
 									</div>
 								</div>
-								<div class="text-[11px] text-muted-foreground border-t pt-2 flex items-center justify-between font-medium">
+								<div class="text-xs text-muted-foreground border-t border-border pt-2 flex items-center justify-between">
 									<span>เช่น mǎ (马)</span>
-									<span class="font-mono">{toneSamples[2] || 0} ตัวอย่าง</span>
+									<span class="font-mono">{toneSamples[2] || 0} ครั้ง</span>
 								</div>
 							</div>
 
-							<!-- Tone 4: ม่วงแดง -->
-							<div class="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-500/[0.08] via-card to-card p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-3">
+							<!-- Tone 4 -->
+							<div class="rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col justify-between space-y-3">
 								<div class="flex items-center justify-between">
-									<span class="rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold px-2 py-0.5 text-xs">
+									<span class="rounded border border-border bg-muted text-foreground font-semibold px-2 py-0.5 text-xs">
 										เสียง 4 · 去声
 									</span>
-									<span class="text-[11px] font-mono text-muted-foreground">เสียงลงฮวบ 51</span>
+									<span class="text-xs font-mono text-muted-foreground">เสียงลง 51</span>
 								</div>
 								<div>
-									<div class="text-3xl font-black font-mono text-purple-600 dark:text-purple-400">
+									<div class="text-3xl font-bold font-mono text-foreground tabular-nums">
 										{toneSamples[3] ? tone4Accuracy + '%' : '—'}
 									</div>
-									<div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-										<div class="h-full bg-purple-500 rounded-full transition-all duration-700" style="width: {toneSamples[3] ? tone4Accuracy : 0}%;"></div>
+									<div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+										<div class="h-full bg-primary rounded-full transition-all duration-700" style="width: {toneSamples[3] ? tone4Accuracy : 0}%;"></div>
 									</div>
 								</div>
-								<div class="text-[11px] text-muted-foreground border-t pt-2 flex items-center justify-between font-medium">
+								<div class="text-xs text-muted-foreground border-t border-border pt-2 flex items-center justify-between">
 									<span>เช่น mà (骂)</span>
-									<span class="font-mono">{toneSamples[3] || 0} ตัวอย่าง</span>
+									<span class="font-mono">{toneSamples[3] || 0} ครั้ง</span>
 								</div>
 							</div>
 						</div>
@@ -1844,16 +1856,31 @@
 
 			<!-- OTHER TABS (Users / Stages / Learning / Audit / Export) -->
 			{#if activeTab === 'users'}
-				<!-- SECTION 1: ตรวจสอบผู้เรียนทั้งหมด (LEARNERS SECTION - STRICTLY NO ADMINS) -->
-				<div class="rounded-3xl border border-rose-500/20 bg-card p-6 shadow-xs space-y-4">
-					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b">
+				<FrontendActionBanner
+					tabTitle="2. ผู้เรียน"
+					headline={atRiskUsers.length > 0
+						? `พบผู้เรียนกลุ่มเสี่ยง (GOP < 70%) จำนวน ${atRiskUsers.length} คน`
+						: 'ผู้เรียนทั้งหมดมีระดับคะแนนอยู่ในเกณฑ์ปกติ'}
+					bullets={[
+						`ผู้เรียนทั้งหมด ${data.stats.totalLearners} คน (ใช้งานวันนี้ ${data.stats.activeToday} คน)`,
+						`ยังไม่ส่งชุดฝึกซ่อมเสริม ${atRiskNotContacted.length} คน`
+					]}
+					chips={[
+						{ label: 'กลุ่มเสี่ยง', value: `${atRiskUsers.length} คน`, tone: atRiskUsers.length > 0 ? 'rose' : 'emerald' },
+						{ label: 'ส่งชุดฝึกแล้ว', value: `${data.teacherInterventions?.length ?? 0} ชุด`, tone: 'blue' }
+					]}
+					onCopied={(m) => showAnalyticsToast(m, 'success')}
+				/>
+				<!-- SECTION 1: ALL LEARNERS -->
+				<div class="rounded-2xl border border-border bg-card p-6 space-y-4">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border">
 						<div>
 							<div class="flex items-center gap-2">
-								<span class="rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 p-1.5"><Users class="size-4" /></span>
-								<h2 class="text-base font-black text-foreground">รายชื่อผู้เรียนทั้งหมด (All Learners Section)</h2>
+								<span class="rounded-lg border border-border bg-background text-primary p-1.5"><Users class="size-4" /></span>
+								<h2 class="text-base font-bold text-foreground">รายชื่อผู้เรียนทั้งหมด</h2>
 							</div>
 							<p class="text-xs text-muted-foreground mt-1">
-								ตรวจสอบความคืบหน้า คะแนนความแม่นยำ GOP และระบุผู้เรียนที่ต้องการการดูแล (แยกขาดจากบัญชีผู้ดูแลระบบ 100%)
+								ตรวจสอบความคืบหน้า คะแนน GOP และมอบหมายชุดฝึกเพิ่มเติม
 							</p>
 						</div>
 						<div class="flex flex-wrap items-center gap-2">
@@ -2034,20 +2061,90 @@
 			{/if}
 
 			{#if activeTab === 'mock_exams'}
-				<ExamDiagnosticsView skillsAnalytics={data.skillsAnalytics} />
+				<div class="space-y-4">
+					<FrontendActionBanner
+						tabTitle="6. ข้อสอบ HSK"
+						headline={(data.skillsAnalytics?.exam?.totalAttempts ?? 0) > 0
+							? `พาร์ทที่คะแนนเฉลี่ยต่ำสุดคือ "${frontendInsights.weakestExamSkill.name}" (${Math.round(frontendInsights.weakestExamSkill.val)}%)`
+							: 'ยังไม่มีผลสอบ HSK ในระบบ'}
+						bullets={[
+							`จำนวนการสอบสะสม ${data.skillsAnalytics?.exam?.totalAttempts ?? 0} ครั้ง`,
+							`อัตราสอบผ่านรวม ${data.skillsAnalytics?.exam?.passRate ?? 0}% (เกณฑ์ 180/300)`
+						]}
+						chips={[
+							{ label: 'คะแนนเฉลี่ย', value: `${data.skillsAnalytics?.exam?.avgScore ?? 0}/300`, tone: 'amber' },
+							{ label: 'พาร์ทต่ำสุด', value: `${Math.round(frontendInsights.weakestExamSkill.val)}%`, tone: 'rose' }
+						]}
+						onCopied={(m) => showAnalyticsToast(m, 'success')}
+					/>
+					<ExamDiagnosticsView skillsAnalytics={data.skillsAnalytics} />
+				</div>
 			{/if}
 
 			{#if activeTab === 'hanzi_writing'}
-				<HanziWritingView skillsAnalytics={data.skillsAnalytics} />
+				<div class="space-y-4">
+					<FrontendActionBanner
+						tabTitle="7. คัดอักษรจีน"
+						headline={frontendInsights.topWeakChar
+							? `ตัวอักษรที่ผิดบ่อยสุดคือ "${frontendInsights.topWeakChar.character}" (${frontendInsights.topWeakChar.totalMistakes} ครั้ง)`
+							: `ความแม่นยำลำดับขีดรวม ${data.skillsAnalytics?.writing?.strokeAccuracyPct ?? 0}% (${data.skillsAnalytics?.writing?.totalAttempts ?? 0} ครั้ง)`}
+						bullets={[
+							`ลากขีดถูกรอบเดียว ${data.skillsAnalytics?.writing?.perfectSequenceRatePct ?? 0}%`,
+							`เวลาเฉลี่ยต่อตัว ${data.skillsAnalytics?.writing?.avgDurationSec ?? 0} วินาที`
+						]}
+						chips={[
+							{ label: 'แม่นยำขีด', value: `${data.skillsAnalytics?.writing?.strokeAccuracyPct ?? 0}%`, tone: 'emerald' },
+							{ label: 'จำนวนครั้ง', value: `${data.skillsAnalytics?.writing?.totalAttempts ?? 0}`, tone: 'blue' }
+						]}
+						onCopied={(m) => showAnalyticsToast(m, 'success')}
+					/>
+					<HanziWritingView skillsAnalytics={data.skillsAnalytics} />
+				</div>
 			{/if}
 
 			{#if activeTab === 'ai_dialogue'}
-				<DialogueFluencyView skillsAnalytics={data.skillsAnalytics} />
+				<div class="space-y-4">
+					<FrontendActionBanner
+						tabTitle="8. สนทนา"
+						headline={frontendInsights.leastScenario
+							? `สถานการณ์ที่เล่นน้อยสุดคือ "${frontendInsights.leastScenario.scenarioTitle}" (${frontendInsights.leastScenario.sessionsCount} รอบ)`
+							: 'ยังไม่มีประวัติการสนทนาในระบบ'}
+						bullets={[
+							`บทสนทนาสะสม ${data.skillsAnalytics?.chatbot?.totalSessions ?? 0} รอบ (${data.skillsAnalytics?.chatbot?.totalTurns ?? 0} ประโยค)`,
+							frontendInsights.lowestScoreScenario
+								? `คะแนนเฉลี่ยต่ำสุด: ${frontendInsights.lowestScoreScenario.scenarioTitle} (${Math.round(frontendInsights.lowestScoreScenario.avgScore)}%)`
+								: 'กำลังเก็บสถิติคะแนนรายสถานการณ์'
+						]}
+						chips={[
+							{ label: 'รอบสนทนา', value: `${data.skillsAnalytics?.chatbot?.totalSessions ?? 0}`, tone: 'blue' },
+							{ label: 'คะแนนเฉลี่ย', value: `${data.skillsAnalytics?.chatbot?.avgScore ?? 0}%`, tone: 'emerald' }
+						]}
+						onCopied={(m) => showAnalyticsToast(m, 'success')}
+					/>
+					<DialogueFluencyView skillsAnalytics={data.skillsAnalytics} />
+				</div>
 			{/if}
 
 			{#if activeTab === 'stages'}
 				<!-- STAGES MANAGEMENT & PROGRESSION FUNNEL VIEW -->
-				<div class="space-y-6">
+				<div class="space-y-4">
+					<FrontendActionBanner
+						tabTitle="3. ด่านฝึกคำศัพท์"
+						headline={frontendInsights.lowestStage
+							? `ด่านคนเข้าน้อยสุดคือ "${frontendInsights.lowestStage.title}" (${frontendInsights.lowestStage.stats?.totalViews ?? 0} ครั้ง)${frontendInsights.hardestStage ? ` · ด่านหลุดสูงสุดคือ "${frontendInsights.hardestStage.title}" (${frontendInsights.hardestStage.stats?.dropRate ?? 0}%)` : ''}`
+							: 'สถิติการเข้าเล่นและอัตราผ่านรายด่าน'}
+						bullets={[
+							`อัตราออกกลางคันรวม ${activeLearningAnalytics?.dropOffFunnel?.overallDropOffRate ?? 0}%`,
+							frontendInsights.hardestStage
+								? `ด่าน ${frontendInsights.hardestStage.id} มีอัตราออกกลางคันสูงสุด`
+								: 'กดแก้ไขเพื่อปรับชุดคำศัพท์ของแต่ละด่านได้'
+						]}
+						chips={[
+							{ label: 'จำนวนด่านทั้งหมด', value: `${data.stages.length} ด่าน`, tone: 'blue' },
+							{ label: 'อัตราผ่านรวม', value: `${passRate}%`, tone: passRate >= 70 ? 'emerald' : 'amber' }
+						]}
+						onCopied={(m) => showAnalyticsToast(m, 'success')}
+					/>
 					<!-- Unified Top Header -->
 					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
 						<div class="flex items-center gap-3">
@@ -2194,33 +2291,94 @@
 			{/if}
 
 			{#if activeTab === 'flashcards'}
-				<FlashcardAnalyticsView flashcardAnalytics={data.flashcardAnalytics} />
+				<div class="space-y-4">
+					<FrontendActionBanner
+						tabTitle="4. แฟลชการ์ด"
+						headline={frontendInsights.lowestFcSet
+							? `ชุดที่ฝึกน้อยสุดคือ HSK ${frontendInsights.lowestFcSet.hskLevel} ชุดที่ ${frontendInsights.lowestFcSet.setIndex} (${frontendInsights.lowestFcSet.completionCount} รอบ) · HSK ${frontendInsights.lowestFcLevel.lvl} มีการใช้งานน้อยสุด`
+							: `ระดับ HSK ${frontendInsights.lowestFcLevel.lvl} มีรอบฝึกน้อยสุด (${frontendInsights.lowestFcLevel.totalCompletions} รอบ)`}
+						bullets={[
+							`ฝึกจบชุดสะสม ${data.flashcardAnalytics?.summary?.totalCompletions ?? 0} ครั้ง (${data.flashcardAnalytics?.summary?.uniqueLearners ?? 0} คน)`,
+							`อัตราจำแม่นเฉลี่ย ${data.flashcardAnalytics?.summary?.avgMasteryRatePct ?? 0}% (รอทวน ${data.flashcardAnalytics?.summary?.totalWordsReviewed ?? 0} คำ)`
+						]}
+						chips={[
+							{ label: 'ชุดที่ใช้งานน้อย', value: `HSK ${frontendInsights.lowestFcLevel.lvl}`, tone: 'blue' },
+							{ label: 'จำแม่นเฉลี่ย', value: `${data.flashcardAnalytics?.summary?.avgMasteryRatePct ?? 0}%`, tone: 'emerald' }
+						]}
+						onCopied={(m) => showAnalyticsToast(m, 'success')}
+					/>
+					<FlashcardAnalyticsView flashcardAnalytics={data.flashcardAnalytics} />
+				</div>
 			{/if}
 
-			{#if activeTab === 'tone_analytics' || activeTab === 'learning'}
-				<ToneAnalyticsView
-					{activeLearningAnalytics}
-					{tone1Accuracy}
-					{tone2Accuracy}
-					{tone3Accuracy}
-					{tone4Accuracy}
-					{toneSamples}
-					{toneSandhiStats}
-					bind:pitchSensitivitySetting
-					{learningPracticeMode}
-					onSavePitchTuning={handleSavePitchTuning}
-					onShowToast={showAnalyticsToast}
-					onChangePracticeMode={(mode) => (learningPracticeMode = mode)}
-				/>
-			{/if}
+			{#if activeTab === 'tone_analytics' || activeTab === 'listening_analytics' || activeTab === 'learning'}
+				<div class="space-y-4">
+					<FrontendActionBanner
+						tabTitle="5. ออกเสียง & คำศัพท์"
+						headline={frontendInsights.hardestWord
+							? `คำที่คะแนนเฉลี่ยต่ำสุดคือ "${frontendInsights.hardestWord.word}" (GOP เฉลี่ย ${frontendInsights.hardestWord.avgScore}% จาก ${frontendInsights.hardestWord.count} ครั้ง)`
+							: 'สถิติความแม่นยำคำศัพท์และวรรณยุกต์ 4 เสียง'}
+						bullets={[
+							tone23Stats.confusionRate !== null
+								? `สับสนเสียงวรรณยุกต์ 2 ↔ 3: ${tone23Stats.confusionRate}%`
+								: 'กำลังเก็บสถิติเสียง 2 ↔ 3',
+							`ผลต่างคะแนนเมื่อฟังตัวอย่างก่อนพูด: ${(activeLearningAnalytics?.lq5ListeningImpact?.deltaGop ?? 0) >= 0 ? '+' : ''}${activeLearningAnalytics?.lq5ListeningImpact?.deltaGop ?? 0}% GOP`
+						]}
+						chips={[
+							frontendInsights.hardestWord
+								? { label: 'คำคะแนนต่ำสุด', value: `${frontendInsights.hardestWord.word} (${frontendInsights.hardestWord.avgScore}%)`, tone: 'rose' }
+								: { label: 'คำคะแนนต่ำสุด', value: 'รอข้อมูล', tone: 'blue' },
+							{ label: 'สับสน 2↔3', value: `${tone23Stats.confusionRate ?? 0}%`, tone: 'blue' }
+						]}
+						onCopied={(m) => showAnalyticsToast(m, 'success')}
+					/>
 
-			{#if activeTab === 'listening_analytics'}
-				<ListeningImpactView
-					{activeLearningAnalytics}
-					bind:listeningPolicySetting
-					onSaveListeningPolicy={handleSaveListeningPolicy}
-					onShowToast={showAnalyticsToast}
-				/>
+					<!-- Clean Sub-Tab Switcher inside Tab 5 -->
+					<div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-2.5 shadow-2xs">
+						<span class="text-xs font-extrabold text-foreground">เลือกมุมมองย่อย:</span>
+						<div class="flex rounded-xl border bg-muted/30 p-0.5 text-xs">
+							<button
+								type="button"
+								onclick={() => { activeTab = 'tone_analytics'; pronunciationSubTab = 'words_tones'; }}
+								class="rounded-lg px-3 py-1 font-bold transition cursor-pointer {activeTab !== 'listening_analytics' && pronunciationSubTab === 'words_tones' ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}"
+							>
+								📊 คำที่ผ่านน้อย & วรรณยุกต์ 4 เสียง
+							</button>
+							<button
+								type="button"
+								onclick={() => { pronunciationSubTab = 'listening'; }}
+								class="rounded-lg px-3 py-1 font-bold transition cursor-pointer {activeTab === 'listening_analytics' || pronunciationSubTab === 'listening' ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'}"
+							>
+								🎧 ผลกระทบจากการฟังเสียง (Listening Impact)
+							</button>
+						</div>
+					</div>
+
+					{#if activeTab === 'listening_analytics' || pronunciationSubTab === 'listening'}
+						<ListeningImpactView
+							{activeLearningAnalytics}
+							bind:listeningPolicySetting
+							onSaveListeningPolicy={handleSaveListeningPolicy}
+							onShowToast={showAnalyticsToast}
+						/>
+					{:else}
+						<HardestWordsAnalyticsCard words={data.practiceBreakdown?.hardestWords || data.practiceBreakdown?.words || []} />
+						<ToneAnalyticsView
+							{activeLearningAnalytics}
+							{tone1Accuracy}
+							{tone2Accuracy}
+							{tone3Accuracy}
+							{tone4Accuracy}
+							{toneSamples}
+							{toneSandhiStats}
+							bind:pitchSensitivitySetting
+							{learningPracticeMode}
+							onSavePitchTuning={handleSavePitchTuning}
+							onShowToast={showAnalyticsToast}
+							onChangePracticeMode={(mode) => (learningPracticeMode = mode)}
+						/>
+					{/if}
+				</div>
 			{/if}
 
 
@@ -2355,33 +2513,108 @@
 			{/if}
 
 			{#if activeTab === 'export'}
-				<!-- EXPORT RESEARCH DATASET VIEW -->
-				<div class="rounded-3xl border bg-card p-6 shadow-xs space-y-4">
-					<div class="flex items-center gap-3">
-						<div class="flex size-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
-							<Download class="size-5" />
+				<!-- EXPORT RESEARCH DATASET VIEW (4 PUBLICATION-GRADE DATASETS) -->
+				<div class="rounded-3xl border bg-card p-6 sm:p-8 shadow-xs space-y-6">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+						<div class="flex items-center gap-3">
+							<div class="flex size-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
+								<Download class="size-5" />
+							</div>
+							<div>
+								<div class="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Research & Statistical Data Exporter</div>
+								<h3 class="font-black text-lg text-foreground">ส่งออกชุดข้อมูลวิจัยและสถิติระดับตีพิมพ์ (PDPA Anonymized)</h3>
+								<p class="text-xs text-muted-foreground">เข้ารหัส UTF-8 BOM พร้อมเปิดใน SPSS, R, Python (pandas), Jamovi, Excel และ LRS มาตรฐาน IEEE 9274.1.1</p>
+							</div>
 						</div>
-						<div>
-							<h3 class="font-extrabold text-sm text-foreground">ส่งออกชุดข้อมูลวิจัยและสถิติ (PDPA Compliant)</h3>
-							<p class="text-xs text-muted-foreground">รองรับการนำไปใช้ใน SPSS, Excel, R, Python</p>
-						</div>
+						<span class="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 px-3 py-1 text-xs font-bold">
+							Zero Audio Storage at Rest • SHA-256 Anonymized
+						</span>
 					</div>
 
-					<div class="flex flex-wrap gap-3 pt-2">
-						<a
-							href="/api/admin/export?format=csv"
-							download
-							class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 text-xs shadow-md transition flex items-center gap-2"
-						>
-							<FileSpreadsheet class="size-4" /> ดาวน์โหลดไฟล์ CSV Dataset
-						</a>
-						<a
-							href="/api/admin/export?format=xapi"
-							download
-							class="rounded-xl border bg-background hover:bg-muted font-bold px-4 py-2.5 text-xs transition flex items-center gap-2"
-						>
-							<FileCode class="size-4 text-blue-500" /> ดาวน์โหลดไฟล์ JSON xAPI Statements
-						</a>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<!-- Dataset 1: Pronunciation & Acoustic Evaluations CSV -->
+						<div class="rounded-2xl border bg-muted/15 p-5 flex flex-col justify-between space-y-4">
+							<div class="space-y-1.5">
+								<div class="flex items-center justify-between">
+									<span class="rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 text-[11px] font-bold">Dataset 1 • CSV</span>
+									<span class="font-mono text-[11px] text-muted-foreground">pronunciation_evaluations</span>
+								</div>
+								<h4 class="font-extrabold text-sm text-foreground">1. ข้อมูลประเมินเสียง สัทศาสตร์ & พฤติกรรมการฟัง (Acoustic + LQ5/LQ6)</h4>
+								<p class="text-xs text-muted-foreground leading-relaxed">
+									ประกอบด้วย GOP, PER, Tone Score, ระดับความชัดเจน (Clarity), รูปทรงกราฟ (Slope Type), จำนวนครั้งที่กดฟังตัวอย่าง (LQ5) และเวลาลังเลก่อนพูด (Hesitation Latency ms - LQ6)
+								</p>
+							</div>
+							<a
+								href="/api/admin/export?format=csv&dataset=evaluations"
+								download
+								class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 text-xs shadow-xs transition inline-flex items-center justify-center gap-2"
+							>
+								<FileSpreadsheet class="size-4" /> ดาวน์โหลด Acoustic & Telemetry CSV
+							</a>
+						</div>
+
+						<!-- Dataset 2: Paired Pre/Mid/Post Assessments + Hake's Gain g CSV -->
+						<div class="rounded-2xl border bg-muted/15 p-5 flex flex-col justify-between space-y-4">
+							<div class="space-y-1.5">
+								<div class="flex items-center justify-between">
+									<span class="rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2.5 py-0.5 text-[11px] font-bold">Dataset 2 • SPSS / R Ready</span>
+									<span class="font-mono text-[11px] text-muted-foreground">paired_assessments</span>
+								</div>
+								<h4 class="font-extrabold text-sm text-foreground">2. ตารางคู่ขนาน Pre-test / Mid-test / Post-test & Hake's Gain (g)</h4>
+								<p class="text-xs text-muted-foreground leading-relaxed">
+									จัดเรียง 1 แถวต่อ 1 ผู้เรียน พร้อมคอลัมน์ Pre/Mid/Post GOP, Tone Score, ΔGOP และดัชนีพัฒนาการสัมพัทธ์ Hake's Normalized Gain (g) สำหรับรัน Paired Sample t-test ทันที
+								</p>
+							</div>
+							<a
+								href="/api/admin/export?format=csv&dataset=paired_assessments"
+								download
+								class="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 text-xs shadow-xs transition inline-flex items-center justify-center gap-2"
+							>
+								<FileSpreadsheet class="size-4" /> ดาวน์โหลด Paired Pre/Mid/Post CSV
+							</a>
+						</div>
+
+						<!-- Dataset 3: Holistic 6-Skill Learner Portfolio CSV -->
+						<div class="rounded-2xl border bg-muted/15 p-5 flex flex-col justify-between space-y-4">
+							<div class="space-y-1.5">
+								<div class="flex items-center justify-between">
+									<span class="rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2.5 py-0.5 text-[11px] font-bold">Dataset 3 • 360° Portfolio</span>
+									<span class="font-mono text-[11px] text-muted-foreground">portfolio</span>
+								</div>
+								<h4 class="font-extrabold text-sm text-foreground">3. แฟ้มสะสมผลงานผู้เรียนรอบด้าน 6 ทักษะ (6-Skill Learner Matrix)</h4>
+								<p class="text-xs text-muted-foreground leading-relaxed">
+									สรุปผลสัมฤทธิ์รายบุคคลครบทั้ง 6 มิติ: การออกเสียง GOP, ความแม่นยำวรรณยุกต์, ด่านผจญภัย, การคัดอักษรจีน, ข้อสอบจำลอง HSK และการสนทนาโต้ตอบ AI
+								</p>
+							</div>
+							<a
+								href="/api/admin/export?format=csv&dataset=portfolio"
+								download
+								class="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2.5 text-xs shadow-xs transition inline-flex items-center justify-center gap-2"
+							>
+								<FileSpreadsheet class="size-4" /> ดาวน์โหลด 6-Skill Portfolio CSV
+							</a>
+						</div>
+
+						<!-- Dataset 4: IEEE xAPI 9274.1.1 JSON -->
+						<div class="rounded-2xl border bg-muted/15 p-5 flex flex-col justify-between space-y-4">
+							<div class="space-y-1.5">
+								<div class="flex items-center justify-between">
+									<span class="rounded-lg bg-blue-500/15 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 text-[11px] font-bold">Dataset 4 • IEEE 9274.1.1</span>
+									<span class="font-mono text-[11px] text-muted-foreground">xAPI LRS JSON</span>
+								</div>
+								<h4 class="font-extrabold text-sm text-foreground">4. มาตรฐาน IEEE xAPI Statements (Learning Record Store)</h4>
+								<p class="text-xs text-muted-foreground leading-relaxed">
+									ชุดข้อมูล JSON ตามโครงสร้าง Actor-Verb-Object-Result-Context ครบทุก Verb: pronounced, listened_to_example, hesitated, hanzi_written, exam_completed, dialogue_completed, flashcard_reviewed
+								</p>
+							</div>
+							<a
+								href="/api/admin/export?format=xapi"
+								download
+								class="rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold px-4 py-2.5 text-xs transition inline-flex items-center justify-center gap-2"
+							>
+								<FileCode class="size-4" /> ดาวน์โหลดไฟล์ JSON xAPI Statements
+							</a>
+						</div>
 					</div>
 				</div>
 

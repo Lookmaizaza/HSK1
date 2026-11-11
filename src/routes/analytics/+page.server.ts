@@ -7,9 +7,12 @@ import {
 	getPronunciationEvaluations,
 	getUserAssessmentStatus,
 	syncPretestToEvaluations,
-	getTeacherInterventions
+	getTeacherInterventions,
+	getUserFullDetail,
+	getProgress
 } from '$lib/server/db';
 import { generateRemedialVocab, type RemedialCard } from '$lib/analytics/remedialEngine';
+import { computeEmaAndRetention } from '$lib/analytics/statisticalEngine';
 import {
 	generateMistakeArticulationGuides,
 	type DynamicArticulationGuide
@@ -47,11 +50,40 @@ export type VocabItemMastery = {
 	category?: string;
 	attempts: number;
 	avgScore: number | null;
+	emaScore: number | null;
 	bestScore: number | null;
+	retentionPct: number | null;
+	halfLifeDays: number;
+	daysSinceLastPractice: number | null;
+	needsReview: boolean;
+	urgencyScore: number;
+	reviewReason: string | null;
 	status: WordMasteryStatus;
 	lastPracticed?: number;
 	questAttempts: number;
 	pitchAttempts: number;
+};
+
+export type SrsReviewItem = {
+	hanzi: string;
+	pinyin: string;
+	thai: string;
+	tone: number;
+	hskLevel: 1 | 2 | 3;
+	emaScore: number | null;
+	retentionPct: number | null;
+	halfLifeDays: number;
+	daysSinceLastPractice: number | null;
+	urgencyScore: number;
+	reviewReason: string;
+	status: WordMasteryStatus;
+};
+
+export type LearnerDailyTrendPoint = {
+	day: string;
+	label: string;
+	attempts: number;
+	avgGop: number | null;
 };
 
 export type HskLevelSummary = {
@@ -74,106 +106,148 @@ export type HskLevelSummary = {
 };
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const currentUserId = locals.user?.id ? String(locals.user.id) : 'usr_uuid_local';
-	
+	// Strict Data Isolation: Logged-in learners only query their own user_id (never mix User #1 or guest data)
+	const queryUserIds = locals.user?.id
+		? [String(locals.user.id)]
+		: ['usr_uuid_local', 'usr_uuid_guest'];
+
 	const assessmentStatus = locals.user
 		? await getUserAssessmentStatus(String(locals.user.id))
 		: { hasPre: false, hasMid: false, hasPost: false, summaries: {} };
 
 	if (locals.user && assessmentStatus.hasPre && !locals.user.isAdmin && !locals.user.isImpersonated) {
-		await syncPretestToEvaluations(String(locals.user.id)).catch(() => {});
+		await syncPretestToEvaluations(String(locals.user.id)).catch(() => { });
 	}
-	// Support querying both the user account and local/guest fallbacks
-	const queryUserIds = Array.from(
-		new Set([currentUserId, '1', 'usr_uuid_local', 'usr_uuid_guest'].filter(Boolean))
-	);
 
-	// Fetch historical diagnostic data & evaluations (up to 1,000 recent evaluations for full coverage analysis)
-	const [diagnosticData, topMistakes, recentMistakes, mistakeStats, learningEvents, evaluations, teacherInterventions] = await Promise.all([
+	// Fetch historical diagnostic data, 360° user portfolio & evaluations (up to 1,000 recent evaluations)
+	const [
+		diagnosticData,
+		topMistakes,
+		recentMistakes,
+		mistakeStats,
+		learningEvents,
+		evaluations,
+		teacherInterventions,
+		userFullDetail,
+		userProgress
+	] = await Promise.all([
 		getDiagnosticAnalytics(queryUserIds),
 		locals.user ? getTopMistakes(locals.user.id, 15) : Promise.resolve([]),
 		locals.user ? getUserMistakes(locals.user.id, 20) : Promise.resolve([]),
 		locals.user ? getMistakeStats(locals.user.id) : Promise.resolve({ totalMistakes: 0, uniqueWords: 0, toneErrors: {} }),
 		getLearningEvents(queryUserIds, undefined, 100),
 		getPronunciationEvaluations(queryUserIds, 1000),
-		locals.user ? getTeacherInterventions(String(locals.user.id)) : Promise.resolve([])
+		locals.user ? getTeacherInterventions(String(locals.user.id)) : Promise.resolve([]),
+		locals.user ? getUserFullDetail(locals.user.id).catch(() => null) : Promise.resolve(null),
+		locals.user ? getProgress(locals.user.id).catch(() => null) : Promise.resolve(null)
 	]);
 
-	// Build map of word evaluation statistics
-	const wordStatsMap = new Map<string, {
-		attempts: number;
-		totalScore: number;
-		bestScore: number;
-		lastPracticed: number;
-		questAttempts: number;
-		pitchAttempts: number;
-	}>();
+	// Build map of word evaluation statistics & chronological attempts for EMA + Ebbinghaus Forgetting Curve
+	const wordStatsMap = new Map<
+		string,
+		{
+			attemptsList: Array<{ score: number; timestampMs: number }>;
+			questAttempts: number;
+			pitchAttempts: number;
+		}
+	>();
 
 	for (const ev of evaluations) {
 		const key = normalizeWordId(ev.word_id);
 		if (!key) continue;
 		const score = ev.scores.gop_overall;
-		const details = ev.scores.phoneme_details || [];
-		const explicitMode = details[0]?.mode;
-		const isPitch = explicitMode ? explicitMode === 'free_pitch' : true;
+		const isStageMode = ev.practice_mode === 'stage' || ev.practice_mode === 'lesson';
 
 		const existing = wordStatsMap.get(key);
 		if (!existing) {
 			wordStatsMap.set(key, {
-				attempts: 1,
-				totalScore: score,
-				bestScore: score,
-				lastPracticed: ev.created_at,
-				questAttempts: isPitch ? 0 : 1,
-				pitchAttempts: isPitch ? 1 : 0
+				attemptsList: [{ score, timestampMs: ev.created_at }],
+				questAttempts: isStageMode ? 1 : 0,
+				pitchAttempts: isStageMode ? 0 : 1
 			});
 		} else {
-			existing.attempts++;
-			existing.totalScore += score;
-			existing.bestScore = Math.max(existing.bestScore, score);
-			existing.lastPracticed = Math.max(existing.lastPracticed, ev.created_at);
-			if (isPitch) {
-				existing.pitchAttempts++;
-			} else {
+			existing.attemptsList.push({ score, timestampMs: ev.created_at });
+			if (isStageMode) {
 				existing.questAttempts++;
+			} else {
+				existing.pitchAttempts++;
 			}
 		}
 	}
 
+	const nowMs = Date.now();
+	const srsCandidates: SrsReviewItem[] = [];
+
 	function processLevelWords(presets: TonePreset[], level: 1 | 2 | 3): VocabItemMastery[] {
 		return presets.map((p) => {
 			const stat = wordStatsMap.get(p.hanzi);
-			const attempts = stat?.attempts ?? 0;
-			const avgScore = attempts > 0 ? Math.round(stat!.totalScore / attempts) : null;
-			const bestScore = stat?.bestScore ?? null;
+			const attemptsList = stat?.attemptsList ?? [];
+			const emaRetention = computeEmaAndRetention(attemptsList, nowMs, 0.4);
+			const lastPracticed =
+				attemptsList.length > 0
+					? Math.max(...attemptsList.map((a) => a.timestampMs))
+					: undefined;
 
-			let status: WordMasteryStatus = 'unpracticed';
-			if (attempts > 0) {
-				if (avgScore !== null && avgScore >= 80) status = 'mastered';
-				else if (avgScore !== null && avgScore >= 60) status = 'learning';
-				else status = 'struggling';
-			}
-
-			return {
+			const item: VocabItemMastery = {
 				hanzi: p.hanzi,
 				pinyin: p.pinyin,
 				thai: p.thai,
 				tone: p.tone,
 				hskLevel: level,
 				category: p.category,
-				attempts,
-				avgScore,
-				bestScore,
-				status,
-				lastPracticed: stat?.lastPracticed,
+				attempts: emaRetention.attempts,
+				avgScore: emaRetention.emaScore ?? emaRetention.rawAvgScore,
+				emaScore: emaRetention.emaScore,
+				bestScore: emaRetention.bestScore,
+				retentionPct: emaRetention.retentionPct,
+				halfLifeDays: emaRetention.halfLifeDays,
+				daysSinceLastPractice: emaRetention.daysSinceLastPractice,
+				needsReview: emaRetention.needsReview,
+				urgencyScore: emaRetention.urgencyScore,
+				reviewReason: emaRetention.reviewReason,
+				status: emaRetention.status,
+				lastPracticed,
 				questAttempts: stat?.questAttempts ?? 0,
 				pitchAttempts: stat?.pitchAttempts ?? 0
 			};
+
+			if (emaRetention.needsReview && emaRetention.attempts > 0) {
+				srsCandidates.push({
+					hanzi: p.hanzi,
+					pinyin: p.pinyin,
+					thai: p.thai,
+					tone: p.tone,
+					hskLevel: level,
+					emaScore: emaRetention.emaScore,
+					retentionPct: emaRetention.retentionPct,
+					halfLifeDays: emaRetention.halfLifeDays,
+					daysSinceLastPractice: emaRetention.daysSinceLastPractice,
+					urgencyScore: emaRetention.urgencyScore,
+					reviewReason: emaRetention.reviewReason || 'ถึงกำหนดทบทวนตามกราฟความจำ',
+					status: emaRetention.status
+				});
+			}
+
+			return item;
 		});
 	}
 
+	const interventionWordTokens: string[] = [];
+	for (const inter of teacherInterventions || []) {
+		if (inter.status === 'pending' && Array.isArray(inter.wordProgress)) {
+			for (const wp of inter.wordProgress) {
+				if (!wp.passed && wp.hanzi) interventionWordTokens.push(wp.hanzi);
+			}
+		}
+	}
+
 	const diagnosticSummary = diagnosticData
-		? { hasData: diagnosticData.hasData, weakPhonemes: diagnosticData.weakPhonemes, weakTones: diagnosticData.weakTones }
+		? {
+			hasData: diagnosticData.hasData || interventionWordTokens.length > 0,
+			weakPhonemes: diagnosticData.weakPhonemes,
+			weakTones: diagnosticData.weakTones,
+			interventionWords: interventionWordTokens
+		}
 		: null;
 
 	// Build summaries for HSK 1, 2, 3
@@ -261,6 +335,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const totalStrugglingCount = hsk1Summary.strugglingCount + hsk2Summary.strugglingCount + hsk3Summary.strugglingCount;
 	const overallCoveragePercent = totalVocabularyCount > 0 ? Math.round((totalPracticedCount / totalVocabularyCount) * 100) : 0;
 
+	// Sort SRS review queue by urgencyScore descending
+	srsCandidates.sort((a, b) => b.urgencyScore - a.urgencyScore);
+	const srsQueue = srsCandidates.slice(0, 12);
+
+	if (diagnosticSummary) {
+		(diagnosticSummary as any).srsWords = srsQueue.map((s) => s.hanzi);
+	}
+
 	// Overall remedial cards (across all levels)
 	const allVocab = [...HSK1_VOCAB_PRESETS, ...HSK2_VOCAB_PRESETS, ...HSK3_VOCAB_PRESETS];
 	const overallRemedialCards = generateRemedialVocab(diagnosticSummary, allVocab, 8).map((c) => {
@@ -277,11 +359,75 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const allWords = [...hsk1Summary.words, ...hsk2Summary.words, ...hsk3Summary.words];
 	const overallArticulationGuides = generateMistakeArticulationGuides(allWords, 4);
 
+	// 7-day learner daily practice & GOP trend
+	const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+	const evalsByDay = new Map<string, number[]>();
+	for (const ev of evaluations) {
+		const dayStr = new Date(ev.created_at).toISOString().slice(0, 10);
+		const arr = evalsByDay.get(dayStr) ?? [];
+		arr.push(ev.scores.gop_overall);
+		evalsByDay.set(dayStr, arr);
+	}
+	const dailyTrend: LearnerDailyTrendPoint[] = Array.from({ length: 7 }, (_, idx) => {
+		const d = new Date();
+		d.setUTCHours(0, 0, 0, 0);
+		d.setUTCDate(d.getUTCDate() - (6 - idx));
+		const day = d.toISOString().slice(0, 10);
+		const [, m, dom] = day.split('-');
+		const scores = evalsByDay.get(day) ?? [];
+		return {
+			day,
+			label: `${Number(dom)} ${thaiMonths[Number(m) - 1] || m}`,
+			attempts: scores.length,
+			avgGop: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+		};
+	});
+
+	const completedStagesCount = userProgress
+		? Object.values(userProgress.completed || {}).filter((s) => s > 0).length
+		: 0;
+	const currentXp = userProgress?.xp ?? 0;
+
+	// Real 4-tone confusion pairs extracted directly from pitch/ONNX tone evaluations
+	const tonePairMap = new Map<string, { targetTone: number; detectedTone: number; count: number }>();
+	for (const ev of evaluations) {
+		const details = Array.isArray(ev.scores?.phoneme_details) ? ev.scores.phoneme_details : [];
+		for (const pd of details) {
+			const tTone = Number((pd as any).targetTone || 0);
+			const dTone = Number((pd as any).detectedTone || 0);
+			if (tTone >= 1 && tTone <= 4 && dTone >= 1 && dTone <= 4 && tTone !== dTone) {
+				const key = `${tTone}_${dTone}`;
+				const prev = tonePairMap.get(key);
+				if (prev) prev.count += 1;
+				else tonePairMap.set(key, { targetTone: tTone, detectedTone: dTone, count: 1 });
+			}
+		}
+	}
+	const toneConfusionPairs = Array.from(tonePairMap.values())
+		.sort((a, b) => b.count - a.count)
+		.slice(0, 6);
+
 	return {
 		user: locals.user || null,
 		hasPre: Boolean(assessmentStatus.hasPre),
+		hasMid: Boolean(assessmentStatus.hasMid),
+		hasPost: Boolean(assessmentStatus.hasPost),
+		assessmentStatus,
+		completedStagesCount,
+		currentXp,
+		learnerLevel: userProgress?.learnerLevel ?? 1,
+		levelExp: userProgress?.levelExp ?? 0,
+		streak: userProgress?.streak ?? 0,
 		teacherInterventions: teacherInterventions || [],
 		diagnostic: diagnosticData,
+		toneConfusionPairs,
+		radar6Axis: userFullDetail?.radar6Axis ?? null,
+		assessmentTrajectory: userFullDetail?.assessmentTrajectory ?? null,
+		writingPortfolio: userFullDetail?.writingPortfolio ?? null,
+		examPortfolio: userFullDetail?.examPortfolio ?? null,
+		chatbotPortfolio: userFullDetail?.chatbotPortfolio ?? null,
+		srsQueue,
+		dailyTrend,
 		levels,
 		vocabOverview: {
 			totalWords: totalVocabularyCount,

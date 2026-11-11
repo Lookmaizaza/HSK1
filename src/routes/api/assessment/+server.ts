@@ -48,7 +48,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				toneConfidence, 
 				toneScore, 
 				gopOverall, 
-				perOverall 
+				perOverall,
+				hesitationLatencyMs,
+				clarity,
+				audioDurationSec,
+				slopeType
 			} = body;
 
 			await recordAssessmentWord({
@@ -71,9 +75,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					const phonemeDetails = [{
 						phoneme: wordId,
 						score: toneScore ?? 0,
+						gop: gopOverall ?? toneScore ?? 0,
+						toneScore: toneScore ?? 0,
 						isMatch: isToneMatch,
 						targetTone: Number(targetTone),
-						detectedTone: Number(detectedTone)
+						detectedTone: Number(detectedTone),
+						hesitationLatencyMs: Number(hesitationLatencyMs || 0),
+						avgClarity: Number(clarity || 0),
+						slopeType: slopeType || null
 					}];
 
 					await recordPronunciationEvaluation({
@@ -83,7 +92,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 						practice_mode: 'assessment',
 						stage_id: String(testType || 'pre'),
 						attempt_number: 1,
-						audio_duration_sec: 1.0,
+						audio_duration_sec: Number(audioDurationSec || 1.0),
+						hesitation_ms: Number(hesitationLatencyMs || 0),
+						clarity: Number(clarity || 0),
+						slope_type: slopeType ? String(slopeType) : null,
 						scores: {
 							gop_overall: Number(gopOverall ?? toneScore ?? 0),
 							per_overall: Number(perOverall ?? (isToneMatch ? 0 : 25)),
@@ -104,8 +116,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 							status: isToneMatch ? 'correct' : 'substitution',
 							target: pt.phoneme,
 							recognized: isToneMatch ? pt.phoneme : '?',
-							practiceMode: 'word' as const,
-							stageId: undefined
+							practiceMode: 'assessment' as const,
+							stageId: String(testType || 'pre')
 						}));
 						await recordPhonemeEvaluations(phonemeRecords);
 					}

@@ -20,6 +20,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const typeParam = url.searchParams.get('type');
 	let requestedType: AssessmentType | null;
 
+	if (typeParam === 'boss') {
+		return {
+			user,
+			status,
+			requestedType: 'boss' as const,
+			learnerLevel: progress.learnerLevel,
+			levelExp: progress.levelExp
+		};
+	}
+
 	if (typeParam) {
 		const isAssessmentType = ['pre', 'mid', 'post'].includes(typeParam);
 		const type = isAssessmentType ? (typeParam as AssessmentType) : null;

@@ -32,7 +32,14 @@
 	const current = $derived(lesson.phrases[index]);
 	const progressPct = $derived(Math.round((index / lesson.phrases.length) * 100));
 
+	let phraseReadyAt = $state<number>(Date.now());
+	let phraseListenCount = $state<number>(0);
+	let phraseListenTimestamps = $state<number[]>([]);
+	let phraseAttemptCount = $state<number>(0);
+
 	function playAudio() {
+		phraseListenCount++;
+		phraseListenTimestamps = [...phraseListenTimestamps, Date.now()];
 		speak(current.hanzi);
 	}
 
@@ -45,6 +52,8 @@
 			activeListener?.stop();
 			return;
 		}
+		phraseAttemptCount++;
+		const hesitationMs = Math.max(0, Date.now() - phraseReadyAt);
 		status = 'listening';
 		heard = '';
 		feedback = '';
@@ -83,6 +92,47 @@
 				corrected = data.corrected;
 				status = data.correct ? 'correct' : 'incorrect';
 			}
+
+			const isLessonPass = status === 'correct';
+			fetch('/api/v1/telemetry/score-ingest', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					eventType: 'pronunciation_evaluation',
+					timestamp: new Date().toISOString(),
+					practiceMode: 'lesson',
+					stageId: `${unit.id}_${lesson.id}`,
+					word: {
+						id: current.hanzi,
+						hanzi: current.hanzi,
+						pinyin: current.pinyin,
+						meaning: current.english || '',
+						expectedTone: lesson.tone ?? 1
+					},
+					behavior: {
+						listenedToExample: phraseListenCount > 0,
+						listenCount: phraseListenCount,
+						listenTimestamps: [...phraseListenTimestamps],
+						hesitationLatencyMs: hesitationMs,
+						attemptNumber: phraseAttemptCount
+					},
+					assessment: {
+						isPassed: isLessonPass,
+						overallScore: score,
+						rawScore: score,
+						isToneMatch: isLessonPass,
+						isWordMatch: isLessonPass,
+						recognizedWord: heard || undefined,
+						speechCandidates: heard ? [heard] : [],
+						syllableResults: [],
+						acoustics: {
+							avgF0: 0,
+							totalDurationMs: 0
+						},
+						overallFeedback: feedback
+					}
+				})
+			}).catch(() => {});
 
 			if (status === 'correct') {
 				correctCount += 1;
@@ -138,6 +188,10 @@
 			heard = '';
 			feedback = '';
 			corrected = null;
+			phraseReadyAt = Date.now();
+			phraseListenCount = 0;
+			phraseListenTimestamps = [];
+			phraseAttemptCount = 0;
 		} else {
 			finishLesson();
 		}

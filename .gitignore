@@ -1,33 +1,47 @@
+# Dependencies
 node_modules
+package-lock.json
 
-# Output
+# Build & Deploy Output
 .output
 .vercel
 .netlify
 .wrangler
 /.svelte-kit
 /build
+dist/
 
-# OS
+# OS & Logs
 .DS_Store
 Thumbs.db
+*.log
+npm-debug.log*
+pnpm-debug.log*
 
-# Env
+# Env (keep templates tracked)
 .env
 .env.*
 !.env.example
 !.env.test
 
-# Local DB
+# Local Databases
 /data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Test & Coverage Artifacts
+coverage/
+test-results/
+playwright-report/
 
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-.vercel
-.env*
+# Python / ML Artifacts
 __pycache__/
 *.pyc
-
 *.npz

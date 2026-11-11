@@ -1,12 +1,18 @@
-// xAPI (Experience API / Tin Can) Telemetry Formatter for HSK Pronunciation Assessment
-// Generates standard-compliant xAPI Statements for LRS (Learning Record Store) integration.
+// xAPI (Experience API / IEEE 9274.1.1) Telemetry Formatter for HSK Learning Analytics
+// Generates standard-compliant xAPI Statements for LRS (Learning Record Store) integration
+// across all 3 core acoustic verbs (pronounced, listened_to_example, hesitated) and
+// cross-skill activities (hanzi_written, flashcard_reviewed, exam_completed, dialogue_completed).
 
 import crypto from 'crypto';
+
+export type PracticeModeType = 'stage' | 'word' | 'flashcard' | 'lesson' | 'assessment' | 'unknown';
 
 export type ListeningBehavior = {
 	listenedToExample: boolean;
 	listenCount: number;
 	listenTimestamps: number[];
+	hesitationLatencyMs?: number; // LQ6: Time from word display / audio end until recording starts
+	attemptNumber?: number; // Attempt index for this word in the current session
 };
 
 export type WordTargetInfo = {
@@ -28,11 +34,16 @@ export type SyllableAssessmentDetail = {
 	score: number;
 	feedback: string;
 	isAIModel?: boolean;
+	slope?: string;
 };
 
 export type AcousticMetrics = {
 	avgF0: number;
 	totalDurationMs: number;
+	avgClarity?: number; // YIN periodicity clarity (0.0 - 1.0)
+	slopeType?: 'flat' | 'rising' | 'dipping' | 'falling' | 'neutral' | string;
+	chaoContour?: string; // e.g. '55', '35', '214', '51'
+	isToneSandhi?: boolean;
 };
 
 export type PronunciationAssessmentTelemetry = {
@@ -40,7 +51,7 @@ export type PronunciationAssessmentTelemetry = {
 	timestamp: string;
 	userId?: string | number;
 	username?: string;
-	practiceMode?: 'stage' | 'word';
+	practiceMode?: PracticeModeType;
 	stageId?: string;
 	word: WordTargetInfo;
 	behavior: ListeningBehavior;
@@ -87,14 +98,15 @@ export type XApiStatement = {
 		};
 	};
 	result: {
-		score: {
+		score?: {
 			scaled: number;
 			raw: number;
 			min: number;
 			max: number;
 		};
-		success: boolean;
-		completion: boolean;
+		success?: boolean;
+		completion?: boolean;
+		duration?: string;
 		response?: string;
 		extensions?: Record<string, unknown>;
 	};
@@ -108,7 +120,15 @@ export type XApiStatement = {
 };
 
 /**
- * Converts pronunciation telemetry payload into standard xAPI Statements (ADL xAPI 1.0.3)
+ * Threshold in milliseconds above which a pre-speaking delay is classified as a cognitive hesitation event (LQ6).
+ */
+export const HESITATION_THRESHOLD_MS = 2500;
+
+/**
+ * Converts pronunciation telemetry payload into standard IEEE 9274.1.1 xAPI Statements:
+ * 1. assessmentStatement ('pronounced')
+ * 2. listeningStatement ('listened_to_example' — LQ5)
+ * 3. hesitationStatement ('hesitated' — LQ6 when hesitationLatencyMs >= 2500ms or attemptNumber > 1)
  */
 export function convertTelemetryToXApi(
 	telemetry: PronunciationAssessmentTelemetry,
@@ -120,6 +140,7 @@ export function convertTelemetryToXApi(
 ): {
 	assessmentStatement: XApiStatement;
 	listeningStatement?: XApiStatement;
+	hesitationStatement?: XApiStatement;
 } {
 	const baseUrl = options.appBaseUrl || 'https://hsk.app';
 	const actorName = options.learnerName || telemetry.username || `Learner_${telemetry.userId || 'Guest'}`;
@@ -136,8 +157,10 @@ export function convertTelemetryToXApi(
 			};
 
 	const wordId = `${baseUrl}/vocab/${encodeURIComponent(telemetry.word.hanzi)}`;
+	const hesitationMs = Math.max(0, Math.round(Number(telemetry.behavior.hesitationLatencyMs || 0)));
+	const attemptNumber = Math.max(1, Math.round(Number(telemetry.behavior.attemptNumber || 1)));
 
-	// 1. Main Assessment xAPI Statement
+	// 1. Main Assessment xAPI Statement (pronounced)
 	const assessmentStatement: XApiStatement = {
 		id: crypto.randomUUID(),
 		actor,
@@ -176,16 +199,22 @@ export function convertTelemetryToXApi(
 			completion: true,
 			response: telemetry.assessment.recognizedWord || undefined,
 			extensions: {
-				// Extension: Listening sequence & behavior
+				// Extension: Listening sequence & behavior (LQ5 & LQ6)
 				'https://hsk.app/xapi/ext/listening-behavior': {
 					listenedToExample: telemetry.behavior.listenedToExample,
 					listenCount: telemetry.behavior.listenCount,
-					listenTimestamps: telemetry.behavior.listenTimestamps
+					listenTimestamps: telemetry.behavior.listenTimestamps,
+					hesitationLatencyMs: hesitationMs,
+					attemptNumber
 				},
 				// Extension: Acoustic and Pitch Metrics
 				'https://hsk.app/xapi/ext/acoustics': {
 					avgF0: telemetry.assessment.acoustics.avgF0,
-					totalDurationMs: telemetry.assessment.acoustics.totalDurationMs
+					totalDurationMs: telemetry.assessment.acoustics.totalDurationMs,
+					avgClarity: telemetry.assessment.acoustics.avgClarity ?? null,
+					slopeType: telemetry.assessment.acoustics.slopeType ?? null,
+					chaoContour: telemetry.assessment.acoustics.chaoContour ?? null,
+					isToneSandhi: telemetry.assessment.acoustics.isToneSandhi ?? false
 				},
 				// Extension: Word & Tone Verification Status
 				'https://hsk.app/xapi/ext/verification': {
@@ -212,12 +241,16 @@ export function convertTelemetryToXApi(
 						}
 					}
 				]
+			},
+			extensions: {
+				'https://hsk.app/xapi/ext/practice-mode': telemetry.practiceMode || 'unknown',
+				'https://hsk.app/xapi/ext/stage-id': telemetry.stageId || null
 			}
 		},
 		timestamp: telemetry.timestamp || new Date().toISOString()
 	};
 
-	// 2. Optional Listening Activity Statement (if user listened to example audio)
+	// 2. Listening Activity Statement (LQ5: listened_to_example)
 	let listeningStatement: XApiStatement | undefined;
 	if (telemetry.behavior.listenedToExample && telemetry.behavior.listenCount > 0) {
 		listeningStatement = {
@@ -262,8 +295,154 @@ export function convertTelemetryToXApi(
 		};
 	}
 
+	// 3. Hesitation Activity Statement (LQ6: hesitated before speaking or retried after pause)
+	let hesitationStatement: XApiStatement | undefined;
+	if (hesitationMs >= HESITATION_THRESHOLD_MS || (attemptNumber > 1 && hesitationMs >= 1200)) {
+		hesitationStatement = {
+			id: crypto.randomUUID(),
+			actor,
+			verb: {
+				id: 'https://hsk.app/xapi/verbs/hesitated',
+				display: {
+					'en-US': 'hesitated before pronouncing',
+					'th-TH': 'ลังเลก่อนออกเสียงคำว่า'
+				}
+			},
+			object: {
+				id: `${wordId}/hesitation`,
+				definition: {
+					name: {
+						'zh-CN': telemetry.word.hanzi,
+						'en-US': `Hesitation Latency on ${telemetry.word.hanzi} (${telemetry.word.pinyin})`,
+						'th-TH': `ความล่าช้าก่อนออกเสียงคำว่า ${telemetry.word.hanzi} (${telemetry.word.pinyin})`
+					},
+					type: 'http://adlnet.gov/expapi/activities/cmi.interaction'
+				}
+			},
+			result: {
+				score: {
+					scaled: Number(Math.min(1, hesitationMs / 10000).toFixed(3)),
+					raw: hesitationMs,
+					min: 0,
+					max: 30000
+				},
+				success: telemetry.assessment.isPassed,
+				completion: true,
+				duration: `PT${(hesitationMs / 1000).toFixed(2)}S`,
+				extensions: {
+					'https://hsk.app/xapi/ext/hesitation-latency-ms': hesitationMs,
+					'https://hsk.app/xapi/ext/attempt-number': attemptNumber,
+					'https://hsk.app/xapi/ext/listened-before-attempt': telemetry.behavior.listenedToExample,
+					'https://hsk.app/xapi/ext/listen-count': telemetry.behavior.listenCount,
+					'https://hsk.app/xapi/ext/subsequent-score': telemetry.assessment.overallScore
+				}
+			},
+			timestamp: telemetry.timestamp || new Date().toISOString()
+		};
+	}
+
 	return {
 		assessmentStatement,
-		listeningStatement
+		listeningStatement,
+		hesitationStatement
+	};
+}
+
+/**
+ * Generates an IEEE 9274.1.1 xAPI Statement for cross-skill learning activities:
+ * - 'hanzi_written': Stroke-order writing attempt
+ * - 'flashcard_reviewed': Flashcard deck completion & self-assessment
+ * - 'exam_completed': Mock HSK exam submission
+ * - 'dialogue_completed': AI Role-play conversation completion
+ */
+export function createSkillXApiStatement(params: {
+	userId: string | number;
+	username?: string;
+	eventType: 'hanzi_written' | 'flashcard_reviewed' | 'exam_completed' | 'dialogue_completed';
+	objectId: string;
+	objectNameZh?: string;
+	objectNameTh: string;
+	scoreRaw: number;
+	scoreMax: number;
+	success: boolean;
+	durationMs?: number;
+	extensions?: Record<string, unknown>;
+	appBaseUrl?: string;
+}): XApiStatement {
+	const baseUrl = params.appBaseUrl || 'https://hsk.app';
+	const actorId = String(params.userId || 'guest');
+	const actorName = params.username || `Learner_${actorId}`;
+
+	const verbMap: Record<typeof params.eventType, { id: string; en: string; th: string; actType: string }> = {
+		hanzi_written: {
+			id: 'http://activitystrea.ms/schema/1.0/author',
+			en: 'wrote Chinese character',
+			th: 'ฝึกคัดอักษรจีนลำดับขีด',
+			actType: 'http://adlnet.gov/expapi/activities/cmi.interaction'
+		},
+		flashcard_reviewed: {
+			id: 'https://w3id.org/xapi/adl/verbs/reviewed',
+			en: 'reviewed flashcard set',
+			th: 'ทบทวนชุดบัตรคำศัพท์',
+			actType: 'http://adlnet.gov/expapi/activities/module'
+		},
+		exam_completed: {
+			id: 'http://adlnet.gov/expapi/verbs/completed',
+			en: 'completed mock HSK exam',
+			th: 'ทำข้อสอบจำลอง HSK เสร็จสิ้น',
+			actType: 'http://adlnet.gov/expapi/activities/assessment'
+		},
+		dialogue_completed: {
+			id: 'http://adlnet.gov/expapi/verbs/interacted',
+			en: 'completed AI role-play dialogue',
+			th: 'ฝึกสนทนาจำลองสถานการณ์กับ AI',
+			actType: 'http://adlnet.gov/expapi/activities/simulation'
+		}
+	};
+
+	const v = verbMap[params.eventType];
+	const maxScore = Math.max(1, params.scoreMax);
+	const scaled = Math.max(0, Math.min(1, Number((params.scoreRaw / maxScore).toFixed(3))));
+
+	return {
+		id: crypto.randomUUID(),
+		actor: {
+			name: actorName,
+			account: {
+				homePage: baseUrl,
+				name: actorId
+			}
+		},
+		verb: {
+			id: v.id,
+			display: {
+				'en-US': v.en,
+				'th-TH': v.th
+			}
+		},
+		object: {
+			id: `${baseUrl}/activities/${params.eventType}/${encodeURIComponent(params.objectId)}`,
+			definition: {
+				name: {
+					...(params.objectNameZh ? { 'zh-CN': params.objectNameZh } : {}),
+					'th-TH': params.objectNameTh,
+					'en-US': params.objectNameTh
+				},
+				type: v.actType
+			}
+		},
+		result: {
+			score: {
+				scaled,
+				raw: params.scoreRaw,
+				min: 0,
+				max: maxScore
+			},
+			success: params.success,
+			completion: true,
+			...(params.durationMs ? { duration: `PT${(params.durationMs / 1000).toFixed(1)}S` } : {}),
+			extensions: params.extensions || {}
+		},
+		timestamp: new Date().toISOString()
 	};
 }

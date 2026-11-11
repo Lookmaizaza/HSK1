@@ -239,6 +239,50 @@
 		{/each}
 	</div>
 
+	<!-- Visual Deck Traffic Bar Chart -->
+	{#if filteredSetStats.length > 0}
+		{@const chartSets = filteredSetStats.slice(0, 12)}
+		{@const maxCompletions = Math.max(5, ...chartSets.map((s) => s.completionCount))}
+		<section class="rounded-2xl border bg-card p-4 sm:p-5 shadow-xs space-y-3">
+			<div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
+				<div class="flex items-center gap-2">
+					<TrendingUp class="size-4 text-emerald-500" />
+					<h3 class="text-xs sm:text-sm font-black text-foreground">
+						กราฟปริมาณการเข้าฝึกแยกตามชุดแฟลชการ์ด (เทียบจำนวนครั้ง & อัตราจำแม่น)
+					</h3>
+				</div>
+				<div class="flex items-center gap-3 text-[10px] font-bold text-muted-foreground">
+					<span class="inline-flex items-center gap-1"><span class="size-2 rounded-xs bg-emerald-500"></span> จำแม่น ≥ 75%</span>
+					<span class="inline-flex items-center gap-1"><span class="size-2 rounded-xs bg-amber-500"></span> จำแม่น 50–74%</span>
+					<span class="inline-flex items-center gap-1"><span class="size-2 rounded-xs bg-rose-500"></span> ควรทบทวน &lt; 50%</span>
+				</div>
+			</div>
+
+			<div class="w-full overflow-x-auto">
+				<svg viewBox="0 0 {Math.max(460, chartSets.length * 46 + 40)} 155" class="w-full h-auto max-h-[180px] min-w-[420px] select-none">
+					{#each [0, 50, 100] as pct (pct)}
+						{@const y = 120 - (pct / 100) * 95}
+						<line x1="30" y1={y} x2={Math.max(440, chartSets.length * 46 + 25)} y2={y} stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3 3" />
+						<text x="24" y={y + 3} text-anchor="end" class="fill-muted-foreground font-mono text-[8.5px]">{Math.round((maxCompletions * pct) / 100)}</text>
+					{/each}
+
+					{#each chartSets as st, i (`bar_${st.hskLevel}_${st.setIndex}`)}
+						{@const x = 44 + i * 44}
+						{@const h = Math.max(6, (st.completionCount / maxCompletions) * 95)}
+						{@const fillCol = st.avgMasteryRatePct >= 75 ? '#10b981' : st.avgMasteryRatePct >= 50 ? '#f59e0b' : '#f43f5e'}
+						<g>
+							<title>HSK {st.hskLevel} ชุด {st.setIndex}: {st.completionCount} ครั้ง · จำแม่น {st.avgMasteryRatePct}%</title>
+							<rect x={x} y={120 - h} width="24" height={h} rx="4" fill={fillCol} opacity="0.88" />
+							<text x={x + 12} y={Math.max(12, 115 - h)} text-anchor="middle" class="fill-foreground font-mono font-black text-[8.5px]">{st.completionCount}</text>
+							<text x={x + 12} y="136" text-anchor="middle" class="fill-foreground font-bold text-[8.5px]">H{st.hskLevel}-{st.setIndex}</text>
+							<text x={x + 12} y="147" text-anchor="middle" class="fill-muted-foreground font-mono text-[7.5px]">{st.avgMasteryRatePct}%</text>
+						</g>
+					{/each}
+				</svg>
+			</div>
+		</section>
+	{/if}
+
 	<!-- Sets Statistics Table -->
 	<section class="rounded-3xl border bg-card p-6 shadow-xs space-y-4">
 		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-3">

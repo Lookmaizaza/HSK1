@@ -25,16 +25,16 @@
 	}
 </script>
 
-<div class="min-h-svh bg-gradient-to-b from-emerald-50 to-white">
+<div class="min-h-svh bg-background">
 	<header class="mx-auto max-w-3xl px-4 py-6">
-		<a href="/" class="flex items-center gap-2 font-extrabold tracking-tight">
-			<span class="flex size-9 items-center justify-center rounded-xl bg-primary text-xl text-primary-foreground">語</span>
+		<a href="/" class="flex items-center gap-2 font-bold tracking-tight">
+			<span class="flex size-9 items-center justify-center rounded-xl bg-primary text-lg text-primary-foreground">語</span>
 			<span class="text-lg">ปากจีน</span>
 		</a>
 	</header>
 
 	<main class="mx-auto max-w-md px-4 pb-16">
-		<div class="rounded-3xl border bg-card p-6 shadow-sm">
+		<div class="rounded-2xl border border-border bg-card p-6">
 			<div class="mb-5 flex gap-1 rounded-xl bg-muted p-1">
 				<button
 					type="button"

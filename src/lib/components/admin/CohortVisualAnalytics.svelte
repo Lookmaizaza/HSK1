@@ -65,6 +65,9 @@
 					: 0
 		)
 	);
+	const pairedTTest = $derived(assessmentData?.pairedTTest || null);
+	const tonePairedTTest = $derived(assessmentData?.tonePairedTTest || null);
+	const avgNormalizedGainG = $derived(assessmentData?.avgNormalizedGainG ?? null);
 
 	// Phase Categories for Grouped Bar & Trend Line (Full-width 760px viewBox)
 	const phasesList = $derived([
@@ -258,43 +261,40 @@
 	<!-- ========================================================================= -->
 	<!-- BLOCK A: Longitudinal Assessment Growth (Grouped Bar Chart)               -->
 	<!-- ========================================================================= -->
-	<section class="rounded-3xl border border-border/70 bg-card p-6 shadow-xs relative overflow-hidden">
-		<!-- Decorative subtle glow -->
-		<div class="absolute -top-16 -right-16 size-48 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none"></div>
-
+	<section class="rounded-2xl border border-border bg-card p-6 relative overflow-hidden">
 		<!-- Block Header -->
-		<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border/60">
+		<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-border">
 			<div class="flex items-center gap-3">
-				<div class="flex size-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
-					<TrendingUp class="size-6" />
+				<div class="flex size-10 items-center justify-center rounded-xl border border-border bg-background text-primary shrink-0">
+					<TrendingUp class="size-5" />
 				</div>
 				<div>
 					<div class="flex items-center gap-2 flex-wrap">
-						<h3 class="text-lg font-black text-foreground">
-							การประเมินพัฒนาการระยะยาวของผู้เรียน (ก่อนเรียน ➔ กลางภาค ➔ หลังจบหลักสูตร)
+						<h3 class="text-base sm:text-lg font-bold text-foreground">
+							พัฒนาการผู้เรียนตามช่วงเวลา (Pre → Mid → Post)
 						</h3>
-						<span class="rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 text-xs font-bold">
-							ภาพรวมผู้เรียนทั้งรุ่น
+						<span class="rounded-md border border-border bg-muted text-foreground px-2 py-0.5 text-xs font-medium">
+							ภาพรวมกลุ่ม
 						</span>
 					</div>
 					<p class="text-xs text-muted-foreground mt-0.5">
-						เปรียบเทียบพัฒนาการ 3 ระยะ (ความชัดเจน GOP %, วรรณยุกต์ %, ความถูกต้องคำ) ข้ามช่วงเวลาการเรียนรู้
+						เปรียบเทียบคะแนน GOP, วรรณยุกต์ และความถูกต้องทั้ง 3 ระยะ
 					</p>
 				</div>
 			</div>
 
-			<!-- Chart Legend in Header -->
-			<div class="flex flex-wrap items-center gap-4 text-xs font-semibold text-muted-foreground bg-muted/20 px-3.5 py-2 rounded-2xl border border-border/40 shrink-0">
+			<!-- Chart Legend -->
+			<div class="flex flex-wrap items-center gap-4 text-xs font-medium text-muted-foreground bg-background px-3.5 py-2 rounded-xl border border-border shrink-0">
 				<div class="flex items-center gap-2">
-					<span class="size-3 rounded-sm bg-indigo-500 inline-block shadow-2xs"></span>
+					<span class="size-2.5 rounded-xs bg-indigo-500 inline-block"></span>
 					<span class="text-foreground">Avg GOP (%)</span>
 				</div>
 				<div class="flex items-center gap-2">
-					<span class="size-3 rounded-sm bg-amber-500 inline-block shadow-2xs"></span>
+					<span class="size-2.5 rounded-xs bg-amber-500 inline-block"></span>
 					<span class="text-foreground">Tone Score (%)</span>
 				</div>
 				<div class="flex items-center gap-2">
-					<span class="size-3 rounded-sm bg-emerald-500 inline-block shadow-2xs"></span>
+					<span class="size-2.5 rounded-xs bg-emerald-500 inline-block"></span>
 					<span class="text-foreground">Correct Tones (%)</span>
 				</div>
 			</div>
@@ -403,6 +403,91 @@
 					<!-- Base X axis line -->
 					<line x1="55" y1="200" x2="725" y2="200" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.5" />
 				</svg>
+			</div>
+		</div>
+
+		<!-- Publication-Grade Inferential Statistics Ribbon (Paired Sample t-test, Cohen's d, Hake's Gain g, 95% CI) -->
+		<div class="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+			<div class="rounded-2xl border border-indigo-500/25 bg-indigo-500/5 p-3.5 text-center">
+				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hake's Gain (⟨g⟩)</div>
+				<div class="mt-1 font-mono text-xl font-black text-indigo-600 dark:text-indigo-400">
+					{avgNormalizedGainG !== null ? avgNormalizedGainG.toFixed(2) : '—'}
+				</div>
+				<div class="mt-0.5 text-[10px] text-muted-foreground">
+					{avgNormalizedGainG === null
+						? 'รอคู่สอบ Pre-Post'
+						: avgNormalizedGainG >= 0.7
+							? 'High Gain (≥0.70)'
+							: avgNormalizedGainG >= 0.3
+								? 'Medium Gain (0.30–0.69)'
+								: 'Low Gain (<0.30)'}
+				</div>
+			</div>
+
+			<div class="rounded-2xl border border-border/70 bg-muted/20 p-3.5 text-center">
+				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Paired t-Statistic</div>
+				<div class="mt-1 font-mono text-xl font-black text-foreground">
+					{pairedTTest && pairedTTest.n >= 2 ? `t = ${pairedTTest.tStat.toFixed(2)}` : '—'}
+				</div>
+				<div class="mt-0.5 text-[10px] font-mono text-muted-foreground">
+					df = {pairedTTest?.df ?? 0} (N = {pairedTTest?.n ?? pairedCount})
+				</div>
+			</div>
+
+			<div class="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-3.5 text-center">
+				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Two-Tailed p-Value</div>
+				<div class="mt-1 font-mono text-xl font-black {pairedTTest?.isSignificant05 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}">
+					{#if pairedTTest && pairedTTest.n >= 2}
+						{pairedTTest.pValue < 0.001 ? 'p < .001***' : `p = ${pairedTTest.pValue.toFixed(3)}`}
+					{:else}
+						—
+					{/if}
+				</div>
+				<div class="mt-0.5 text-[10px] text-muted-foreground">
+					{pairedTTest?.isSignificant01
+						? 'นัยสำคัญ α = .01'
+						: pairedTTest?.isSignificant05
+							? 'นัยสำคัญ α = .05'
+							: 'รอเพิ่มกลุ่มตัวอย่าง'}
+				</div>
+			</div>
+
+			<div class="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3.5 text-center">
+				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Effect Size (Cohen's d)</div>
+				<div class="mt-1 font-mono text-xl font-black text-amber-600 dark:text-amber-400">
+					{pairedTTest && pairedTTest.n >= 2 ? `d = ${pairedTTest.cohensD.toFixed(2)}` : '—'}
+				</div>
+				<div class="mt-0.5 text-[10px] text-muted-foreground">
+					{pairedTTest?.effectSizeLabel || 'รอข้อมูลคู่ขนาน'}
+				</div>
+			</div>
+
+			<div class="rounded-2xl border border-border/70 bg-muted/20 p-3.5 text-center">
+				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">95% CI of ΔGOP</div>
+				<div class="mt-1 font-mono text-sm font-black text-foreground pt-1">
+					{#if pairedTTest && pairedTTest.n >= 2}
+						[{pairedTTest.ci95Lower > 0 ? '+' : ''}{pairedTTest.ci95Lower}, {pairedTTest.ci95Upper > 0 ? '+' : ''}{pairedTTest.ci95Upper}]
+					{:else}
+						—
+					{/if}
+				</div>
+				<div class="mt-1 text-[10px] font-mono text-muted-foreground">
+					Mean Δ = {pairedTTest ? `${pairedTTest.meanDiff > 0 ? '+' : ''}${pairedTTest.meanDiff}%` : '—'}
+				</div>
+			</div>
+
+			<div class="rounded-2xl border border-border/70 bg-muted/20 p-3.5 text-center">
+				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pre / Post SD</div>
+				<div class="mt-1 font-mono text-sm font-black text-foreground pt-1">
+					{#if pairedTTest && pairedTTest.n >= 2}
+						±{pairedTTest.preSd}% ➔ ±{pairedTTest.postSd}%
+					{:else}
+						—
+					{/if}
+				</div>
+				<div class="mt-1 text-[10px] font-mono text-muted-foreground">
+					Tone d = {tonePairedTTest && tonePairedTTest.n >= 2 ? tonePairedTTest.cohensD.toFixed(2) : '—'}
+				</div>
 			</div>
 		</div>
 
@@ -646,22 +731,22 @@
 		<!-- ===================================================================== -->
 		<!-- BLOCK C: 6-Module Cross-Feature Activity Breakdown (5 cols)           -->
 		<!-- ===================================================================== -->
-		<section class="xl:col-span-5 rounded-3xl border border-border/70 bg-card p-6 shadow-xs flex flex-col justify-between">
+		<section class="xl:col-span-5 rounded-2xl border border-border bg-card p-6 flex flex-col justify-between">
 			<!-- Header -->
-			<div class="flex items-center justify-between pb-5 border-b border-border/60">
+			<div class="flex items-center justify-between pb-5 border-b border-border">
 				<div class="flex items-center gap-3">
-					<div class="flex size-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-						<PieChart class="size-6" />
+					<div class="flex size-10 items-center justify-center rounded-xl border border-border bg-background text-primary">
+						<PieChart class="size-5" />
 					</div>
 					<div>
-						<h3 class="text-lg font-black text-foreground">สัดส่วนการใช้งาน 6 โมดูลหลัก (Cross-Feature Activity)</h3>
+						<h3 class="text-base sm:text-lg font-bold text-foreground">สัดส่วนการใช้งานรายโหมด</h3>
 						<p class="text-xs text-muted-foreground mt-0.5">
-							สถิติการมีส่วนร่วมและกิจกรรมรวมของผู้เรียนทั้ง {totalStudents} คน
+							กิจกรรมรวมของผู้เรียน {totalStudents} คน
 						</p>
 					</div>
 				</div>
-				<span class="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1 text-xs font-mono font-bold border border-amber-500/30">
-					{totalCrossEvents.toLocaleString()} กิจกรรม
+				<span class="rounded-md border border-border bg-muted text-foreground px-2.5 py-1 text-xs font-mono font-semibold">
+					{totalCrossEvents.toLocaleString()} ครั้ง
 				</span>
 			</div>
 

@@ -2,11 +2,13 @@ import { json, error } from '@sveltejs/kit';
 import {
 	getProgress,
 	addXp,
+	completeBoss,
 	loseHeart,
 	completeLesson,
 	refillHearts
 } from '$lib/server/db';
 import type { RequestHandler } from './$types';
+import { MAX_LEARNER_LEVEL } from '$lib/gamification';
 
 const MAX_HEARTS = 5;
 
@@ -17,6 +19,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 type Action =
 	| { action: 'addXp'; amount: number }
+	| { action: 'completeBoss'; level: number }
 	| { action: 'recordMistake' }
 	| { action: 'loseHeart' }
 	| { action: 'refillHearts' }
@@ -31,6 +34,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		case 'addXp':
 			// Security: Cap XP to max 100 per action to prevent arbitrary leaderboard inflation
 			await addXp(uid, Math.min(100, Math.max(0, Math.floor(body.amount || 0))));
+			break;
+		case 'completeBoss':
+			if (!Number.isInteger(body.level) || body.level < 1 || body.level > MAX_LEARNER_LEVEL) {
+				throw error(400, 'Invalid learner level');
+			}
+			if (!(await completeBoss(uid, body.level))) {
+				throw error(409, 'Boss stage is not ready or learner level has changed');
+			}
 			break;
 		case 'recordMistake':
 		case 'loseHeart':

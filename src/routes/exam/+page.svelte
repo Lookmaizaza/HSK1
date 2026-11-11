@@ -250,6 +250,7 @@
 	});
 
 	function submitExam() {
+		if (examState !== 'testing') return;
 		stopTimer();
 		examState = 'result';
 		if (examResult.isPassed) {
@@ -258,10 +259,19 @@
 			progress.addXp(30);
 		}
 
-		// Send exam attempt to Backend Learning Analytics API
+		// Send exam attempt to Backend Learning Analytics API (including wrongItems for Cross-Skill Remediation)
 		try {
 			const totalTime = (currentExam?.durationMinutes || 35) * 60;
 			const spent = Math.max(0, totalTime - remainingSeconds);
+			const wrongItems = examResult.questionResults
+				.filter((q) => !q.isCorrect)
+				.slice(0, 15)
+				.map((q) => ({
+					hanzi: q.hanzi || q.promptHanzi || q.answer || `HSK${selectedLevel}-${q.id}`,
+					pinyin: q.pinyin || '',
+					meaning: q.explanationThai || q.promptThai || `ข้อสอบ HSK ${selectedLevel} (${q.sectionId})`,
+					sectionId: q.sectionId
+				}));
 			fetch('/api/exam', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -277,7 +287,8 @@
 					writingScore: examResult.writingScore,
 					correctCount: examResult.correctCount,
 					wrongCount: examResult.wrongCount,
-					timeSpentSec: spent
+					timeSpentSec: spent,
+					wrongItems
 				})
 			}).catch(() => {});
 		} catch {}
@@ -297,7 +308,7 @@
 </script>
 
 <svelte:head>
-	<title>จำลองสอบจริง HSK 1-3 — ระบบทดลองทำข้อสอบมาตรฐานสากล</title>
+	<title>ลองทำข้อสอบ HSK 1–3 — ปากจีน</title>
 </svelte:head>
 
 <AppHeader />
@@ -306,43 +317,40 @@
 	<!-- 1. LOBBY STATE (เลือกระดับ & โหมดการสอบ) -->
 	{#if examState === 'lobby'}
 		<div class="space-y-8 animate-in fade-in duration-300">
-			<!-- Hero Banner (Clean Light Theme) -->
-			<section class="relative overflow-hidden rounded-3xl bg-card border border-amber-200/60 dark:border-amber-950 p-6 sm:p-10 text-foreground shadow-sm">
-				<div class="pointer-events-none absolute -left-16 -top-16 size-64 rounded-full bg-amber-500/5 blur-2xl"></div>
-				<div class="pointer-events-none absolute -right-16 -bottom-16 size-64 rounded-full bg-rose-500/5 blur-2xl"></div>
-
-				<div class="relative z-10 max-w-3xl">
+			<!-- Hero Banner -->
+			<section class="rounded-2xl bg-card border border-border p-6 sm:p-10 text-foreground">
+				<div class="max-w-3xl">
 					<div class="flex flex-wrap items-center gap-2 mb-3">
-						<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 border border-amber-500/20">
-							<FileText class="size-3.5" /> ข้อสอบมาตรฐาน HSK ฉบับจริง
+						<span class="inline-flex items-center gap-1.5 rounded-md bg-muted border border-border px-2.5 py-1 text-xs font-medium text-foreground">
+							<FileText class="size-3.5 text-primary" /> ข้อสอบ HSK 1–3
 						</span>
-						<span class="rounded-full bg-muted/60 px-3 py-1 text-xs font-semibold text-muted-foreground border border-border/60">
-							อ้างอิงชุด H10901 • H20901 • H31001
+						<span class="rounded-md bg-background px-2.5 py-1 text-xs font-mono text-muted-foreground border border-border">
+							H10901 · H20901 · H31001
 						</span>
 					</div>
 
-					<h1 class="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground leading-tight">
-						ลองทำข้อสอบจริง <span class="text-amber-600">HSK 1–3</span>
+					<h1 class="text-2xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+						ลองทำข้อสอบ <span class="text-primary">HSK 1–3</span>
 					</h1>
 
 					<p class="mt-3 text-sm sm:text-base text-muted-foreground leading-relaxed max-w-2xl">
-						ฝึกฝนกับชุดข้อสอบจริงที่ใช้วัดระดับความรู้ภาษาจีนระดับสากล มีระบบเสียงการฟังต้นแบบของแท้ พร้อมระบบคิดคะแนนและเฉลยละเอียดภาษาไทยครบทุกข้อ
+						ฝึกทำข้อสอบ HSK พร้อมไฟล์เสียงฟัง คิดคะแนน และเฉลยคำตอบภาษาไทย
 					</p>
 
 					<div class="mt-6 flex flex-wrap items-center gap-3">
 						<a
 							href="#exam-selector"
-							class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-amber-500/20 transition active:scale-95"
+							class="inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-primary/90 px-5 py-2.5 text-sm font-semibold text-primary-foreground transition"
 						>
-							<Play class="size-4 fill-white" />
-							<span>เลือกระดับและเริ่มทำข้อสอบ</span>
+							<Play class="size-4 fill-current" />
+							<span>เลือกระดับข้อสอบ</span>
 						</a>
 						<a
 							href="/quest"
-							class="inline-flex items-center gap-2 rounded-2xl bg-white dark:bg-card hover:bg-muted/60 border border-border px-5 py-3 text-sm font-bold text-foreground transition active:scale-95 shadow-xs"
+							class="inline-flex items-center gap-2 rounded-xl bg-card hover:bg-muted border border-border px-5 py-2.5 text-sm font-medium text-foreground transition"
 						>
-							<BookOpen class="size-4" />
-							<span>ดูแผนที่ด่านคำศัพท์</span>
+							<BookOpen class="size-4 text-muted-foreground" />
+							<span>ฝึกคำศัพท์เป็นด่าน</span>
 						</a>
 					</div>
 				</div>
@@ -350,41 +358,39 @@
 
 			<!-- Level Cards Grid -->
 			<div id="exam-selector" class="space-y-4">
-				<div class="flex items-center justify-between">
-					<div>
-						<h2 class="text-xl sm:text-2xl font-black text-foreground">เลือกระดับข้อสอบที่ต้องการทดสอบ</h2>
-						<p class="text-xs sm:text-sm text-muted-foreground mt-0.5">เลือกชุดข้อสอบระดับที่คุณต้องการ และเลือกโหมดการจับเวลา</p>
-					</div>
+				<div>
+					<h2 class="text-xl sm:text-2xl font-bold text-foreground">เลือกระดับข้อสอบ</h2>
+					<p class="text-xs sm:text-sm text-muted-foreground mt-0.5">เลือกชุดข้อสอบและโหมดการจับเวลา</p>
 				</div>
 
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 					<!-- HSK 1 Card -->
-					<div class="group relative overflow-hidden rounded-3xl border-2 bg-card p-6 shadow-sm transition hover:shadow-xl hover:border-emerald-500/50 flex flex-col justify-between {selectedLevel === 1 ? 'border-emerald-500 ring-2 ring-emerald-500/20' : ''}">
+					<div class="rounded-2xl border bg-card p-6 transition hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between {selectedLevel === 1 ? 'border-primary ring-1 ring-primary' : 'border-border'}">
 						<div>
 							<div class="flex items-center justify-between mb-4">
-								<span class="rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-3 py-1 text-xs font-black border border-emerald-500/30">
-									ชุด H10901
+								<span class="rounded-md border border-border bg-muted text-foreground px-2.5 py-0.5 text-xs font-mono font-medium">
+									H10901
 								</span>
-								<span class="text-xs font-bold text-muted-foreground">ระดับเริ่มต้น</span>
+								<span class="text-xs font-medium text-muted-foreground">ระดับต้น</span>
 							</div>
 
-							<h3 class="text-2xl font-black text-foreground">HSK ระดับ 1</h3>
+							<h3 class="text-xl font-bold text-foreground">HSK ระดับ 1</h3>
 							<p class="text-xs text-muted-foreground mt-1">
-								เหมาะสำหรับผู้เรียนคำศัพท์ประมาณ 150 คำ เข้าใจประโยคภาษาจีนพื้นฐานในชีวิตประจำวัน
+								คำศัพท์ประมาณ 150 คำ · ประโยคพื้นฐานในชีวิตประจำวัน
 							</p>
 
-							<div class="mt-5 space-y-2 py-3 border-y text-xs text-foreground/80">
+							<div class="mt-5 space-y-2 py-3 border-y border-border text-xs text-foreground">
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">โครงสร้าง:</span>
-									<span class="font-bold">การฟัง 20 ข้อ • การอ่าน 20 ข้อ</span>
+									<span class="text-muted-foreground">จำนวนข้อ:</span>
+									<span class="font-semibold">ฟัง 20 · อ่าน 20</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">คะแนนเต็ม:</span>
-									<span class="font-bold">200 คะแนน (ผ่านที่ 120)</span>
+									<span class="text-muted-foreground">เกณฑ์ผ่าน:</span>
+									<span class="font-semibold">120 / 200</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">เวลาสอบมาตรฐาน:</span>
-									<span class="font-bold">35 นาที</span>
+									<span class="text-muted-foreground">เวลาสอบ:</span>
+									<span class="font-semibold">35 นาที</span>
 								</div>
 							</div>
 						</div>
@@ -393,48 +399,48 @@
 							<button
 								type="button"
 								onclick={() => startExam(1, true)}
-								class="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white py-3 text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 transition active:scale-95 cursor-pointer"
+								class="w-full flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 text-xs sm:text-sm font-semibold transition cursor-pointer"
 							>
 								<Clock class="size-4" />
-								<span>เริ่มสอบแบบจับเวลาจริง (35 นาที)</span>
+								<span>เริ่มสอบจับเวลา (35 นาที)</span>
 							</button>
 							<button
 								type="button"
 								onclick={() => startExam(1, false)}
-								class="w-full flex items-center justify-center gap-2 rounded-2xl border bg-muted/30 hover:bg-muted py-2.5 text-xs font-bold text-foreground transition active:scale-95 cursor-pointer"
+								class="w-full flex items-center justify-center gap-2 rounded-xl border border-border bg-card hover:bg-muted py-2.5 text-xs font-medium text-foreground transition cursor-pointer"
 							>
-								<span>ฝึกทำสบายๆ (ไม่จำกัดเวลา)</span>
+								<span>ฝึกทำไม่จับเวลา</span>
 							</button>
 						</div>
 					</div>
 
 					<!-- HSK 2 Card -->
-					<div class="group relative overflow-hidden rounded-3xl border-2 bg-card p-6 shadow-sm transition hover:shadow-xl hover:border-sky-500/50 flex flex-col justify-between {selectedLevel === 2 ? 'border-sky-500 ring-2 ring-sky-500/20' : ''}">
+					<div class="rounded-2xl border bg-card p-6 transition hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between {selectedLevel === 2 ? 'border-primary ring-1 ring-primary' : 'border-border'}">
 						<div>
 							<div class="flex items-center justify-between mb-4">
-								<span class="rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400 px-3 py-1 text-xs font-black border border-sky-500/30">
-									ชุด H20901
+								<span class="rounded-md border border-border bg-muted text-foreground px-2.5 py-0.5 text-xs font-mono font-medium">
+									H20901
 								</span>
-								<span class="text-xs font-bold text-muted-foreground">ระดับพื้นฐานต่อยอด</span>
+								<span class="text-xs font-medium text-muted-foreground">พื้นฐานต่อยอด</span>
 							</div>
 
-							<h3 class="text-2xl font-black text-foreground">HSK ระดับ 2</h3>
+							<h3 class="text-xl font-bold text-foreground">HSK ระดับ 2</h3>
 							<p class="text-xs text-muted-foreground mt-1">
-								เหมาะสำหรับผู้เรียนคำศัพท์ประมาณ 300 คำ สื่อสารเรื่องง่ายๆ และบอกข้อมูลตนเองได้
+								คำศัพท์ประมาณ 300 คำ · สื่อสารเรื่องทั่วไปในชีวิตประจำวัน
 							</p>
 
-							<div class="mt-5 space-y-2 py-3 border-y text-xs text-foreground/80">
+							<div class="mt-5 space-y-2 py-3 border-y border-border text-xs text-foreground">
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">โครงสร้าง:</span>
-									<span class="font-bold">การฟัง 35 ข้อ • การอ่าน 25 ข้อ</span>
+									<span class="text-muted-foreground">จำนวนข้อ:</span>
+									<span class="font-semibold">ฟัง 35 · อ่าน 25</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">คะแนนเต็ม:</span>
-									<span class="font-bold">200 คะแนน (ผ่านที่ 120)</span>
+									<span class="text-muted-foreground">เกณฑ์ผ่าน:</span>
+									<span class="font-semibold">120 / 200</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">เวลาสอบมาตรฐาน:</span>
-									<span class="font-bold">55 นาที</span>
+									<span class="text-muted-foreground">เวลาสอบ:</span>
+									<span class="font-semibold">55 นาที</span>
 								</div>
 							</div>
 						</div>
@@ -443,48 +449,48 @@
 							<button
 								type="button"
 								onclick={() => startExam(2, true)}
-								class="w-full flex items-center justify-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white py-3 text-xs sm:text-sm font-bold shadow-md shadow-sky-600/20 transition active:scale-95 cursor-pointer"
+								class="w-full flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 text-xs sm:text-sm font-semibold transition cursor-pointer"
 							>
 								<Clock class="size-4" />
-								<span>เริ่มสอบแบบจับเวลาจริง (55 นาที)</span>
+								<span>เริ่มสอบจับเวลา (55 นาที)</span>
 							</button>
 							<button
 								type="button"
 								onclick={() => startExam(2, false)}
-								class="w-full flex items-center justify-center gap-2 rounded-2xl border bg-muted/30 hover:bg-muted py-2.5 text-xs font-bold text-foreground transition active:scale-95 cursor-pointer"
+								class="w-full flex items-center justify-center gap-2 rounded-xl border border-border bg-card hover:bg-muted py-2.5 text-xs font-medium text-foreground transition cursor-pointer"
 							>
-								<span>ฝึกทำสบายๆ (ไม่จำกัดเวลา)</span>
+								<span>ฝึกทำไม่จับเวลา</span>
 							</button>
 						</div>
 					</div>
 
 					<!-- HSK 3 Card -->
-					<div class="group relative overflow-hidden rounded-3xl border-2 bg-card p-6 shadow-sm transition hover:shadow-xl hover:border-purple-500/50 flex flex-col justify-between {selectedLevel === 3 ? 'border-purple-500 ring-2 ring-purple-500/20' : ''}">
+					<div class="rounded-2xl border bg-card p-6 transition hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between {selectedLevel === 3 ? 'border-primary ring-1 ring-primary' : 'border-border'}">
 						<div>
 							<div class="flex items-center justify-between mb-4">
-								<span class="rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 px-3 py-1 text-xs font-black border border-purple-500/30">
-									ชุด H31001
+								<span class="rounded-md border border-border bg-muted text-foreground px-2.5 py-0.5 text-xs font-mono font-medium">
+									H31001
 								</span>
-								<span class="text-xs font-bold text-muted-foreground">ระดับกลางเบื้องต้น</span>
+								<span class="text-xs font-medium text-muted-foreground">ระดับกลางต้น</span>
 							</div>
 
-							<h3 class="text-2xl font-black text-foreground">HSK ระดับ 3</h3>
+							<h3 class="text-xl font-bold text-foreground">HSK ระดับ 3</h3>
 							<p class="text-xs text-muted-foreground mt-1">
-								เหมาะสำหรับผู้เรียนคำศัพท์ประมาณ 600 คำ สื่อสารการเรียน การทำงาน และการท่องเที่ยวได้
+								คำศัพท์ประมาณ 600 คำ · การเรียน การทำงาน และการเดินทาง
 							</p>
 
-							<div class="mt-5 space-y-2 py-3 border-y text-xs text-foreground/80">
+							<div class="mt-5 space-y-2 py-3 border-y border-border text-xs text-foreground">
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">โครงสร้าง:</span>
-									<span class="font-bold">ฟัง 40 • อ่าน 30 • เขียน 10</span>
+									<span class="text-muted-foreground">จำนวนข้อ:</span>
+									<span class="font-semibold">ฟัง 40 · อ่าน 30 · เขียน 10</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">คะแนนเต็ม:</span>
-									<span class="font-bold">300 คะแนน (ผ่านที่ 180)</span>
+									<span class="text-muted-foreground">เกณฑ์ผ่าน:</span>
+									<span class="font-semibold">180 / 300</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-muted-foreground">เวลาสอบมาตรฐาน:</span>
-									<span class="font-bold">85 นาที</span>
+									<span class="text-muted-foreground">เวลาสอบ:</span>
+									<span class="font-semibold">85 นาที</span>
 								</div>
 							</div>
 						</div>
@@ -493,17 +499,17 @@
 							<button
 								type="button"
 								onclick={() => startExam(3, true)}
-								class="w-full flex items-center justify-center gap-2 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white py-3 text-xs sm:text-sm font-bold shadow-md shadow-purple-600/20 transition active:scale-95 cursor-pointer"
+								class="w-full flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 text-xs sm:text-sm font-semibold transition cursor-pointer"
 							>
 								<Clock class="size-4" />
-								<span>เริ่มสอบแบบจับเวลาจริง (85 นาที)</span>
+								<span>เริ่มสอบจับเวลา (85 นาที)</span>
 							</button>
 							<button
 								type="button"
 								onclick={() => startExam(3, false)}
-								class="w-full flex items-center justify-center gap-2 rounded-2xl border bg-muted/30 hover:bg-muted py-2.5 text-xs font-bold text-foreground transition active:scale-95 cursor-pointer"
+								class="w-full flex items-center justify-center gap-2 rounded-xl border border-border bg-card hover:bg-muted py-2.5 text-xs font-medium text-foreground transition cursor-pointer"
 							>
-								<span>ฝึกทำสบายๆ (ไม่จำกัดเวลา)</span>
+								<span>ฝึกทำไม่จับเวลา</span>
 							</button>
 						</div>
 					</div>

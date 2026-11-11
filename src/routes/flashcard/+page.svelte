@@ -48,6 +48,7 @@
 		type SyllableToneResult
 	} from '$lib/pitch';
 	import { initToneNeuralNetwork, predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
+	import { progress } from '$lib/progress.svelte';
 	import { onMount, tick } from 'svelte';
 
 	// Screen view states: 'levelSelect' | 'setSelect' | 'study' | 'summary'
@@ -68,6 +69,7 @@
 	// Voice practice & ONNX AI Tone detection
 	let isListening = $state(false);
 	let voiceScore = $state<number | null>(null);
+	let earnedPracticeXp = $state(0);
 	let voiceFeedback = $state<string | null>(null);
 	let voiceHeard = $state<string | null>(null);
 	let detectedAITone = $state<number | null>(null);
@@ -77,6 +79,8 @@
 
 	// Writing practice modal
 	let writingModalOpen = $state(false);
+	let levelUpPromptOpen = $state(false);
+	let levelUpPromptDismissed = $state(false);
 
 	// HanziWriter container elements for each character in word
 	let charContainers = $state<Record<number, HTMLDivElement | null>>({});
@@ -97,6 +101,12 @@
 		refreshStats();
 		// Warm up our trained ONNX deep learning tone model in background
 		initToneNeuralNetwork().catch(() => {});
+	});
+
+	$effect(() => {
+		if (progress.bossReady && !levelUpPromptDismissed) {
+			levelUpPromptOpen = true;
+		}
 	});
 
 	// Current word being studied
@@ -168,6 +178,7 @@
 	$effect(() => {
 		if (currentView === 'study' && currentWord) {
 			voiceScore = null;
+			earnedPracticeXp = 0;
 			voiceFeedback = null;
 			voiceHeard = null;
 			detectedAITone = null;
@@ -200,6 +211,8 @@
 	}
 
 	function playAudio(text: string) {
+		cardListenCount++;
+		cardListenTimestamps = [...cardListenTimestamps, Date.now()];
 		speak(text);
 	}
 
@@ -209,6 +222,11 @@
 	let speechCandidates: string[] = [];
 	let activePitchTracker: RealtimePitchTracker | null = null;
 	let silenceDebounce: ReturnType<typeof setTimeout> | null = null;
+	let cardPresentedAt = $state<number>(Date.now());
+	let cardListenCount = $state<number>(0);
+	let cardListenTimestamps = $state<number[]>([]);
+	let cardAttemptCount = $state<number>(0);
+	let lastHesitationMs = $state<number>(0);
 
 	async function toggleVoicePractice() {
 		if (!currentWord) return;
@@ -217,8 +235,11 @@
 			return;
 		}
 
+		cardAttemptCount++;
+		lastHesitationMs = Math.max(0, Date.now() - cardPresentedAt);
 		isListening = false;
 		voiceScore = null;
+		earnedPracticeXp = 0;
 		voiceFeedback = null;
 		voiceHeard = null;
 		detectedAITone = null;
@@ -354,6 +375,14 @@
 			const isPassed = isWordCorrect && isToneReasonable;
 			const finalScore = isPassed ? Math.max(analysis.overallScore, 75) : Math.min(analysis.overallScore, 50);
 			voiceScore = Math.round(finalScore);
+			if (isPassed) {
+				try {
+					earnedPracticeXp = await progress.addPracticeExp();
+				} catch (error) {
+					console.error('Error saving pronunciation practice XP:', error);
+					voiceFeedback = 'ออกเสียงผ่านแล้ว แต่บันทึก XP ไม่สำเร็จ กรุณาลองอีกครั้ง';
+				}
+			}
 			voiceHeard = finalHeard || candidatePool[0] || null;
 			syllableResults = analysis.syllableResults;
 			const firstSyllable = analysis.syllableResults[0];
@@ -369,6 +398,78 @@
 				: isWordCorrect
 					? 'อ่านคำศัพท์ได้ แต่เสียงวรรณยุกต์ยังไม่ตรง ลองฟังตัวอย่างแล้วพูดใหม่'
 					: `ยังตรวจไม่พบคำว่า "${currentWord.hanzi}"${finalHeard ? ` (ได้ยิน: "${finalHeard}")` : ''} ลองพูดใหม่อีกครั้ง`;
+
+			// Send pronunciation evaluation telemetry (practiceMode: 'flashcard')
+			const avgClarity =
+				voicedFrames.length > 0
+					? Number((voicedFrames.reduce((s, p) => s + p.clarity, 0) / voicedFrames.length).toFixed(3))
+					: 0;
+			fetch('/api/v1/telemetry/score-ingest', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					eventType: 'pronunciation_evaluation',
+					timestamp: new Date().toISOString(),
+					practiceMode: 'flashcard',
+					stageId: `hsk${selectedLevel}_set${selectedSetIndex}`,
+					word: {
+						id: currentWord.id,
+						hanzi: currentWord.hanzi,
+						pinyin: currentWord.pinyin,
+						meaning: currentWord.thai || currentWord.english || '',
+						expectedTone: currentWord.tone
+					},
+					behavior: {
+						listenedToExample: cardListenCount > 0,
+						listenCount: cardListenCount,
+						listenTimestamps: [...cardListenTimestamps],
+						hesitationLatencyMs: lastHesitationMs,
+						attemptNumber: cardAttemptCount
+					},
+					assessment: {
+						isPassed,
+						overallScore: Math.round(finalScore),
+						rawScore: analysis.overallScore,
+						isToneMatch: isToneReasonable,
+						isWordMatch: isWordCorrect,
+						recognizedWord: finalHeard || undefined,
+						speechCandidates: [...candidatePool],
+						syllableResults: (analysis.syllableResults || []).map((s) => ({
+							syllableIndex: s.syllableIndex,
+							hanzi: s.hanzi,
+							pinyin: s.pinyin,
+							targetTone: s.targetTone,
+							detectedTone: s.detectedTone,
+							isMatch: s.isMatch,
+							score: s.score,
+							feedback: s.feedback,
+							isAIModel: s.isAIModel
+						})),
+						acoustics: {
+							avgF0: analysis.avgF0 || 0,
+							totalDurationMs: analysis.totalDurationMs || 0,
+							avgClarity
+						},
+						overallFeedback: voiceFeedback
+					}
+				})
+			}).catch(() => {});
+
+			if (!isPassed) {
+				fetch('/api/mistakes', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						hanzi: currentWord.hanzi,
+						pinyin: currentWord.pinyin,
+						meaning: currentWord.thai || currentWord.english || '',
+						expectedTone: currentWord.tone,
+						heardText: finalHeard || '(แฟลชการ์ด)',
+						score: Math.round(finalScore),
+						feedback: voiceFeedback
+					})
+				}).catch(() => {});
+			}
 		} catch (error) {
 			console.error('Error during flashcard pronunciation evaluation:', error);
 			voiceFeedback = 'ยังตรวจเสียงไม่ได้ ลองพูดอีกครั้งนะ';
@@ -396,6 +497,14 @@
 
 	async function syncSetCompletionToServer() {
 		try {
+			const reviewWords = (currentSet?.words || activeWords)
+				.filter((w) => reviewThisSession.includes(w.id))
+				.map((w) => ({
+					hanzi: w.hanzi,
+					pinyin: w.pinyin,
+					meaning: w.thai || w.english || '',
+					tone: w.tone
+				}));
 			await fetch('/api/flashcard/complete', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -404,7 +513,8 @@
 					setIndex: selectedSetIndex,
 					masteredCount: masteredThisSession.length,
 					reviewCount: reviewThisSession.length,
-					totalWords: currentSet?.words?.length || activeWords.length
+					totalWords: currentSet?.words?.length || activeWords.length,
+					reviewWords
 				})
 			});
 		} catch (e) {
@@ -413,6 +523,10 @@
 	}
 
 	function advanceWord() {
+		cardPresentedAt = Date.now();
+		cardListenCount = 0;
+		cardListenTimestamps = [];
+		cardAttemptCount = 0;
 		if (currentIndex + 1 < activeWords.length) {
 			currentIndex += 1;
 		} else {
@@ -463,132 +577,129 @@
 					<BookOpen class="size-3.5" />
 					HSK Flashcards Trainer
 				</div>
-				<h1 class="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
-					ฝึกคำศัพท์ภาษาจีนตามระดับ
+				<h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+					ฝึกคำศัพท์ HSK 1–3
 				</h1>
 				<p class="text-sm text-muted-foreground mt-1">
-					เลือกมาตรฐานระดับ HSK ที่คุณต้องการฝึก มีระบบคัดลายมือและตรวจการออกเสียง
+					เลือกระดับเพื่อฝึกคำศัพท์ ลำดับขีด และออกเสียง
 				</p>
 			</div>
 
 			<!-- Level Cards Grid -->
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 				<!-- HSK 1 -->
-				<div class="relative bg-card border rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between overflow-hidden group">
-					<div class="absolute -top-12 -right-12 size-36 rounded-full bg-rose-500/10 group-hover:scale-125 transition-all duration-500"></div>
+				<div class="relative bg-card border border-border rounded-2xl p-6 transition hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between">
 					<div>
-						<div class="size-14 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-4">
-							<BookOpen class="size-7" />
+						<div class="size-11 rounded-xl border border-border bg-background text-primary flex items-center justify-center mb-4">
+							<BookOpen class="size-5" />
 						</div>
-						<h2 class="text-2xl font-black text-foreground">HSK ระดับ 1</h2>
-						<p class="text-xs text-muted-foreground mt-0.5">มีทั้งหมด 300 คำ (15 ชุดคำศัพท์)</p>
+						<h2 class="text-xl font-bold text-foreground">HSK ระดับ 1</h2>
+						<p class="text-xs text-muted-foreground mt-0.5">300 คำ · 15 ชุด</p>
 
 						<!-- Progress stats -->
-						<div class="grid grid-cols-2 gap-2 my-5 bg-muted/40 rounded-2xl p-3 border">
+						<div class="grid grid-cols-2 gap-2 my-5 bg-background rounded-xl p-3 border border-border">
 							<div class="text-center">
-								<div class="text-xs text-muted-foreground font-semibold">เรียนแล้ว</div>
-								<div class="text-xl font-black text-emerald-600 dark:text-emerald-400">{level1Stats.masteredCount}</div>
+								<div class="text-xs text-muted-foreground font-medium">ผ่านแล้ว</div>
+								<div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{level1Stats.masteredCount}</div>
 							</div>
-							<div class="text-center border-l">
-								<div class="text-xs text-muted-foreground font-semibold">ทบทวน</div>
-								<div class="text-xl font-black text-amber-600 dark:text-amber-400">{level1Stats.reviewCount}</div>
+							<div class="text-center border-l border-border">
+								<div class="text-xs text-muted-foreground font-medium">ทบทวน</div>
+								<div class="text-xl font-bold text-foreground tabular-nums">{level1Stats.reviewCount}</div>
 							</div>
 						</div>
 
-						<div class="space-y-1 mb-6">
-							<div class="flex justify-between text-xs font-bold text-muted-foreground">
+						<div class="space-y-1.5 mb-6">
+							<div class="flex justify-between text-xs font-medium text-muted-foreground">
 								<span>ความคืบหน้า</span>
-								<span>{level1Stats.percentComplete}%</span>
+								<span class="tabular-nums">{level1Stats.percentComplete}%</span>
 							</div>
-							<Progress value={level1Stats.percentComplete} class="h-2" />
+							<Progress value={level1Stats.percentComplete} class="h-1.5" />
 						</div>
 					</div>
 
 					<Button
 						onclick={() => selectLevel(1)}
-						class="w-full rounded-2xl py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
+						class="w-full rounded-xl py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold flex items-center justify-center gap-2"
 					>
-						เข้าเรียน HSK 1
+						เริ่มเรียน HSK 1
 						<ArrowRight class="size-4" />
 					</Button>
 				</div>
 
 				<!-- HSK 2 -->
-				<div class="relative bg-card border rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between overflow-hidden group">
-					<div class="absolute -top-12 -right-12 size-36 rounded-full bg-emerald-500/10 group-hover:scale-125 transition-all duration-500"></div>
+				<div class="relative bg-card border border-border rounded-2xl p-6 transition hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between">
 					<div>
-						<div class="size-14 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-4">
-							<BookOpen class="size-7" />
+						<div class="size-11 rounded-xl border border-border bg-background text-primary flex items-center justify-center mb-4">
+							<BookOpen class="size-5" />
 						</div>
-						<h2 class="text-2xl font-black text-foreground">HSK ระดับ 2</h2>
-						<p class="text-xs text-muted-foreground mt-0.5">มีทั้งหมด 200 คำ (10 ชุดคำศัพท์)</p>
+						<h2 class="text-xl font-bold text-foreground">HSK ระดับ 2</h2>
+						<p class="text-xs text-muted-foreground mt-0.5">200 คำ · 10 ชุด</p>
 
 						<!-- Progress stats -->
-						<div class="grid grid-cols-2 gap-2 my-5 bg-muted/40 rounded-2xl p-3 border">
+						<div class="grid grid-cols-2 gap-2 my-5 bg-background rounded-xl p-3 border border-border">
 							<div class="text-center">
-								<div class="text-xs text-muted-foreground font-semibold">เรียนแล้ว</div>
-								<div class="text-xl font-black text-emerald-600 dark:text-emerald-400">{level2Stats.masteredCount}</div>
+								<div class="text-xs text-muted-foreground font-medium">ผ่านแล้ว</div>
+								<div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{level2Stats.masteredCount}</div>
 							</div>
-							<div class="text-center border-l">
-								<div class="text-xs text-muted-foreground font-semibold">ทบทวน</div>
-								<div class="text-xl font-black text-amber-600 dark:text-amber-400">{level2Stats.reviewCount}</div>
+							<div class="text-center border-l border-border">
+								<div class="text-xs text-muted-foreground font-medium">ทบทวน</div>
+								<div class="text-xl font-bold text-foreground tabular-nums">{level2Stats.reviewCount}</div>
 							</div>
 						</div>
 
-						<div class="space-y-1 mb-6">
-							<div class="flex justify-between text-xs font-bold text-muted-foreground">
+						<div class="space-y-1.5 mb-6">
+							<div class="flex justify-between text-xs font-medium text-muted-foreground">
 								<span>ความคืบหน้า</span>
-								<span>{level2Stats.percentComplete}%</span>
+								<span class="tabular-nums">{level2Stats.percentComplete}%</span>
 							</div>
-							<Progress value={level2Stats.percentComplete} class="h-2" />
+							<Progress value={level2Stats.percentComplete} class="h-1.5" />
 						</div>
 					</div>
 
 					<Button
 						onclick={() => selectLevel(2)}
-						class="w-full rounded-2xl py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
+						class="w-full rounded-xl py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold flex items-center justify-center gap-2"
 					>
-						เข้าเรียน HSK 2
+						เริ่มเรียน HSK 2
 						<ArrowRight class="size-4" />
 					</Button>
 				</div>
 
 				<!-- HSK 3 -->
-				<div class="relative bg-card border rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between overflow-hidden group">
-					<div class="absolute -top-12 -right-12 size-36 rounded-full bg-indigo-500/10 group-hover:scale-125 transition-all duration-500"></div>
+				<div class="relative bg-card border border-border rounded-2xl p-6 transition hover:border-slate-300 dark:hover:border-slate-700 flex flex-col justify-between">
 					<div>
-						<div class="size-14 rounded-2xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4">
-							<BookOpen class="size-7" />
+						<div class="size-11 rounded-xl border border-border bg-background text-primary flex items-center justify-center mb-4">
+							<BookOpen class="size-5" />
 						</div>
-						<h2 class="text-2xl font-black text-foreground">HSK ระดับ 3</h2>
-						<p class="text-xs text-muted-foreground mt-0.5">มีทั้งหมด 500 คำ (25 ชุดคำศัพท์)</p>
+						<h2 class="text-xl font-bold text-foreground">HSK ระดับ 3</h2>
+						<p class="text-xs text-muted-foreground mt-0.5">500 คำ · 25 ชุด</p>
 
 						<!-- Progress stats -->
-						<div class="grid grid-cols-2 gap-2 my-5 bg-muted/40 rounded-2xl p-3 border">
+						<div class="grid grid-cols-2 gap-2 my-5 bg-background rounded-xl p-3 border border-border">
 							<div class="text-center">
-								<div class="text-xs text-muted-foreground font-semibold">เรียนแล้ว</div>
-								<div class="text-xl font-black text-emerald-600 dark:text-emerald-400">{level3Stats.masteredCount}</div>
+								<div class="text-xs text-muted-foreground font-medium">ผ่านแล้ว</div>
+								<div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{level3Stats.masteredCount}</div>
 							</div>
-							<div class="text-center border-l">
-								<div class="text-xs text-muted-foreground font-semibold">ทบทวน</div>
-								<div class="text-xl font-black text-amber-600 dark:text-amber-400">{level3Stats.reviewCount}</div>
+							<div class="text-center border-l border-border">
+								<div class="text-xs text-muted-foreground font-medium">ทบทวน</div>
+								<div class="text-xl font-bold text-foreground tabular-nums">{level3Stats.reviewCount}</div>
 							</div>
 						</div>
 
-						<div class="space-y-1 mb-6">
-							<div class="flex justify-between text-xs font-bold text-muted-foreground">
+						<div class="space-y-1.5 mb-6">
+							<div class="flex justify-between text-xs font-medium text-muted-foreground">
 								<span>ความคืบหน้า</span>
-								<span>{level3Stats.percentComplete}%</span>
+								<span class="tabular-nums">{level3Stats.percentComplete}%</span>
 							</div>
-							<Progress value={level3Stats.percentComplete} class="h-2" />
+							<Progress value={level3Stats.percentComplete} class="h-1.5" />
 						</div>
 					</div>
 
 					<Button
 						onclick={() => selectLevel(3)}
-						class="w-full rounded-2xl py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
+						class="w-full rounded-xl py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold flex items-center justify-center gap-2"
 					>
-						เข้าเรียน HSK 3
+						เริ่มเรียน HSK 3
 						<ArrowRight class="size-4" />
 					</Button>
 				</div>
@@ -607,20 +718,20 @@
 				<Button
 					variant="ghost"
 					onclick={() => (currentView = 'levelSelect')}
-					class="rounded-xl flex items-center gap-1.5 font-bold"
+					class="rounded-xl flex items-center gap-1.5 font-medium"
 				>
 					<ArrowLeft class="size-4" />
 					เปลี่ยนระดับ
 				</Button>
 
-				<div class="text-sm font-bold text-muted-foreground">
-					HSK {selectedLevel} • ทั้งหมด {sets.length} ชุดคำศัพท์
+				<div class="text-sm font-medium text-muted-foreground">
+					HSK {selectedLevel} · {sets.length} ชุด
 				</div>
 			</div>
 
 			<div class="mb-6">
-				<h2 class="text-3xl font-black text-foreground">เลือกชุดคำศัพท์ HSK {selectedLevel}</h2>
-				<p class="text-xs text-muted-foreground">แต่ละชุดบรรจุ 20 คำศัพท์ ฝึกอ่าน เขียน และออกเสียง</p>
+				<h2 class="text-2xl font-bold text-foreground">ชุดคำศัพท์ HSK {selectedLevel}</h2>
+				<p class="text-xs text-muted-foreground mt-0.5">ชุดละ 20 คำ · ฝึกอ่าน เขียน ออกเสียง</p>
 			</div>
 
 			<!-- Sets Grid -->
@@ -630,7 +741,7 @@
 					{@const masteredInSet = set.words.filter((w) => studyProg.masteredWords.includes(w.id)).length}
 					{@const pct = Math.round((masteredInSet / set.words.length) * 100)}
 
-					<div class="bg-card border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between {isCompleted ? 'border-emerald-500/40 bg-emerald-50/20 dark:bg-emerald-950/10' : ''}">
+					<div class="bg-card border rounded-xl p-5 transition flex flex-col justify-between {isCompleted ? 'border-emerald-300 dark:border-emerald-800' : 'border-border hover:border-slate-300 dark:hover:border-slate-700'}">
 						<div>
 							<div class="flex items-center justify-between mb-2">
 								<span class="text-base font-black text-foreground">{set.title}</span>
@@ -874,6 +985,11 @@
 										{voiceFeedback}
 									</p>
 								{/if}
+								{#if earnedPracticeXp > 0}
+									<p class="font-black text-violet-600 dark:text-violet-400">ได้รับ +{earnedPracticeXp} XP</p>
+								{:else if progress.bossReady && voiceScore !== null && voiceScore >= 75}
+									<p class="font-bold text-amber-600 dark:text-amber-400">XP ครบแล้ว ไปพิชิต Boss Stage เพื่อปลดล็อกเลเวลถัดไป</p>
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -975,3 +1091,39 @@
 		</div>
 	{/if}
 </div>
+
+{#if levelUpPromptOpen}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation">
+		<div
+			class="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-center"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="level-up-title"
+		>
+			<div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border border-border bg-background text-primary">
+				<Award class="size-7" />
+			</div>
+			<h2 id="level-up-title" class="text-xl font-bold text-foreground">XP ครบแล้ว</h2>
+			<p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+				XP ในระดับนี้ครบแล้ว ทำแบบประเมินเพื่อเลื่อนระดับได้ทันที
+			</p>
+			<a
+				href="/assessment?type=boss"
+				class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+			>
+				เริ่มทำแบบประเมิน
+				<ArrowRight class="size-4" />
+			</a>
+			<button
+				type="button"
+				onclick={() => {
+					levelUpPromptDismissed = true;
+					levelUpPromptOpen = false;
+				}}
+				class="mt-2.5 w-full rounded-xl px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+			>
+				ไว้ทีหลัง
+			</button>
+		</div>
+	</div>
+{/if}

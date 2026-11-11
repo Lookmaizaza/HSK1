@@ -315,158 +315,153 @@
 		</div>
 	</section>
 
-	<!-- ========================================================================= -->
-	<!-- DEEP-DIVE: Mandarin Tone Sandhi (变调) & Bidirectional 2 ↔ 3 Analysis -->
-	<!-- ========================================================================= -->
-	<section class="rounded-3xl border border-rose-500/20 bg-gradient-to-br from-card via-card to-rose-500/[0.04] p-6 shadow-xs space-y-6 relative overflow-hidden">
-		<!-- Decorative Background Accent -->
-		<div class="absolute -top-12 -right-12 size-40 rounded-full bg-rose-500/5 blur-3xl pointer-events-none"></div>
-
+	<!-- DEEP-DIVE: Mandarin Tone Sandhi & Bidirectional 2 <-> 3 Analysis -->
+	<section class="rounded-2xl border border-border bg-card p-6 space-y-6">
 		<!-- Deep Dive Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/60">
+		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
 			<div class="flex items-center gap-3">
-				<div class="flex size-11 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0">
-					<ArrowRightLeft class="size-6" />
+				<div class="flex size-10 items-center justify-center rounded-xl border border-border bg-background text-primary shrink-0">
+					<ArrowRightLeft class="size-5" />
 				</div>
 				<div>
 					<div class="flex items-center gap-2">
-						<h3 class="text-lg font-black text-foreground">
-							เจาะลึกความสับสนวรรณยุกต์คู่ 2 ↔ 3 และกฎ Tone Sandhi (变调)
+						<h3 class="text-base sm:text-lg font-bold text-foreground">
+							ความสับสนวรรณยุกต์ 2 ↔ 3 และ Tone Sandhi
 						</h3>
-						<span class="rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 px-2.5 py-0.5 text-xs font-bold font-mono">
-							Bidirectional Analysis
+						<span class="rounded-md border border-border bg-muted text-foreground px-2 py-0.5 text-xs font-medium font-mono">
+							2 ↔ 3
 						</span>
 					</div>
 					<p class="text-xs text-muted-foreground mt-0.5">
-						การวิเคราะห์สองทิศทาง (2→3 และ 3→2) จากข้อมูลประเมินเสียงจริงในฐานข้อมูล พร้อมสาเหตุสัทศาสตร์สำหรับผู้เรียนชาวไทย
+						เทียบทิศทาง 2→3 และ 3→2 จากผลประเมินจริงในฐานข้อมูล
 					</p>
 				</div>
 			</div>
 
-			<div class="inline-flex items-center gap-2 rounded-2xl border bg-card/80 px-3 py-1.5 text-xs shadow-2xs font-mono">
-				<span class="text-muted-foreground">กลุ่มตัวอย่าง:</span>
-				<span class="font-bold text-foreground">N = {toneSandhiStats.samples} ครั้ง</span>
-				<span class="text-muted-foreground">(สับสนรวม {toneSandhiStats.confusionRate ?? 27}%)</span>
+			<div class="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-mono">
+				<span class="text-muted-foreground">ตัวอย่าง:</span>
+				<span class="font-semibold text-foreground">N = {toneSandhiStats.samples}</span>
+				<span class="text-muted-foreground">({toneSandhiStats.confusionRate ?? 27}%)</span>
 			</div>
 		</div>
 
 		<!-- Directional Breakdown Comparison Grid -->
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 			<!-- CARD 1: Direction 2 -> 3 -->
-			<div class="rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-5 space-y-3 relative">
+			<div class="rounded-xl border border-border bg-background p-5 space-y-3">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						<span class="size-2 rounded-full bg-amber-500"></span>
-						<span class="text-xs font-black uppercase text-amber-700 dark:text-amber-400 tracking-wider">
-							ทิศทางที่ 1: เสียงที่ 2 → เสียงที่ 3
+						<span class="size-2 rounded-full bg-primary"></span>
+						<span class="text-xs font-semibold text-foreground">
+							เสียง 2 → เสียง 3
 						</span>
 					</div>
-					<span class="rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-bold">
-						กดระดับเสียงต่ำเกินไป
+					<span class="rounded border border-border bg-card text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
+						ระดับเสียงตั้งต้นต่ำ
 					</span>
 				</div>
 
 				<div class="flex items-baseline gap-3 pt-1">
-					<span class="text-4xl font-black font-mono text-amber-600 dark:text-amber-400">
+					<span class="text-3xl font-bold font-mono text-primary">
 						{toneSandhiStats.t2AsT3Pct ?? 33}%
 					</span>
 					<div class="text-xs text-muted-foreground">
-						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t2AsT3Count ?? 2}</strong> ครั้ง จากเป้าหมายเสียง 2 ทั้งหมด <strong class="text-foreground font-mono">{toneSandhiStats.samples2 ?? 6}</strong> ครั้ง
+						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t2AsT3Count ?? 2}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples2 ?? 6}</strong> ครั้ง
 					</div>
 				</div>
 
-				<div class="space-y-2 text-xs leading-relaxed text-muted-foreground pt-1 border-t border-amber-500/15">
-					<div class="text-foreground font-semibold flex items-center gap-1.5 text-[11.5px]">
-						<BookOpen class="size-3.5 text-amber-500" />
-						<span>สาเหตุทางสัทศาสตร์ (Articulatory Root Cause):</span>
+				<div class="space-y-2 text-xs leading-relaxed text-muted-foreground pt-2 border-t border-border">
+					<div class="text-foreground font-semibold flex items-center gap-1.5 text-xs">
+						<BookOpen class="size-3.5 text-muted-foreground" />
+						<span>สาเหตุหลัก</span>
 					</div>
-					<p class="text-[11px]">
-						ผู้เรียนชาวไทยคุ้นชินกับ <em>เสียงจัตวาไทย</em> ซึ่งมีเส้นเสียงเริ่มต้นจากระดับต่ำก่อนทะยานขึ้น เมื่อพูดเสียงที่ 2 ของจีน (35) มักเผลอกดคอและลดระดับเสียงต้นพยางค์ต่ำเกินไป (F0 &lt; 150 Hz) ทำให้อัลกอริทึม Pitch Tracker ตรวจจับเป็นเสียงเอก/เสียงที่ 3 (214)
+					<p class="text-xs">
+						ผู้เรียนมักเริ่มเสียง 2 (35) ต่ำเกินไป (F0 &lt; 150 Hz) คล้ายเสียงจัตวาไทย ทำให้ระบบตรวจเป็นเสียง 3 (214)
 					</p>
-					<div class="bg-amber-500/10 rounded-xl p-2.5 text-[10.5px] text-amber-900 dark:text-amber-200">
-						💡 <strong>วิธีแก้:</strong> ให้เริ่มเปล่งเสียงจากระดับกลาง (สเกล 3) ทันที แล้วทะยานขึ้นสู่ระดับ 5 โดยไม่กดลูกกระเดือกลงต่ำก่อน
+					<div class="rounded-lg border border-border bg-card p-2.5 text-xs text-foreground">
+						<strong>วิธีแก้:</strong> เริ่มเปล่งเสียงจากระดับกลาง (สเกล 3) แล้วไต่ขึ้นระดับ 5 ทันที
 					</div>
 				</div>
 
 				<div class="pt-2 flex items-center justify-between">
-					<div class="text-xs font-mono font-bold text-foreground">
+					<div class="text-xs font-mono font-semibold text-foreground">
 						ตัวอย่าง: <span class="text-base font-serif">麻</span> <span class="text-muted-foreground font-sans">má (เสียง 2)</span>
 					</div>
 					<button
 						type="button"
 						onclick={() => playToneAudio(2)}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 text-white font-bold text-xs hover:bg-amber-600 transition shadow-2xs"
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium text-xs transition cursor-pointer"
 					>
-						<Volume2 class="size-3.5" />
+						<Volume2 class="size-3.5 text-primary" />
 						<span>ฟังเสียง 2</span>
 					</button>
 				</div>
 			</div>
 
 			<!-- CARD 2: Direction 3 -> 2 (Tone Sandhi) -->
-			<div class="rounded-2xl border border-indigo-500/25 bg-indigo-500/[0.03] p-5 space-y-3 relative">
+			<div class="rounded-xl border border-border bg-background p-5 space-y-3">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						<span class="size-2 rounded-full bg-indigo-500"></span>
-						<span class="text-xs font-black uppercase text-indigo-700 dark:text-indigo-400 tracking-wider">
-							ทิศทางที่ 2: เสียงที่ 3 → เสียงที่ 2 (Tone Sandhi)
+						<span class="size-2 rounded-full bg-slate-500"></span>
+						<span class="text-xs font-semibold text-foreground">
+							เสียง 3 → เสียง 2 (Tone Sandhi)
 						</span>
 					</div>
-					<span class="rounded-md bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-[10px] font-bold">
-						ตวัดหางเสียงเร็วเกินไป
+					<span class="rounded border border-border bg-card text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
+						ตวัดเสียงเร็ว
 					</span>
 				</div>
 
 				<div class="flex items-baseline gap-3 pt-1">
-					<span class="text-4xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+					<span class="text-3xl font-bold font-mono text-foreground">
 						{toneSandhiStats.t3AsT2Pct ?? 20}%
 					</span>
 					<div class="text-xs text-muted-foreground">
-						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t3AsT2Count ?? 1}</strong> ครั้ง จากเป้าหมายเสียง 3 ทั้งหมด <strong class="text-foreground font-mono">{toneSandhiStats.samples3 ?? 5}</strong> ครั้ง
+						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t3AsT2Count ?? 1}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples3 ?? 5}</strong> ครั้ง
 					</div>
 				</div>
 
-				<div class="space-y-2 text-xs leading-relaxed text-muted-foreground pt-1 border-t border-indigo-500/15">
-					<div class="text-foreground font-semibold flex items-center gap-1.5 text-[11.5px]">
-						<BookOpen class="size-3.5 text-indigo-500" />
-						<span>สาเหตุทางสัทศาสตร์ (Articulatory Root Cause):</span>
+				<div class="space-y-2 text-xs leading-relaxed text-muted-foreground pt-2 border-t border-border">
+					<div class="text-foreground font-semibold flex items-center gap-1.5 text-xs">
+						<BookOpen class="size-3.5 text-muted-foreground" />
+						<span>สาเหตุหลัก</span>
 					</div>
-					<p class="text-[11px]">
-						เกิดจากกฎการผันวรรณยุกต์จีน (Tone Sandhi: 3+3 ➔ 2+3 เช่น 你好: nǐ hǎo ➔ ní hǎo) หรือผู้เรียนตวัดหางเสียงขึ้นเร็วเกินไป (Premature Rise) โดยข้ามช่วงกดต่ำสุด (Chao Scale 1) ทำให้ Contour กลายเป็นเส้นทะยานขึ้น (35) เหมือนเสียง 2
+					<p class="text-xs">
+						เกิดจากกฎ Tone Sandhi (3+3 ➔ 2+3 เช่น 你好) หรือผู้เรียนตวัดเสียงขึ้นเร็วเกินไปก่อนถึงระดับต่ำสุด (Chao Scale 1)
 					</p>
-					<div class="bg-indigo-500/10 rounded-xl p-2.5 text-[10.5px] text-indigo-900 dark:text-indigo-200">
-						💡 <strong>วิธีแก้:</strong> ต้องกดระดับเสียงลงต่ำสุดจนถึงจุดดิ่ง (สเกล 1) แช่ไว้สั้นๆ ก่อนตวัดปลายหางเสียงขึ้นเล็กน้อย
+					<div class="rounded-lg border border-border bg-card p-2.5 text-xs text-foreground">
+						<strong>วิธีแก้:</strong> กดระดับเสียงลงต่ำสุด (สเกล 1) สั้นๆ ก่อนยกปลายเสียงขึ้น
 					</div>
 				</div>
 
 				<div class="pt-2 flex items-center justify-between">
-					<div class="text-xs font-mono font-bold text-foreground">
+					<div class="text-xs font-mono font-semibold text-foreground">
 						ตัวอย่าง: <span class="text-base font-serif">马</span> <span class="text-muted-foreground font-sans">mǎ (เสียง 3)</span>
 					</div>
 					<button
 						type="button"
 						onclick={() => playToneAudio(3)}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition shadow-2xs"
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium text-xs transition cursor-pointer"
 					>
-						<Volume2 class="size-3.5" />
+						<Volume2 class="size-3.5 text-primary" />
 						<span>ฟังเสียง 3</span>
 					</button>
 				</div>
 			</div>
 		</div>
 
-		<!-- Minimal Pair Interactive Contrast Strip -->
-		<div class="rounded-2xl bg-muted/25 border border-border/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+		<!-- Minimal Pair Contrast Strip -->
+		<div class="rounded-xl bg-background border border-border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 			<div class="flex items-center gap-3">
-				<div class="size-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+				<div class="size-9 rounded-lg border border-border bg-card text-primary flex items-center justify-center shrink-0">
 					<Sparkles class="size-4" />
 				</div>
 				<div>
-					<div class="text-xs font-bold text-foreground">
-						คู่เทียบเสียงจำแนก (Minimal Pair Contrast): 麻 (má) vs 马 (mǎ)
+					<div class="text-xs font-semibold text-foreground">
+						คู่เทียบเสียง: 麻 (má) vs 马 (mǎ)
 					</div>
-					<div class="text-[11px] text-muted-foreground">
-						สูตรคำนวณถ่วงน้ำหนักรวม: ({toneSandhiStats.t2AsT3Count ?? 2} + {toneSandhiStats.t3AsT2Count ?? 1} ครั้ง) ÷ {toneSandhiStats.samples} ตัวอย่าง = <strong>{toneSandhiStats.confusionRate ?? 27}%</strong>
+					<div class="text-xs text-muted-foreground">
+						({toneSandhiStats.t2AsT3Count ?? 2} + {toneSandhiStats.t3AsT2Count ?? 1}) ÷ {toneSandhiStats.samples} = <strong>{toneSandhiStats.confusionRate ?? 27}%</strong>
 					</div>
 				</div>
 			</div>
@@ -475,18 +470,18 @@
 				<button
 					type="button"
 					onclick={() => playToneAudio(2)}
-					class="px-3 py-1 rounded-xl border bg-card hover:bg-muted text-xs font-mono font-bold flex items-center gap-1.5 transition"
+					class="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-mono font-semibold flex items-center gap-1.5 transition cursor-pointer"
 				>
-					<Volume2 class="size-3 text-amber-500" />
+					<Volume2 class="size-3 text-primary" />
 					<span>má [35]</span>
 				</button>
 				<span class="text-xs text-muted-foreground font-mono">vs</span>
 				<button
 					type="button"
 					onclick={() => playToneAudio(3)}
-					class="px-3 py-1 rounded-xl border bg-card hover:bg-muted text-xs font-mono font-bold flex items-center gap-1.5 transition"
+					class="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-mono font-semibold flex items-center gap-1.5 transition cursor-pointer"
 				>
-					<Volume2 class="size-3 text-indigo-500" />
+					<Volume2 class="size-3 text-foreground" />
 					<span>mǎ [214]</span>
 				</button>
 			</div>
