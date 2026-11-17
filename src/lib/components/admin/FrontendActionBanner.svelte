@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Lightbulb, Copy, Check, ArrowRight } from '@lucide/svelte';
+	import { Lightbulb, ArrowRight } from '@lucide/svelte';
 
 	export interface InsightChip {
 		label: string;
@@ -25,8 +25,6 @@
 		onCopied?: (msg: string) => void;
 	} = $props();
 
-	let copied = $state(false);
-
 	function chipStyle(tone: InsightChip['tone']) {
 		switch (tone) {
 			case 'rose':
@@ -35,26 +33,6 @@
 				return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
 			default:
 				return 'bg-background text-foreground border-border';
-		}
-	}
-
-	async function copySummary() {
-		const report = [
-			`[${tabTitle}]`,
-			`• ${headline}`,
-			...bullets.map((b) => `• ${b}`),
-			chips.length ? `• Metrics: ${chips.map((c) => `${c.label}: ${c.value}`).join(' | ')}` : ''
-		]
-			.filter(Boolean)
-			.join('\n');
-
-		try {
-			await navigator.clipboard.writeText(report);
-			copied = true;
-			onCopied?.(`คัดลอกสรุป "${tabTitle}" แล้ว`);
-			setTimeout(() => (copied = false), 2000);
-		} catch {
-			onCopied?.('ไม่สามารถคัดลอกได้ กรุณาลองอีกครั้ง');
 		}
 	}
 </script>
@@ -78,8 +56,8 @@
 			</div>
 		</div>
 
-		<div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
-			{#if actionLabel && onAction}
+		{#if actionLabel && onAction}
+			<div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
 				<button
 					type="button"
 					onclick={onAction}
@@ -88,22 +66,8 @@
 					<span>{actionLabel}</span>
 					<ArrowRight class="size-3" />
 				</button>
-			{/if}
-			<button
-				type="button"
-				onclick={copySummary}
-				class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground transition cursor-pointer"
-				title="คัดลอกสรุปข้อมูล"
-			>
-				{#if copied}
-					<Check class="size-3.5 text-emerald-600" />
-					<span class="text-emerald-600">คัดลอกแล้ว</span>
-				{:else}
-					<Copy class="size-3.5 text-muted-foreground" />
-					<span>คัดลอกสรุป</span>
-				{/if}
-			</button>
-		</div>
+			</div>
+		{/if}
 	</div>
 
 	{#if chips.length > 0 || bullets.length > 0}
