@@ -452,6 +452,39 @@ export async function createUser(username: string, password: string): Promise<Us
 	return { id, username };
 }
 
+export function isGuestUsername(username: string): boolean {
+	return /^guest_[a-z0-9]{4,16}$/i.test(String(username || '').trim());
+}
+
+export async function createGuestUser(): Promise<User> {
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const suffix = randomBytes(3).toString('hex');
+		const username = `guest_${suffix}`;
+		const existing = await findUserByUsername(username);
+		if (!existing) {
+			const randomPassword = randomBytes(16).toString('hex');
+			return createUser(username, randomPassword);
+		}
+	}
+	const fallbackUsername = `guest_${Date.now().toString(36).slice(-6)}`;
+	return createUser(fallbackUsername, randomBytes(16).toString('hex'));
+}
+
+export async function upgradeGuestUser(
+	userId: number,
+	newUsername: string,
+	newPassword: string
+): Promise<User> {
+	const client = getDb();
+	if (!client) throw new Error('Database not available');
+	await init();
+	await client.execute({
+		sql: 'UPDATE users SET username = ?, password_hash = ? WHERE id = ?',
+		args: [newUsername, hashPassword(newPassword), userId]
+	});
+	return { id: userId, username: newUsername };
+}
+
 export async function findUserByUsername(
 	username: string
 ): Promise<{ id: number; username: string; password_hash: string } | null> {
@@ -649,6 +682,13 @@ export async function getAdminUserIds(): Promise<string[]> {
 	} catch {
 		return [];
 	}
+}
+
+export async function isAdminUserOrId(userIdentifier: string): Promise<boolean> {
+	if (!userIdentifier) return false;
+	if (isUserAdmin(userIdentifier)) return true;
+	const adminIds = await getAdminUserIds();
+	return adminIds.includes(String(userIdentifier));
 }
 
 export type AdminUserRow = {
@@ -1955,6 +1995,226 @@ export async function getCrossSkillPortfolioExportData(): Promise<Array<{
 		});
 	}
 	return rows;
+}
+
+export async function getStudentCrossSkillSummary(userIds: string[]): Promise<{
+	progress: {
+		xp: number;
+		streak: number;
+		hearts: number;
+		learnerLevel: number;
+		lessonsCompleted: number;
+		totalStars: number;
+	};
+	writing: {
+		attempts: number;
+		avgScore: number | null;
+		avgDurationSec: number | null;
+		weakCharacters: Array<{ character: string; pinyin: string; avgMistakes: number; attempts: number }>;
+	};
+	exam: {
+		attempts: number;
+		passedCount: number;
+		bestScorePct: number | null;
+		avgScorePct: number | null;
+		latestExam: {
+			hskLevel: number;
+			totalScore: number;
+			maxScore: number;
+			passScore: number;
+			isPassed: boolean;
+			listeningScore: number;
+			readingScore: number;
+			writingScore: number;
+		} | null;
+	};
+	chatbot: {
+		sessions: number;
+		avgScore: number | null;
+		totalTurns: number;
+		totalXp: number;
+		lastScenarioTitle: string | null;
+	};
+	flashcard: {
+		setsCompleted: number;
+		totalMastered: number;
+		totalReview: number;
+		totalWords: number;
+		reviewRatioPct: number | null;
+		weakestSet: { hskLevel: number; setIndex: number; reviewCount: number; totalWords: number } | null;
+	};
+	quest: {
+		passedStages: number;
+		totalAttempts: number;
+		strugglingStages: Array<{ stageId: string; failCount: number; totalRetries: number; totalHints: number }>;
+	};
+}> {
+	const emptyResult = {
+		progress: { xp: 0, streak: 0, hearts: 5, learnerLevel: 1, lessonsCompleted: 0, totalStars: 0 },
+		writing: { attempts: 0, avgScore: null, avgDurationSec: null, weakCharacters: [] },
+		exam: { attempts: 0, passedCount: 0, bestScorePct: null, avgScorePct: null, latestExam: null },
+		chatbot: { sessions: 0, avgScore: null, totalTurns: 0, totalXp: 0, lastScenarioTitle: null },
+		flashcard: { setsCompleted: 0, totalMastered: 0, totalReview: 0, totalWords: 0, reviewRatioPct: null, weakestSet: null },
+		quest: { passedStages: 0, totalAttempts: 0, strugglingStages: [] }
+	};
+
+	const cleanIds = userIds.map((id) => String(id).trim()).filter(Boolean);
+	if (cleanIds.length === 0) return emptyResult;
+
+	const client = getDb();
+	if (!client) return emptyResult;
+	await init();
+
+	const placeholders = cleanIds.map(() => '?').join(',');
+	const numericIds = cleanIds.filter((id) => /^\d+$/.test(id)).map((id) => Number(id));
+	const numPlaceholders = numericIds.map(() => '?').join(',');
+
+	const [
+		progRes,
+		lessonRes,
+		writingStatsRes,
+		writingWeakRes,
+		examStatsRes,
+		latestExamRes,
+		chatRes,
+		lastChatRes,
+		fcRes,
+		fcWeakRes,
+		questRes,
+		questStruggleRes
+	] = await Promise.all([
+		numericIds.length > 0
+			? client.execute({ sql: `SELECT xp, streak, hearts, learner_level FROM progress WHERE user_id IN (${numPlaceholders}) LIMIT 1`, args: numericIds }).catch(() => ({ rows: [] }))
+			: Promise.resolve({ rows: [] }),
+		numericIds.length > 0
+			? client.execute({ sql: `SELECT COUNT(*) as cnt, COALESCE(SUM(stars), 0) as stars FROM lesson_completions WHERE user_id IN (${numPlaceholders})`, args: numericIds }).catch(() => ({ rows: [] }))
+			: Promise.resolve({ rows: [] }),
+		client.execute({
+			sql: `SELECT COUNT(*) as cnt, AVG(CAST(score AS REAL) / CASE WHEN max_score > 0 THEN max_score ELSE 100 END * 100) as avg_score FROM hanzi_writing_attempts WHERE user_id IN (${placeholders})`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT character, MAX(pinyin) as pinyin, AVG(mistake_count) as avg_mistakes, COUNT(*) as cnt FROM hanzi_writing_attempts WHERE user_id IN (${placeholders}) GROUP BY character HAVING avg_mistakes >= 1.5 ORDER BY avg_mistakes DESC, cnt DESC LIMIT 4`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT COUNT(*) as cnt, SUM(CASE WHEN is_passed = 1 THEN 1 ELSE 0 END) as passed_cnt, MAX(CAST(total_score AS REAL) / CASE WHEN max_score > 0 THEN max_score ELSE 200 END * 100) as best_pct, AVG(CAST(total_score AS REAL) / CASE WHEN max_score > 0 THEN max_score ELSE 200 END * 100) as avg_pct FROM exam_attempts WHERE user_id IN (${placeholders})`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT hsk_level, total_score, max_score, pass_score, is_passed, listening_score, reading_score, writing_score FROM exam_attempts WHERE user_id IN (${placeholders}) ORDER BY completed_at DESC LIMIT 1`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT COUNT(*) as cnt, AVG(avg_score) as avg_score, COALESCE(SUM(turns_count), 0) as turns, COALESCE(SUM(total_xp), 0) as xp FROM chatbot_sessions WHERE user_id IN (${placeholders})`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT scenario_title FROM chatbot_sessions WHERE user_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 1`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT COUNT(*) as cnt, COALESCE(SUM(mastered_count), 0) as mastered, COALESCE(SUM(review_count), 0) as review, COALESCE(SUM(total_words), 0) as total_words FROM flashcard_set_completions WHERE user_id IN (${placeholders})`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT hsk_level, set_index, review_count, total_words FROM flashcard_set_completions WHERE user_id IN (${placeholders}) AND total_words > 0 ORDER BY (CAST(review_count AS REAL) / total_words) DESC, completed_at DESC LIMIT 1`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT SUM(CASE WHEN event_type = 'pass' THEN 1 ELSE 0 END) as passed_cnt, SUM(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 ELSE 0 END) as attempt_cnt FROM stage_telemetry WHERE user_id IN (${placeholders})`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT stage_id, SUM(CASE WHEN event_type = 'fail' THEN 1 ELSE 0 END) as fail_cnt, COALESCE(SUM(retries_count), 0) as retries, COALESCE(SUM(hints_used), 0) as hints FROM stage_telemetry WHERE user_id IN (${placeholders}) GROUP BY stage_id HAVING fail_cnt > 0 OR retries >= 2 OR hints >= 2 ORDER BY fail_cnt DESC, retries DESC LIMIT 3`,
+			args: cleanIds
+		}).catch(() => ({ rows: [] }))
+	]);
+
+	const progRow = progRes.rows[0];
+	const lessonRow = lessonRes.rows[0];
+	const writeRow = writingStatsRes.rows[0];
+	const examRow = examStatsRes.rows[0];
+	const latestExamRow = latestExamRes.rows[0];
+	const chatRow = chatRes.rows[0];
+	const fcRow = fcRes.rows[0];
+	const fcWeakRow = fcWeakRes.rows[0];
+	const questRow = questRes.rows[0];
+
+	const fcTotalWords = Number(fcRow?.total_words || 0);
+	const fcTotalReview = Number(fcRow?.review || 0);
+
+	return {
+		progress: {
+			xp: Number(progRow?.xp || 0),
+			streak: Number(progRow?.streak || 0),
+			hearts: Number(progRow?.hearts ?? 5),
+			learnerLevel: Number(progRow?.learner_level || 1),
+			lessonsCompleted: Number(lessonRow?.cnt || 0),
+			totalStars: Number(lessonRow?.stars || 0)
+		},
+		writing: {
+			attempts: Number(writeRow?.cnt || 0),
+			avgScore: Number(writeRow?.cnt || 0) > 0 ? Math.round(Number(writeRow?.avg_score || 0)) : null,
+			avgDurationSec: null,
+			weakCharacters: writingWeakRes.rows.map((r) => ({
+				character: String(r.character),
+				pinyin: String(r.pinyin || ''),
+				avgMistakes: Number(r.avg_mistakes || 0),
+				attempts: Number(r.cnt || 0)
+			}))
+		},
+		exam: {
+			attempts: Number(examRow?.cnt || 0),
+			passedCount: Number(examRow?.passed_cnt || 0),
+			bestScorePct: Number(examRow?.cnt || 0) > 0 ? Math.round(Number(examRow?.best_pct || 0)) : null,
+			avgScorePct: Number(examRow?.cnt || 0) > 0 ? Math.round(Number(examRow?.avg_pct || 0)) : null,
+			latestExam: latestExamRow
+				? {
+						hskLevel: Number(latestExamRow.hsk_level),
+						totalScore: Number(latestExamRow.total_score),
+						maxScore: Number(latestExamRow.max_score || 200),
+						passScore: Number(latestExamRow.pass_score || 120),
+						isPassed: Boolean(latestExamRow.is_passed),
+						listeningScore: Number(latestExamRow.listening_score || 0),
+						readingScore: Number(latestExamRow.reading_score || 0),
+						writingScore: Number(latestExamRow.writing_score || 0)
+					}
+				: null
+		},
+		chatbot: {
+			sessions: Number(chatRow?.cnt || 0),
+			avgScore: Number(chatRow?.cnt || 0) > 0 ? Math.round(Number(chatRow?.avg_score || 0)) : null,
+			totalTurns: Number(chatRow?.turns || 0),
+			totalXp: Number(chatRow?.xp || 0),
+			lastScenarioTitle: lastChatRes.rows[0]?.scenario_title ? String(lastChatRes.rows[0].scenario_title) : null
+		},
+		flashcard: {
+			setsCompleted: Number(fcRow?.cnt || 0),
+			totalMastered: Number(fcRow?.mastered || 0),
+			totalReview: fcTotalReview,
+			totalWords: fcTotalWords,
+			reviewRatioPct: fcTotalWords > 0 ? Math.round((fcTotalReview / fcTotalWords) * 100) : null,
+			weakestSet: fcWeakRow
+				? {
+						hskLevel: Number(fcWeakRow.hsk_level),
+						setIndex: Number(fcWeakRow.set_index),
+						reviewCount: Number(fcWeakRow.review_count || 0),
+						totalWords: Number(fcWeakRow.total_words || 0)
+					}
+				: null
+		},
+		quest: {
+			passedStages: Number(questRow?.passed_cnt || 0),
+			totalAttempts: Number(questRow?.attempt_cnt || 0),
+			strugglingStages: questStruggleRes.rows.map((r) => ({
+				stageId: String(r.stage_id),
+				failCount: Number(r.fail_cnt || 0),
+				totalRetries: Number(r.retries || 0),
+				totalHints: Number(r.hints || 0)
+			}))
+		}
+	};
 }
 
 export async function getAllLearningEventsForExport(limit = 10000): Promise<any[]> {
@@ -3578,6 +3838,17 @@ export async function getUserFullDetail(userId: number) {
 export type ParticipationTrendPoint = {
 	day: string;
 	formattedDate: string;
+	totalActions: number;
+	activeLearners: number;
+	weeklyUniqueLearners: number;
+	breakdown: {
+		quest: number;
+		pitch: number;
+		flashcard: number;
+		hanzi: number;
+		exam: number;
+		dialogue: number;
+	};
 	stagePracticeCount: number;
 	wordPracticeCount: number;
 	unclassifiedCount: number;
@@ -3590,44 +3861,129 @@ export async function getParticipationTrend(): Promise<ParticipationTrendPoint[]
 	if (!client) return [];
 	await init();
 	try {
-		const res = await client.execute(`
-			SELECT 
-				strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) as day,
-				practice_mode,
-				COUNT(*) as total_actions,
-				ROUND(AVG(gop_overall), 1) as avg_gop
-			FROM pronunciation_evaluations
-			WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
-			GROUP BY day, practice_mode
-			ORDER BY day ASC, practice_mode ASC
-		`);
+		const cteSql = `
+			WITH all_events AS (
+				SELECT
+					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					CAST(user_id AS TEXT) AS user_id,
+					CASE WHEN practice_mode = 'stage' THEN 'quest' ELSE 'pitch' END AS activity_type,
+					gop_overall AS gop
+				FROM pronunciation_evaluations
+				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				UNION ALL
+				SELECT
+					strftime('%Y-%m-%d', datetime(completed_at/1000, 'unixepoch')) AS day,
+					CAST(user_id AS TEXT) AS user_id,
+					'flashcard' AS activity_type,
+					NULL AS gop
+				FROM flashcard_set_completions
+				WHERE completed_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				UNION ALL
+				SELECT
+					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					CAST(user_id AS TEXT) AS user_id,
+					'hanzi' AS activity_type,
+					NULL AS gop
+				FROM hanzi_writing_attempts
+				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				UNION ALL
+				SELECT
+					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					CAST(user_id AS TEXT) AS user_id,
+					'exam' AS activity_type,
+					NULL AS gop
+				FROM exam_attempts
+				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				UNION ALL
+				SELECT
+					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					CAST(user_id AS TEXT) AS user_id,
+					'dialogue' AS activity_type,
+					NULL AS gop
+				FROM chatbot_sessions
+				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+			)
+		`;
+
+		const [typeRes, dauRes, weeklyRes] = await Promise.all([
+			client.execute(`
+				${cteSql}
+				SELECT day, activity_type, COUNT(*) AS total_actions, ROUND(AVG(gop), 1) AS avg_gop
+				FROM all_events
+				GROUP BY day, activity_type
+				ORDER BY day ASC
+			`),
+			client.execute(`
+				${cteSql}
+				SELECT day, COUNT(DISTINCT user_id) AS active_learners
+				FROM all_events
+				GROUP BY day
+			`),
+			client.execute(`
+				${cteSql}
+				SELECT COUNT(DISTINCT user_id) AS weekly_learners
+				FROM all_events
+			`)
+		]);
+
 		const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-		const byDay = new Map<string, typeof res.rows>();
-		for (const row of res.rows) {
+		const byDay = new Map<string, typeof typeRes.rows>();
+		for (const row of typeRes.rows) {
 			const day = String(row.day);
 			const rows = byDay.get(day) ?? [];
 			rows.push(row);
 			byDay.set(day, rows);
 		}
+
+		const dauByDay = new Map<string, number>();
+		for (const row of dauRes.rows) {
+			dauByDay.set(String(row.day), Number(row.active_learners || 0));
+		}
+
+		const weeklyUniqueLearners = Number(weeklyRes.rows[0]?.weekly_learners || 0);
+
 		return Array.from({ length: 7 }, (_, index) => {
 			const date = new Date();
 			date.setUTCHours(0, 0, 0, 0);
 			date.setUTCDate(date.getUTCDate() - (6 - index));
 			const day = date.toISOString().slice(0, 10);
 			const rows = byDay.get(day) ?? [];
-			const stageRow = rows.find((row) => String(row.practice_mode) === 'stage');
-			const wordRow = rows.find((row) => String(row.practice_mode) === 'word');
-			const unclassifiedRow = rows.find((row) => !['stage', 'word'].includes(String(row.practice_mode)));
+
+			const findCount = (type: string) =>
+				Number(rows.find((r) => String(r.activity_type) === type)?.total_actions || 0);
+			const questRow = rows.find((r) => String(r.activity_type) === 'quest');
+			const pitchRow = rows.find((r) => String(r.activity_type) === 'pitch');
+
+			const breakdown = {
+				quest: findCount('quest'),
+				pitch: findCount('pitch'),
+				flashcard: findCount('flashcard'),
+				hanzi: findCount('hanzi'),
+				exam: findCount('exam'),
+				dialogue: findCount('dialogue')
+			};
+			const totalActions =
+				breakdown.quest +
+				breakdown.pitch +
+				breakdown.flashcard +
+				breakdown.hanzi +
+				breakdown.exam +
+				breakdown.dialogue;
+
 			const [, month, dateOfMonth] = day.split('-');
 			const thaiMonth = months[Number(month) - 1] || month;
 			return {
 				day,
 				formattedDate: `${Number(dateOfMonth)} ${thaiMonth}`,
-				stagePracticeCount: Number(stageRow?.total_actions || 0),
-				wordPracticeCount: Number(wordRow?.total_actions || 0),
-				unclassifiedCount: Number(unclassifiedRow?.total_actions || 0),
-				stageAvgScore: stageRow?.avg_gop == null ? null : Number(stageRow.avg_gop),
-				wordAvgScore: wordRow?.avg_gop == null ? null : Number(wordRow.avg_gop)
+				totalActions,
+				activeLearners: dauByDay.get(day) ?? 0,
+				weeklyUniqueLearners,
+				breakdown,
+				stagePracticeCount: breakdown.quest,
+				wordPracticeCount: breakdown.pitch,
+				unclassifiedCount: 0,
+				stageAvgScore: questRow?.avg_gop == null ? null : Number(questRow.avg_gop),
+				wordAvgScore: pitchRow?.avg_gop == null ? null : Number(pitchRow.avg_gop)
 			};
 		});
 	} catch (e) {
@@ -4576,7 +4932,7 @@ export type ExamAttemptRecord = {
 };
 
 export async function recordExamAttempt(record: ExamAttemptRecord): Promise<void> {
-	if (isUserAdmin(record.userId)) return;
+	if (await isAdminUserOrId(record.userId)) return;
 	const client = getDb();
 	if (!client) return;
 	await init();
@@ -4615,7 +4971,7 @@ export type ChatbotSessionRecord = {
 };
 
 export async function recordChatbotSession(record: ChatbotSessionRecord): Promise<void> {
-	if (isUserAdmin(record.userId)) return;
+	if (await isAdminUserOrId(record.userId)) return;
 	const client = getDb();
 	if (!client) return;
 	await init();
@@ -4657,7 +5013,7 @@ export type HanziWritingAttemptRecord = {
 };
 
 export async function recordHanziWritingAttempt(record: HanziWritingAttemptRecord): Promise<void> {
-	if (isUserAdmin(record.userId)) return;
+	if (await isAdminUserOrId(record.userId)) return;
 	const client = getDb();
 	if (!client) return;
 	await init();

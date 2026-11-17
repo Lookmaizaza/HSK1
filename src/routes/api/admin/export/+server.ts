@@ -4,19 +4,26 @@ import {
 	getAllLearningEventsForExport,
 	getPairedAssessmentExportData,
 	getCrossSkillPortfolioExportData,
+	recordAuditLog,
 	type ExportableEvaluationRecord
 } from '$lib/server/db';
+import { extractClientIp } from '$lib/server/rateLimit';
 
 function escapeCsvField(val: any): string {
 	if (val === null || val === undefined) return '';
-	const str = String(val);
+	let str = String(val);
+	// Neutralize CSV Formula Injection while preserving valid negative numbers (e.g., -4.50)
+	if (/^[=+\t\r@]/.test(str) || (/^-/.test(str) && !/^-?\d+(\.\d+)?$/.test(str))) {
+		str = `'${str}`;
+	}
 	if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
 		return `"${str.replace(/"/g, '""')}"`;
 	}
 	return str;
 }
 
-export const GET: RequestHandler = async ({ locals, url }) => {
+export const GET: RequestHandler = async (event) => {
+	const { locals, url, request } = event;
 	// Security check: Only authenticated administrators can export research datasets
 	const admin = locals.realAdmin || locals.user;
 	if (!admin) {
@@ -28,12 +35,24 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	const format = url.searchParams.get('format')?.toLowerCase() || 'csv';
 	const dataset = url.searchParams.get('dataset')?.toLowerCase() || 'evaluations';
-	const limitParam = Number(url.searchParams.get('limit')) || 10000;
+	const limitParam = Math.min(Math.max(1, Number(url.searchParams.get('limit')) || 10000), 100000);
 	const dateStr = new Date().toISOString().slice(0, 10);
+
+	const logExport = (rowCount: number, exportFormat: string, exportDataset: string) =>
+		recordAuditLog({
+			actorUsername: admin.username,
+			action: 'EXPORT_RESEARCH_DATA',
+			resourceType: 'research_export',
+			resourceId: exportDataset,
+			details: { format: exportFormat, dataset: exportDataset, rowCount },
+			ipAddress: extractClientIp(event),
+			userAgent: request.headers.get('user-agent')
+		}).catch(() => {});
 
 	// 1. Export as IEEE 9274.1.1 xAPI Statements (JSON)
 	if (format === 'xapi' || format === 'json' || dataset === 'xapi') {
 		const statements = await getAllLearningEventsForExport(limitParam);
+		await logExport(statements.length, 'xapi_json', 'xapi');
 		const jsonBody = JSON.stringify(statements, null, 2);
 
 		return new Response(jsonBody, {
@@ -49,6 +68,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	// 2. Export Paired Pre/Mid/Post Assessment Dataset (for SPSS, R, Jamovi Paired t-test & Hake's g)
 	if (dataset === 'paired_assessments') {
 		const pairedRows = await getPairedAssessmentExportData();
+		await logExport(pairedRows.length, 'csv', 'paired_assessments');
 		const headers = [
 			'anonymized_user_id',
 			'pre_gop',
@@ -102,6 +122,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	// 3. Export Cross-Skill 6-Axis Portfolio Dataset (for Correlation & Factor Analysis)
 	if (dataset === 'portfolio') {
 		const portfolioRows = await getCrossSkillPortfolioExportData();
+		await logExport(portfolioRows.length, 'csv', 'portfolio');
 		const headers = [
 			'anonymized_user_id',
 			'phoneme_clarity_score',
@@ -148,6 +169,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	// 4. Default: Export Pronunciation Evaluations & LQ5/LQ6 Behavioral Dataset (CSV)
 	const records: ExportableEvaluationRecord[] = await getAllPronunciationEvaluationsForExport(limitParam);
+	await logExport(records.length, 'csv', 'evaluations');
 
 	const headers = [
 		'evaluation_id',
@@ -167,7 +189,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		'slope_type',
 		'attempt_number',
 		'audio_duration_sec',
-		'hesitation_latency_ms',
 		'listened_to_example',
 		'example_listen_count',
 		'phoneme_errors_summary'
@@ -194,7 +215,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			escapeCsvField(r.slopeType),
 			escapeCsvField(r.attemptNumber),
 			escapeCsvField(r.audioDurationSec.toFixed(2)),
-			escapeCsvField(r.hesitationLatencyMs),
 			escapeCsvField(r.listenedToExample ? 1 : 0),
 			escapeCsvField(r.exampleListenCount),
 			escapeCsvField(r.phonemeErrorsSummary)

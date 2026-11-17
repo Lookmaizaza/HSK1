@@ -1,5 +1,5 @@
 import type { Handle } from '@sveltejs/kit';
-import { findUserBySession } from '$lib/server/db';
+import { findUserBySession, isGuestUsername } from '$lib/server/db';
 import { env } from '$env/dynamic/private';
 
 const ADMIN_USERNAMES = new Set(
@@ -34,10 +34,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 				});
 				const impRow = impRes.rows[0];
 				if (impRow) {
+					const impUsername = String(impRow.username);
 					event.locals.user = {
 						id: Number(impRow.id),
-						username: String(impRow.username),
+						username: impUsername,
 						isAdmin: false,
+						isGuest: isGuestUsername(impUsername),
 						role: 'user',
 						isImpersonated: true,
 						realAdminUsername: user.username
@@ -54,6 +56,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			? {
 					...user,
 					isAdmin,
+					isGuest: !isAdmin && isGuestUsername(user.username),
 					role: isAdmin ? ('admin' as const) : ('user' as const)
 			  }
 			: null;

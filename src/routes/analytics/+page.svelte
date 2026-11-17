@@ -1,6 +1,7 @@
 <!-- src/routes/analytics/+page.svelte -->
 <script lang="ts">
 	import AppHeader from '$lib/components/AppHeader.svelte';
+	import StudentSkillRadar from '$lib/components/analytics/StudentSkillRadar.svelte';
 	import type { HskLevelSummary, VocabItemMastery, WordMasteryStatus } from './+page.server';
 	import {
 		Activity,
@@ -21,9 +22,12 @@
 		Layers,
 		CheckCircle2,
 		XCircle,
-		Lock,
-		Unlock,
-		Wind
+		Wind,
+		PenTool,
+		GraduationCap,
+		MessageCircle,
+		Compass,
+		Zap
 	} from '@lucide/svelte';
 	import { speak } from '$lib/speech';
 
@@ -32,11 +36,13 @@
 	const stats = $derived(data.diagnostic);
 	const levels: HskLevelSummary[] = $derived(data.levels || []);
 	const vocabOverview = $derived(data.vocabOverview);
+	const crossSkill = $derived(data.crossSkillSummary);
+	const coachRecs = $derived(data.coachRecommendations || []);
 
-	// Scientific CAPT threshold: minimum 20 words required for reliable acoustic diagnostics
-	const MIN_DIAGNOSTIC_WORDS = 20;
+	// Dashboard Main Tab: 'overview' | 'pronunciation' | 'vocabulary'
+	let activeTab = $state<'overview' | 'pronunciation' | 'vocabulary'>('overview');
 
-	// Strict Pre-test requirement: Must complete the 20-word diagnostic baseline pre-test
+	// Strict Pre-test status (non-blocking banner when false)
 	const totalPracticedWords = $derived(vocabOverview?.practicedWords ?? 0);
 	const isDiagnosticUnlocked = $derived(Boolean(data.hasPre));
 
@@ -143,58 +149,318 @@
 
 <AppHeader />
 
-<main class="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
-	<!-- 1. ANALYTICS HERO -->
-	<section class="relative isolate overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-sm sm:p-7">
+<main class="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6">
+	<!-- 1. TOP ANALYTICS HEADER + GAMIFICATION BAR -->
+	<section class="relative isolate overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-sm sm:p-6">
 		<div class="pointer-events-none absolute inset-y-0 right-0 -z-10 w-1/3 bg-gradient-to-l from-amber-400/10 to-transparent"></div>
+		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+			<div class="space-y-1">
+				<div class="inline-flex items-center gap-1.5 text-xs font-bold text-primary">
+					<Activity class="size-3.5" />
+					<span>Student Learning Analytics</span>
+				</div>
+				<h1 class="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+					แดชบอร์ดพัฒนาการเรียนรู้ 6 ทักษะ
+				</h1>
+				<p class="text-xs text-muted-foreground">
+					วิเคราะห์จากข้อมูลการฝึกจริงทั้งการพูด คัดอักษรจีน ผจญภัย ข้อสอบ HSK และสนทนา AI
+				</p>
+			</div>
 
-		<div class="flex items-center gap-2">
-			<a
-				href="/pitch"
-				class="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white px-4 py-2.5 text-xs font-bold shadow-md shadow-primary/20 transition active:scale-95"
-			>
-				<Mic class="size-3.5" />
-				<span>ห้องฝึกพูดสด</span>
-			</a>
+			<div class="flex flex-wrap items-center gap-2">
+				<div class="inline-flex items-center gap-1.5 rounded-xl border bg-card/80 px-3 py-2 text-xs font-bold">
+					<Flame class="size-3.5 text-orange-500" />
+					<span class="font-mono">{crossSkill?.progress.streak ?? 0}</span>
+					<span class="text-muted-foreground">วันติด</span>
+				</div>
+				<div class="inline-flex items-center gap-1.5 rounded-xl border bg-card/80 px-3 py-2 text-xs font-bold">
+					<Zap class="size-3.5 text-violet-500" />
+					<span class="font-mono">{crossSkill?.progress.xp ?? 0}</span>
+					<span class="text-muted-foreground">XP</span>
+				</div>
+				<a
+					href="/pitch"
+					class="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-white px-4 py-2 text-xs font-bold shadow-md shadow-primary/20 transition active:scale-95"
+				>
+					<Mic class="size-3.5" />
+					<span>ห้องฝึกพูดสด</span>
+				</a>
+			</div>
 		</div>
 	</section>
 
-		<!-- ข้อเสนอแนะและการมอบหมายจากผู้สอน (Teacher Interventions & Feedback) -->
-	{#if data.teacherInterventions && data.teacherInterventions.length > 0}
-		<section class="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3">
-			<div class="flex items-center justify-between">
-				<div class="flex items-center gap-2 font-black text-amber-900 dark:text-amber-200 text-sm">
-					<span>💡 ข้อเสนอแนะจากผู้สอนถึงคุณ</span>
+	<!-- NON-BLOCKING PRE-TEST INVITATION BANNER -->
+	{#if !isDiagnosticUnlocked}
+		<section class="rounded-2xl border border-primary/25 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+			<div class="flex items-start gap-3">
+				<div class="rounded-xl bg-primary/15 p-2 text-primary shrink-0">
+					<Sparkles class="size-4" />
 				</div>
-				<span class="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-900 dark:text-amber-100">
-					{data.teacherInterventions.length} ข้อความ
+				<div class="space-y-0.5">
+					<h2 class="text-sm font-extrabold text-foreground">
+						แนะนำ: ทำแบบทดสอบก่อนเรียน (Pre-test 20 คำ) เพื่อสร้างเกณฑ์วัดระดับเสียงเริ่มต้น
+					</h2>
+					<p class="text-xs text-muted-foreground">
+						คุณสามารถดูสถิติจากโหมดอื่นๆ ด้านล่างได้ทันที หรือใช้เวลา 2-3 นาทีทำ Pre-test เพื่อให้ระบบวิเคราะห์เสียงวรรณยุกต์ได้แม่นยำขึ้น
+					</p>
+				</div>
+			</div>
+			<a
+				href="/assessment?type=pre"
+				class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-xs font-extrabold shrink-0 transition active:scale-95"
+			>
+				<span>เริ่มทำ Pre-test</span>
+				<ArrowRight class="size-3.5" />
+			</a>
+		</section>
+	{/if}
+
+	<!-- 2. HERO OVERVIEW: 6-AXIS RADAR + RULE-BASED SMART COACH -->
+	<section class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+		<!-- Left: 6-Axis Holistic Skill Radar -->
+		<div class="lg:col-span-5 rounded-3xl border bg-card p-5 sm:p-6 shadow-sm flex flex-col justify-between">
+			<div class="flex items-center justify-between mb-2">
+				<div>
+					<h2 class="text-sm font-black text-foreground">เรดาร์ทักษะ 6 มิติ</h2>
+					<p class="text-[11px] text-muted-foreground">ภาพรวมความสมดุลจากทุกโหมดในระบบ</p>
+				</div>
+				<span class="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-extrabold text-primary">
+					{vocabOverview.practicedWords}/{vocabOverview.totalWords} คำ
 				</span>
 			</div>
-			<div class="space-y-2 text-xs">
-				{#each data.teacherInterventions as item (item.id)}
-					<div class="rounded-2xl bg-card border border-amber-500/20 p-3.5 space-y-1.5">
-						<div class="font-extrabold text-foreground flex items-center justify-between">
-							<span>{item.title}</span>
-							<span class="text-[10px] text-muted-foreground font-mono">จาก @{item.assignedBy}</span>
-						</div>
-						<p class="text-muted-foreground leading-relaxed">{item.message}</p>
-						{#if item.remedialWords?.length}
-							<div class="flex flex-wrap items-center gap-1.5 pt-1">
-								<span class="text-[11px] font-bold text-amber-700 dark:text-amber-300">คำศัพท์ที่ครูแนะนำให้ฝึกซ้ำ:</span>
-								{#each item.remedialWords as word (word)}
-									<span class="rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-400 font-extrabold px-2 py-0.5 text-xs">
-										{word}
+			<StudentSkillRadar axes={data.radarAxes || []} overallScore={data.holisticReadinessScore} />
+		</div>
+
+		<!-- Right: Rule-Based Smart Next-Step Coach -->
+		<div class="lg:col-span-7 rounded-3xl border bg-card p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-4">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-2">
+					<div class="rounded-xl bg-amber-500/15 p-2 text-amber-600 dark:text-amber-400">
+						<Sparkles class="size-4" />
+					</div>
+					<div>
+						<h2 class="text-sm font-black text-foreground">คำแนะนำอัตโนมัติสำหรับคุณ (Smart Coach)</h2>
+						<p class="text-[11px] text-muted-foreground">ประมวลผลจากจุดผิดพลาดและพฤติกรรมการฝึกจริงของคุณ</p>
+					</div>
+				</div>
+				<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+					Auto-Engine
+				</span>
+			</div>
+
+			<div class="space-y-2.5">
+				{#each coachRecs as rec (rec.id)}
+					<div class="rounded-2xl border bg-background/80 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition hover:border-primary/40">
+						<div class="space-y-1">
+							<div class="flex flex-wrap items-center gap-1.5">
+								<span class="text-[10px] font-black px-2 py-0.5 rounded-full {rec.priority === 'high' ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400' : rec.priority === 'medium' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'}">
+									{rec.priority === 'high' ? 'ควรซ่อมด่วน' : rec.priority === 'medium' ? 'แนะนำ' : 'ต่อยอด'}
+								</span>
+								{#if rec.metricBadge}
+									<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-muted text-foreground">
+										{rec.metricBadge}
 									</span>
-								{/each}
+								{/if}
 							</div>
-						{/if}
+							<h3 class="text-xs sm:text-sm font-extrabold text-foreground">{rec.title}</h3>
+							<p class="text-[11px] text-muted-foreground leading-relaxed">{rec.description}</p>
+						</div>
+						<a
+							href={rec.actionHref}
+							class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground px-3.5 py-2 text-xs font-extrabold transition shrink-0"
+						>
+							<span>{rec.actionLabel}</span>
+							<ArrowRight class="size-3.5" />
+						</a>
 					</div>
 				{/each}
+			</div>
+		</div>
+	</section>
+
+	<!-- 3. SEGMENTED 3-TAB NAVIGATION -->
+	<nav class="grid grid-cols-3 gap-2 rounded-2xl border bg-muted/40 p-1.5">
+		<button
+			type="button"
+			onclick={() => (activeTab = 'overview')}
+			class="rounded-xl px-3 py-2.5 text-xs sm:text-sm font-extrabold transition cursor-pointer {activeTab === 'overview' ? 'bg-card text-foreground shadow-sm border' : 'text-muted-foreground hover:text-foreground'}"
+		>
+			ความก้าวหน้าโดยรวม
+		</button>
+		<button
+			type="button"
+			onclick={() => (activeTab = 'pronunciation')}
+			class="rounded-xl px-3 py-2.5 text-xs sm:text-sm font-extrabold transition cursor-pointer {activeTab === 'pronunciation' ? 'bg-card text-foreground shadow-sm border' : 'text-muted-foreground hover:text-foreground'}"
+		>
+			ออกเสียงและวรรณยุกต์
+		</button>
+		<button
+			type="button"
+			onclick={() => (activeTab = 'vocabulary')}
+			class="rounded-xl px-3 py-2.5 text-xs sm:text-sm font-extrabold transition cursor-pointer {activeTab === 'vocabulary' ? 'bg-card text-foreground shadow-sm border' : 'text-muted-foreground hover:text-foreground'}"
+		>
+			คลังคำศัพท์ HSK 1-3
+		</button>
+	</nav>
+
+	<!-- TAB 1: CROSS-SKILL OVERVIEW -->
+	{#if activeTab === 'overview'}
+		<section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+			<!-- Card 1: Hanzi Writing -->
+			<div class="rounded-3xl border bg-card p-5 space-y-3 shadow-sm">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2.5">
+						<div class="rounded-xl bg-emerald-500/15 p-2.5 text-emerald-600 dark:text-emerald-400">
+							<PenTool class="size-4" />
+						</div>
+						<div>
+							<h3 class="text-sm font-black text-foreground">คัดอักษรจีนตามลำดับขีด</h3>
+							<p class="text-[11px] text-muted-foreground">ฝึกแล้ว {crossSkill?.writing.attempts ?? 0} ครั้ง</p>
+						</div>
+					</div>
+					<span class="font-mono text-lg font-black text-emerald-600 dark:text-emerald-400">
+						{crossSkill?.writing.avgScore !== null && crossSkill?.writing.avgScore !== undefined ? `${crossSkill.writing.avgScore}%` : '—'}
+					</span>
+				</div>
+				{#if crossSkill?.writing.weakCharacters.length}
+					<div class="flex flex-wrap items-center gap-1.5 text-xs">
+						<span class="text-[11px] text-muted-foreground">ตัวที่ผิดบ่อย:</span>
+						{#each crossSkill.writing.weakCharacters as wc (wc.character)}
+							<span class="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 font-bold text-rose-600 dark:text-rose-400">
+								{wc.character} ({wc.avgMistakes.toFixed(1)} ขีด)
+							</span>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-xs text-muted-foreground">ยังไม่มีข้อมูลตัวอักษรที่ผิดลำดับขีดบ่อย</p>
+				{/if}
+				<div class="pt-1">
+					<a href="/quest" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+						<span>ไปฝึกคัดในบทเรียน</span>
+						<ArrowRight class="size-3" />
+					</a>
+				</div>
+			</div>
+
+			<!-- Card 2: HSK Mock Exam -->
+			<div class="rounded-3xl border bg-card p-5 space-y-3 shadow-sm">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2.5">
+						<div class="rounded-xl bg-amber-500/15 p-2.5 text-amber-600 dark:text-amber-400">
+							<GraduationCap class="size-4" />
+						</div>
+						<div>
+							<h3 class="text-sm font-black text-foreground">ข้อสอบจำลอง HSK</h3>
+							<p class="text-[11px] text-muted-foreground">
+								สอบแล้ว {crossSkill?.exam.attempts ?? 0} ครั้ง (ผ่าน {crossSkill?.exam.passedCount ?? 0})
+							</p>
+						</div>
+					</div>
+					<span class="font-mono text-lg font-black text-amber-600 dark:text-amber-400">
+						{crossSkill?.exam.bestScorePct !== null && crossSkill?.exam.bestScorePct !== undefined ? `${crossSkill.exam.bestScorePct}%` : '—'}
+					</span>
+				</div>
+				{#if crossSkill?.exam.latestExam}
+					{@const ex = crossSkill.exam.latestExam}
+					<div class="grid grid-cols-3 gap-2 text-center rounded-2xl bg-muted/40 p-2.5 text-xs">
+						<div>
+							<div class="text-[10px] text-muted-foreground">ฟัง</div>
+							<div class="font-mono font-bold text-foreground">{ex.listeningScore}</div>
+						</div>
+						<div>
+							<div class="text-[10px] text-muted-foreground">อ่าน</div>
+							<div class="font-mono font-bold text-foreground">{ex.readingScore}</div>
+						</div>
+						<div>
+							<div class="text-[10px] text-muted-foreground">เขียน</div>
+							<div class="font-mono font-bold text-foreground">{ex.writingScore}</div>
+						</div>
+					</div>
+				{:else}
+					<p class="text-xs text-muted-foreground">ลองทำข้อสอบจำลอง HSK เพื่อวัดระดับความพร้อม</p>
+				{/if}
+				<div class="pt-1">
+					<a href="/exam" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+						<span>เข้าห้องสอบจำลอง</span>
+						<ArrowRight class="size-3" />
+					</a>
+				</div>
+			</div>
+
+			<!-- Card 3: AI Role-Play Conversation -->
+			<div class="rounded-3xl border bg-card p-5 space-y-3 shadow-sm">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2.5">
+						<div class="rounded-xl bg-sky-500/15 p-2.5 text-sky-600 dark:text-sky-400">
+							<MessageCircle class="size-4" />
+						</div>
+						<div>
+							<h3 class="text-sm font-black text-foreground">สนทนา AI (Role-Play)</h3>
+							<p class="text-[11px] text-muted-foreground">
+								{crossSkill?.chatbot.sessions ?? 0} บทสนทนา · {crossSkill?.chatbot.totalTurns ?? 0} เทิร์น
+							</p>
+						</div>
+					</div>
+					<span class="font-mono text-lg font-black text-sky-600 dark:text-sky-400">
+						{crossSkill?.chatbot.avgScore !== null && crossSkill?.chatbot.avgScore !== undefined ? `${crossSkill.chatbot.avgScore}%` : '—'}
+					</span>
+				</div>
+				<p class="text-xs text-muted-foreground">
+					{#if crossSkill?.chatbot.lastScenarioTitle}
+						สถานการณ์ล่าสุด: <strong class="text-foreground">{crossSkill.chatbot.lastScenarioTitle}</strong>
+					{:else}
+						ฝึกโต้ตอบภาษาจีนในสถานการณ์จำลองเพื่อเพิ่มความคล่องแคล่ว
+					{/if}
+				</p>
+				<div class="pt-1">
+					<a href="/talk" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+						<span>ไปฝึกสนทนา AI</span>
+						<ArrowRight class="size-3" />
+					</a>
+				</div>
+			</div>
+
+			<!-- Card 4: Flashcards & Adventure Quest -->
+			<div class="rounded-3xl border bg-card p-5 space-y-3 shadow-sm">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2.5">
+						<div class="rounded-xl bg-violet-500/15 p-2.5 text-violet-600 dark:text-violet-400">
+							<Compass class="size-4" />
+						</div>
+						<div>
+							<h3 class="text-sm font-black text-foreground">Flashcards & ด่านผจญภัย</h3>
+							<p class="text-[11px] text-muted-foreground">
+								Flashcards {crossSkill?.flashcard.setsCompleted ?? 0} ชุด · ดาวด่าน {crossSkill?.progress.totalStars ?? 0} ★
+							</p>
+						</div>
+					</div>
+					<span class="font-mono text-lg font-black text-violet-600 dark:text-violet-400">
+						{crossSkill?.progress.lessonsCompleted ?? 0} บท
+					</span>
+				</div>
+				<p class="text-xs text-muted-foreground">
+					{#if crossSkill?.flashcard.totalWords}
+						จำได้แล้ว {crossSkill.flashcard.totalMastered} คำ · ต้องทวน {crossSkill.flashcard.totalReview} คำ
+					{:else}
+						ทบทวนคำศัพท์ด้วย Flashcards และตะลุยด่านผจญภัยเพื่อสะสมดาว
+					{/if}
+				</p>
+				<div class="flex items-center gap-4 pt-1">
+					<a href="/flashcard" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+						<span>เปิด Flashcards</span>
+						<ArrowRight class="size-3" />
+					</a>
+					<a href="/quest" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+						<span>ลุยด่านผจญภัย</span>
+						<ArrowRight class="size-3" />
+					</a>
+				</div>
 			</div>
 		</section>
 	{/if}
 
-	<!-- 2. HSK LEVEL SELECTOR TABS (HSK 1, HSK 2, HSK 3 & ทุกระดับ) -->
+	<!-- HSK LEVEL SELECTOR (SHOWN IN PRONUNCIATION & VOCABULARY TABS) -->
+	{#if activeTab !== 'overview'}
 	<section class="space-y-2">
 		<div class="flex items-center justify-between">
 			<span class="text-xs font-bold text-muted-foreground uppercase tracking-wider">
@@ -288,41 +554,10 @@
 			{/if}
 		</div>
 	</section>
+	{/if}
 
-	<!-- 3. ACOUSTIC DATA COLLECTION PROGRESS (PRETEST GATE) -->
-	{#if !isDiagnosticUnlocked}
-		<section class="rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-background p-6 sm:p-8 space-y-5 shadow-sm">
-			<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-				<div class="space-y-2">
-					<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-primary/15 text-primary border border-primary/25">
-						<Lock class="size-3.5" />
-						<span>ปลดล็อกแดชบอร์ดการวิเคราะห์</span>
-					</div>
-					<h2 class="text-xl sm:text-2xl font-black text-foreground">
-						ทำแบบทดสอบก่อนเรียน (Pre-test 20 คำ) เพื่อเปิดระบบผลวิเคราะห์
-					</h2>
-					<p class="text-xs sm:text-sm text-muted-foreground max-w-xl leading-relaxed">
-						ใช้เวลาเพียง 2-3 นาทีในการออกเสียงคำศัพท์พื้นฐาน 20 คำ ระบบจะประมวลผลเกณฑ์วัดระดับสัทศาสตร์เริ่มต้น (Baseline) จุดแข็ง-จุดอ่อน วรรณยุกต์ และโฟนีมให้คุณทันที 100%
-					</p>
-				</div>
-				<div class="sm:text-right shrink-0">
-					<a
-						href="/assessment?type=pre"
-						class="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3.5 text-sm font-extrabold shadow-md hover:shadow-lg transition active:scale-98 cursor-pointer"
-					>
-						<Sparkles class="size-4" />
-						<span>เริ่มทำแบบทดสอบก่อนเรียน (20 คำ) →</span>
-					</a>
-				</div>
-			</div>
-		</section>
-	{:else}
-		<!-- 4. UNLOCKED FULL ACOUSTIC & PHONETIC DIAGNOSTIC SUITE -->
-		<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-			<Unlock class="size-3.5" />
-			<span>ปลดล็อกผลวิเคราะห์เสียงแล้วจากการทำแบบประเมินก่อนเรียน (Pre-test) · {activeLevelTitle}</span>
-		</div>
-
+	<!-- TAB 2: PRONUNCIATION & TONE DIAGNOSTICS -->
+	{#if activeTab === 'pronunciation'}
 		<!-- 4.1 HERO VISUAL SCORE GAUGE & KEY METRICS -->
 		<section class="grid grid-cols-1 md:grid-cols-12 gap-4">
 			<!-- Left: Circular Radial Gauge Hero -->
@@ -688,7 +923,10 @@
 				</div>
 			{/if}
 		</section>
+	{/if}
 
+	<!-- TAB 3: HSK 1-3 VOCABULARY & REMEDIAL CARDS -->
+	{#if activeTab === 'vocabulary'}
 		<!-- 4.4 ADAPTIVE REMEDIAL FLASHCARDS -->
 		<section class="space-y-4">
 			<div class="flex items-center justify-between">
@@ -760,7 +998,9 @@
 				</div>
 			{/if}
 		</section>
+	{/if}
 
+	{#if activeTab === 'pronunciation'}
 		<!-- 4.5 SHENGMU CONSONANTS VISUAL HEATMAP -->
 		{#if stats?.phonemeBreakdown && stats.phonemeBreakdown.length > 0}
 			<section class="rounded-3xl border bg-card p-5 sm:p-6 space-y-4 shadow-sm">
@@ -793,6 +1033,7 @@
 		{/if}
 	{/if}
 
+	{#if activeTab === 'vocabulary'}
 	<!-- 5. HSK VOCABULARY BANK (ACCESSIBLE TO REACH 20-WORD THRESHOLD & MASTER WORDS) -->
 	<section class="rounded-3xl border bg-card p-5 sm:p-6 space-y-4 shadow-sm">
 		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
@@ -888,4 +1129,5 @@
 			</div>
 		{/if}
 	</section>
+	{/if}
 </main>

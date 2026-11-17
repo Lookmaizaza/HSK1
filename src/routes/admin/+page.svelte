@@ -11,7 +11,6 @@
 	import DialogueFluencyView from '$lib/components/admin/skills/DialogueFluencyView.svelte';
 	import ExamDiagnosticsView from '$lib/components/admin/skills/ExamDiagnosticsView.svelte';
 	import FlashcardAnalyticsView from '$lib/components/admin/skills/FlashcardAnalyticsView.svelte';
-	import FrontendActionBanner from '$lib/components/admin/FrontendActionBanner.svelte';
 	import HardestWordsAnalyticsCard from '$lib/components/admin/skills/HardestWordsAnalyticsCard.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import {
@@ -104,95 +103,6 @@
 	// OmniRoute Quick Nav & Quick Actions
 	let quickNavOpen = $state(false);
 	let quickNavQuery = $state('');
-	// Smart Teacher Interventions State
-	let interventionModalUser = $state<any | null>(null);
-	let editingIntervention = $state<any | null>(null);
-	let interventionModalOpen = $state(false);
-	let interventionTargetUserId = $state('');
-	let interventionTargetUsername = $state('');
-	let interventionTitle = $state('ข้อเสนอแนะและชุดฝึกซ่อมเสริมเฉพาะบุคคล');
-	let interventionMessage = $state('');
-	let interventionRemedialWords = $state('');
-	let interventionStatus = $state<'pending' | 'improved'>('pending');
-
-	const AI_INTERVENTION_PRESETS = [
-		{
-			label: 'วรรณยุกต์เสียง 3 (Tone 3)',
-			title: 'เทคนิคการออกเสียงวรรณยุกต์เสียงที่ 3 (上声)',
-			msg: 'แนะนำให้ลากเสียงลงต่ำสุดก่อนแล้วค่อยตวัดขึ้นเล็กน้อย (ระดับ 214) อย่าเพิ่งรีบยกเสียงสูงขึ้นทันที จะช่วยให้ไม่สับสนกับเสียง 2 ครับ',
-			words: '好, 你, 我, 很, 水'
-		},
-		{
-			label: 'เสียงดัดลิ้น zh / ch / sh',
-			title: 'การจัดรูปปากและตำแหน่งลิ้นพยัญชนะดัดลิ้น (zh, ch, sh)',
-			msg: 'ให้ยกปลายลิ้นขึ้นแตะที่ปุ่มเหงือกด้านบน ปล่อยลมออกมาอย่างมั่นใจ ไม่ต้องเกร็งริมฝีปากมากเกินไปครับ',
-			words: '是, 吃, 书, 说, 谁'
-		},
-		{
-			label: 'กฎผันเสียง Tone Sandhi',
-			title: 'การผันเสียงวรรณยุกต์ต่อเนื่อง (Tone Sandhi)',
-			msg: 'เมื่อมีเสียง 3 อยู่ติดกันสองพยางค์ พยางค์แรกให้ออกเสียงเป็นเสียง 2 นะครับ เช่น 你好 ให้ออกเป็น ní hǎo อย่างเป็นธรรมชาติ',
-			words: '你好, 可以, 很好, 水果'
-		},
-		{
-			label: 'ความคล่องแคล่วและจังหวะ',
-			title: 'ฝึกออกเสียงเป็นกลุ่มคำ (Chunking & Rhythm)',
-			msg: 'ออกเสียงคำศัพท์ได้ถูกต้องดีแล้วครับ ขั้นตอนต่อไปแนะนำให้ฝึกพูดเชื่อมโยงเป็นประโยคสั้นๆ เพื่อให้จังหวะการพูดเป็นธรรมชาติยิ่งขึ้น',
-			words: '我是中国人, 他很开心, 你喝水吗'
-		}
-	];
-
-	function openCreateIntervention(user?: any, suggestedWords?: string[]) {
-		editingIntervention = null;
-		if (user) {
-			interventionModalUser = user;
-			interventionTargetUserId = String(user.id);
-			interventionTargetUsername = user.username || '';
-			interventionTitle = `คำแนะนำและชุดฝึกซ่อมเสริมสำหรับ @${user.username}`;
-			if (suggestedWords && suggestedWords.length > 0) {
-				interventionRemedialWords = suggestedWords.join(', ');
-				interventionMessage = `ครูสังเกตเห็นว่ายังมีจุดที่ควรเสริมความแม่นยำในคำว่า ${interventionRemedialWords} แนะนำให้ฝึกฟังเสียงต้นแบบและสังเกตรูปปากก่อนออกเสียงครับ`;
-			} else {
-				const mistakeWords = (user.topMistakes || user.mistakes || []).map((m: any) => m.hanzi || m.word).filter(Boolean);
-			if (mistakeWords.length > 0) {
-				interventionRemedialWords = [...new Set(mistakeWords)].slice(0, 6).join(', ');
-				interventionMessage = `ครูสังเกตเห็นว่ายังมีจุดที่ออกเสียงวรรณยุกต์คลาดเคลื่อนในคำว่า ${interventionRemedialWords} แนะนำให้ฝึกกดเสียงต่ำลงในเสียง 3 ก่อนเชื่อมคำครับ`;
-			} else {
-				interventionRemedialWords = '好, 你, 我, 很, 是';
-				interventionMessage = 'แนะนำให้ฝึกฟังเสียงต้นแบบช้าๆ และสังเกตรูปปากก่อนออกเสียงวรรณยุกต์ 3 และ 4 ครับ';
-			}
-			}
-		} else {
-			interventionModalUser = null;
-			interventionTargetUserId = '';
-			interventionTargetUsername = '';
-			interventionTitle = 'ข้อเสนอแนะและชุดฝึกซ่อมเสริมเฉพาะบุคคล';
-			interventionMessage = '';
-			interventionRemedialWords = '';
-		}
-		interventionStatus = 'pending';
-		interventionModalOpen = true;
-	}
-
-	function openEditIntervention(item: any) {
-		editingIntervention = item;
-		interventionModalUser = null;
-		interventionTargetUserId = String(item.userId);
-		interventionTargetUsername = '';
-		interventionTitle = item.title;
-		interventionMessage = item.message;
-		interventionRemedialWords = Array.isArray(item.remedialWords) ? item.remedialWords.join(', ') : String(item.remedialWords || '');
-		interventionStatus = item.status || 'pending';
-		interventionModalOpen = true;
-	}
-
-	function applyAiPreset(preset: typeof AI_INTERVENTION_PRESETS[0]) {
-		interventionTitle = preset.title;
-		interventionMessage = preset.msg;
-		if (!interventionRemedialWords || interventionRemedialWords.trim() === '') {
-			interventionRemedialWords = preset.words;
-		}
-	}
 
 	// Users State
 	let userSearchQuery = $state('');
@@ -204,15 +114,17 @@
 	const userPageSize = 10;
 
 	// Selected user drilldown & Impersonation modal (Supports URL pre-selection e.g. /admin?userId=123)
-	let selectedUserModal = $state<any | null>(
-		data.selectedUserDetail
-			? {
-					...data.selectedUserDetail,
-					loading: false,
-					fullDetail: data.selectedUserDetail
-			  }
-			: null
-	);
+	let selectedUserModal = $state<any | null>(null);
+
+	$effect(() => {
+		if (data.selectedUserDetail) {
+			selectedUserModal = {
+				...data.selectedUserDetail,
+				loading: false,
+				fullDetail: data.selectedUserDetail
+			};
+		}
+	});
 	let selectedUserTab = $state<'360_profile' | 'dashboard' | 'progress' | 'mistakes' | 'evals' | 'events'>('360_profile');
 	let previewHskLevel = $state(1);
 	let practiceBreakdownHsk = $state(1);
@@ -251,12 +163,6 @@
 	// Advanced Learning Analytics Interactive State
 	let analyticsToast = $state<{ type: 'success' | 'info'; message: string } | null>(null);
 	let activePitchTone = $state<number>(3); // Tone 3 (most confused)
-	let listeningPolicySetting = $state<'low_pass' | 'hard_vocab' | 'strict' | 'none'>(
-		((data as any).listeningPolicy as any) || 'low_pass'
-	);
-	let pitchSensitivitySetting = $state<'standard' | 'strict' | 'forgiving'>(
-		((data as any).pitchSensitivity as any) || 'standard'
-	);
 	let funnelFilterHsk = $state<number | 'all'>('all');
 	let learningPracticeMode = $state<'stage' | 'word'>('stage');
 	let audioPlayingWord = $state<string | null>(null);
@@ -314,7 +220,29 @@
 		};
 	});
 	let toneSandhiStats = $derived(tone23Stats);
-	let tone34Stats = $derived(tone23Stats);
+	let tone34Stats = $derived.by(() => {
+		const rows = activeLearningAnalytics?.toneConfusionHeatmap?.matrix || [];
+		const tone3 = rows.find((row: any) => row.targetTone === 3);
+		const tone4 = rows.find((row: any) => row.targetTone === 4);
+		const samples3 = Number(tone3?.sampleCount || 0);
+		const samples4 = Number(tone4?.sampleCount || 0);
+		const samples = samples3 + samples4;
+		const t3AsT4Pct = Number(tone3?.recognizedT4 || 0);
+		const t3AsT4Count = samples3 > 0 ? Math.round((t3AsT4Pct * samples3) / 100) : 0;
+		const t4AsT3Pct = Number(tone4?.recognizedT3 || 0);
+		const t4AsT3Count = samples4 > 0 ? Math.round((t4AsT3Pct * samples4) / 100) : 0;
+		const confusedCount = t3AsT4Count + t4AsT3Count;
+		return {
+			samples,
+			samples3,
+			samples4,
+			t3AsT4Pct: samples3 > 0 ? t3AsT4Pct : null,
+			t3AsT4Count,
+			t4AsT3Pct: samples4 > 0 ? t4AsT3Pct : null,
+			t4AsT3Count,
+			confusionRate: samples > 0 ? Math.round((confusedCount / samples) * 100) : null
+		};
+	});
 
 	let pendingInterventionsCount = $derived(
 		(data.teacherInterventions || []).filter((item: any) => item.status !== 'improved').length
@@ -348,13 +276,29 @@
 		return { improved, pending: items.length - improved };
 	});
 	let weeklyPracticeMax = $derived(Math.max(
-		1,
-		...(data.participationTrend || []).flatMap((point: any) => [
-			point.stagePracticeCount,
-			point.wordPracticeCount,
-			point.unclassifiedCount
-		])
+		4,
+		...(data.participationTrend || []).map((point: any) =>
+			Number(point.totalActions ?? ((point.stagePracticeCount || 0) + (point.wordPracticeCount || 0) + (point.unclassifiedCount || 0)))
+		)
 	));
+	let weeklyDauMax = $derived(Math.max(
+		4,
+		...(data.participationTrend || []).map((point: any) => Number(point.activeLearners ?? 0))
+	));
+	let weeklyBreakdownTotals = $derived.by(() => {
+		const pts = data.participationTrend || [];
+		return {
+			quest: pts.reduce((s: number, p: any) => s + Number(p.breakdown?.quest ?? p.stagePracticeCount ?? 0), 0),
+			pitch: pts.reduce((s: number, p: any) => s + Number(p.breakdown?.pitch ?? p.wordPracticeCount ?? 0), 0),
+			flashcard: pts.reduce((s: number, p: any) => s + Number(p.breakdown?.flashcard ?? 0), 0),
+			hanzi: pts.reduce((s: number, p: any) => s + Number(p.breakdown?.hanzi ?? 0), 0),
+			exam: pts.reduce((s: number, p: any) => s + Number(p.breakdown?.exam ?? 0), 0),
+			dialogue: pts.reduce((s: number, p: any) => s + Number(p.breakdown?.dialogue ?? 0), 0),
+			total: pts.reduce((s: number, p: any) => s + Number(p.totalActions ?? 0), 0),
+			todayActive: Number(pts[pts.length - 1]?.activeLearners ?? 0),
+			weeklyUniqueLearners: Number(pts[0]?.weeklyUniqueLearners ?? 0)
+		};
+	});
 	let weeklyStageGopPoints = $derived(
 		(data.participationTrend || [])
 			.map((point: any, index: number) => ({
@@ -416,65 +360,6 @@
 
 	let phonemeTargets = $derived(activeLearningAnalytics?.phonemeSubstitutionMatrix?.targets || ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x']);
 	let phonemeMatrix = $derived(activeLearningAnalytics?.phonemeSubstitutionMatrix?.matrix || {});
-
-	// =========================================================================
-	// Actionable Insights Engine for Frontend / Product Team Meetings
-	// =========================================================================
-	let frontendInsights = $derived.by(() => {
-		const stagesList = (data.stages || []) as any[];
-		const sortedByLowViews = [...stagesList].sort((a, b) => (a.stats?.totalViews ?? 0) - (b.stats?.totalViews ?? 0));
-		const sortedByDrop = [...stagesList]
-			.filter((s) => (s.stats?.totalViews ?? 0) > 0)
-			.sort((a, b) => (b.stats?.dropRate ?? 0) - (a.stats?.dropRate ?? 0));
-		const lowestStage = sortedByLowViews[0] ?? null;
-		const hardestStage = sortedByDrop[0] ?? null;
-
-		const fcSets = (data.flashcardAnalytics?.setStats || []) as any[];
-		const sortedFcByLowCount = [...fcSets].sort((a, b) => (a.completionCount ?? 0) - (b.completionCount ?? 0));
-		const lowestFcSet = sortedFcByLowCount[0] ?? null;
-		const fcLevels = [1, 2, 3].map((lvl) => ({
-			lvl,
-			...(data.flashcardAnalytics?.byLevel?.[lvl] || { totalCompletions: 0, avgMasteryRatePct: 0 })
-		}));
-		const lowestFcLevel = [...fcLevels].sort((a, b) => a.totalCompletions - b.totalCompletions)[0];
-
-		const wordsList = (data.practiceBreakdown?.hardestWords || data.practiceBreakdown?.words || []) as Array<{ word: string; count: number; avgScore: number }>;
-		const sortedWordsLowPass = [...wordsList].filter((w) => w.count > 0).sort((a, b) => a.avgScore - b.avgScore);
-		const hardestWord = sortedWordsLowPass[0] ?? null;
-
-		const crossFeatures = (data.skillsAnalytics?.crossFeatureUsage || []) as Array<{ label: string; totalEvents: number; sharePct: number }>;
-		const leastFeature = [...crossFeatures].sort((a, b) => a.totalEvents - b.totalEvents)[0] ?? null;
-		const topFeature = [...crossFeatures].sort((a, b) => b.totalEvents - a.totalEvents)[0] ?? null;
-
-		const examSummary = (data.skillsAnalytics?.exam || {}) as Record<string, any>;
-		const examSkills = [
-			{ name: 'การฟัง (Listening)', val: Number(examSummary.avgListening ?? 0) },
-			{ name: 'การอ่าน (Reading)', val: Number(examSummary.avgReading ?? 0) },
-			{ name: 'การเขียน (Writing)', val: Number(examSummary.avgWriting ?? 0) }
-		].sort((a, b) => a.val - b.val);
-		const weakestExamSkill = examSkills[0];
-
-		const weakChars = (data.skillsAnalytics?.writing?.weakCharacters || []) as any[];
-		const topWeakChar = weakChars[0] ?? null;
-
-		const scenarios = (data.skillsAnalytics?.chatbot?.byScenario || []) as any[];
-		const leastScenario = [...scenarios].sort((a, b) => (a.sessionsCount ?? 0) - (b.sessionsCount ?? 0))[0] ?? null;
-		const lowestScoreScenario = [...scenarios].sort((a, b) => (a.avgScore ?? 0) - (b.avgScore ?? 0))[0] ?? null;
-
-		return {
-			lowestStage,
-			hardestStage,
-			lowestFcSet,
-			lowestFcLevel,
-			hardestWord,
-			leastFeature,
-			topFeature,
-			weakestExamSkill,
-			topWeakChar,
-			leastScenario,
-			lowestScoreScenario
-		};
-	});
 
 	function showAnalyticsToast(message: string, type: 'success' | 'info' = 'success') {
 		analyticsToast = { type, message };
@@ -543,60 +428,24 @@
 		}
 	}
 
-	function handleGenerateMinimalPairsQuest() {
-		showAnalyticsToast('⚡ สร้างชุดแบบฝึกหัด Minimal Pairs (zh/z, ch/c, sh/s, q/x) พร้อมมอบหมายงานเรียบร้อยแล้ว!', 'success');
-	}
+	const dashboardToneInsight = $derived.by(() => {
+		const trend = data.participationTrend || [];
+		const activeDays = trend.filter(
+			(p: any) => (p.stagePracticeCount || 0) + (p.wordPracticeCount || 0) + (p.unclassifiedCount || 0) > 0
+		).length;
 
-	async function handleSaveListeningPolicy(policy?: 'low_pass' | 'hard_vocab' | 'strict' | 'none') {
-		if (policy) listeningPolicySetting = policy;
-		const policyLabel = {
-			low_pass: 'บังคับเฉพาะด่านที่มี Pass Rate ต่ำกว่า 70%',
-			hard_vocab: 'บังคับเฉพาะด่านที่มีคำศัพท์ยาก (zh/ch/sh หรือเสียง 2/3)',
-			strict: 'บังคับทุกด่านในระบบ (Strict Mode)',
-			none: 'ปิด (ให้ผู้เรียนกดไมค์ได้อิสระ)'
-		}[listeningPolicySetting];
+		const tones = [
+			{ tone: 1, acc: tone1Accuracy, samples: toneSamples[0] || 0 },
+			{ tone: 2, acc: tone2Accuracy, samples: toneSamples[1] || 0 },
+			{ tone: 3, acc: tone3Accuracy, samples: toneSamples[2] || 0 },
+			{ tone: 4, acc: tone4Accuracy, samples: toneSamples[3] || 0 }
+		].filter((t) => t.samples > 0);
 
-		try {
-			const fd = new FormData();
-			fd.append('policy', listeningPolicySetting);
-			const res = await fetch('?/saveListeningPolicy', {
-				method: 'POST',
-				body: fd
-			});
-			if (res.ok) {
-				showAnalyticsToast(`💾 บันทึกนโยบาย LQ5 เรียบร้อย: "${policyLabel}"`, 'success');
-			} else {
-				showAnalyticsToast('❌ เกิดข้อผิดพลาดในการบันทึกนโยบาย', 'info');
-			}
-		} catch {
-			showAnalyticsToast(`💾 บันทึกนโยบาย LQ5 เรียบร้อย: "${policyLabel}"`, 'success');
-		}
-	}
-
-	async function handleSavePitchTuning(sensitivity?: 'standard' | 'strict' | 'forgiving') {
-		if (sensitivity) pitchSensitivitySetting = sensitivity;
-		const label = {
-			standard: 'มาตรฐานสำหรับผู้เรียนไทย (±25Hz)',
-			strict: 'เข้มงวด (Strict ±15Hz)',
-			forgiving: 'ผ่อนปรน (Forgiving ±35Hz)'
-		}[pitchSensitivitySetting];
-
-		try {
-			const fd = new FormData();
-			fd.append('sensitivity', pitchSensitivitySetting);
-			const res = await fetch('?/savePitchTuning', {
-				method: 'POST',
-				body: fd
-			});
-			if (res.ok) {
-				showAnalyticsToast(`💾 บันทึกการตั้งค่า Pitch Contour Feedback: "${label}"`, 'success');
-			} else {
-				showAnalyticsToast('❌ เกิดข้อผิดพลาดในการบันทึกการตั้งค่า', 'info');
-			}
-		} catch {
-			showAnalyticsToast(`💾 บันทึกการตั้งค่า Pitch Contour Feedback: "${label}"`, 'success');
-		}
-	}
+		const sorted = [...tones].sort((a, b) => b.acc - a.acc);
+		const strongest = sorted[0] ?? null;
+		const weakest = sorted.length > 1 ? sorted[sorted.length - 1] : null;
+		return { activeDays, strongest, weakest, hasToneData: tones.length > 0 };
+	});
 
 	// Login Submitting & Lockout state
 	let submitting = $state(false);
@@ -654,9 +503,7 @@
 		stop_impersonate: { label: 'กลับสู่มุมมองผู้ดูแล', color: 'bg-muted text-muted-foreground border-border' },
 		assign_teacher_intervention: { label: 'มอบหมายชุดฝึก', color: 'bg-muted text-foreground border-border' },
 		update_teacher_intervention: { label: 'อัปเดตคำแนะนำ', color: 'bg-muted text-foreground border-border' },
-		update_listening_policy: { label: 'ตั้งค่าเสียงฟัง', color: 'bg-muted text-foreground border-border' },
-		update_pitch_sensitivity: { label: 'ปรับความไวเสียง', color: 'bg-muted text-foreground border-border' },
-		delete_mock_learners: { label: 'ลบข้อมูลจำลอง', color: 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 border-red-200 dark:border-red-800' },
+		EXPORT_RESEARCH_DATA: { label: 'ส่งออกข้อมูลวิจัย', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
 		export_audit_logs: { label: 'ส่งออก Audit Logs', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' }
 	};
 
@@ -1223,29 +1070,6 @@
 		<!-- 3. PAGE CONTENT -->
 		<div class="p-4 sm:p-6 space-y-4 max-w-7xl w-full mx-auto">
 			{#if activeTab === 'dashboard'}
-				<FrontendActionBanner
-					tabTitle="1. ภาพรวม"
-					headline={frontendInsights.leastFeature
-						? `ฟีเจอร์ที่มีการเข้าใช้น้อยสุดคือ "${frontendInsights.leastFeature.label}" (${frontendInsights.leastFeature.totalEvents} ครั้ง)`
-						: 'ภาพรวมการใช้งานและสถิติผู้เรียน'}
-					bullets={[
-						frontendInsights.lowestFcLevel
-							? `แฟลชการ์ด HSK ${frontendInsights.lowestFcLevel.lvl} มีรอบฝึกน้อยสุด (${frontendInsights.lowestFcLevel.totalCompletions} รอบ)`
-							: 'กำลังเก็บสถิติแฟลชการ์ด',
-						frontendInsights.lowestStage
-							? `ด่านคนเข้าน้อยสุด: ${frontendInsights.lowestStage.title} (${frontendInsights.lowestStage.stats?.totalViews ?? 0} ครั้ง)`
-							: 'กำลังเก็บสถิติด่านเรียน',
-						frontendInsights.hardestWord
-							? `คำศัพท์คะแนนเฉลี่ยต่ำสุด: "${frontendInsights.hardestWord.word}" (GOP ${frontendInsights.hardestWord.avgScore}%)`
-							: 'กำลังเก็บสถิติคำศัพท์'
-					]}
-					chips={[
-						{ label: 'Active วันนี้', value: `${data.stats.activeToday}/${data.stats.totalLearners}`, tone: 'emerald' },
-						{ label: 'กลุ่มเสี่ยง GOP<70', value: `${atRiskUsers.length} คน`, tone: atRiskUsers.length > 0 ? 'rose' : 'emerald' },
-						{ label: 'GOP เฉลี่ย', value: `${data.classPhonemeStats.avgGop || 0}%`, tone: 'blue' }
-					]}
-					onCopied={(m) => showAnalyticsToast(m, 'success')}
-				/>
 				<!-- ============================================================== -->
 				<!-- ZONE 1: EXECUTIVE KPI COCKPIT (HERO BENTO CARDS)              -->
 				<!-- ============================================================== -->
@@ -1370,36 +1194,33 @@
 				<!-- ZONE 2: ANALYTICS & TREND VISUALIZATIONS (SPLIT CARDS + METRICS)-->
 				<!-- ============================================================== -->
 				<div class="space-y-4" aria-label="การแสดงผลการวิเคราะห์เชิงลึก">
-					<!-- ROW 1: สองกราฟอิสระเคียงกัน (Bar ปริมาณการฝึก VS Spline คะแนน GOP) -->
+					<!-- ROW 1: สองกราฟอิสระเคียงกัน (Bar ปริมาณกิจกรรมรวมทุกพฤติกรรม VS Bar จำนวนผู้เรียนรายวัน DAU) -->
 					<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-						<!-- CHART 1: กราฟแท่งเฉพาะ "ปริมาณการฝึก 7 วันล่าสุด" (Quest สีฟ้า vs Pitch สีม่วง) -->
+						<!-- CHART 1: กราฟแท่งเดี่ยว "ปริมาณกิจกรรมการเรียนรู้รวม 7 วันล่าสุด" (รวมทุกพฤติกรรม) -->
 						<div class="rounded-3xl border bg-card p-5 sm:p-6 shadow-xs flex flex-col justify-between space-y-4">
 							<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
 								<div>
 									<div class="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Activity Breakdown</div>
 									<h2 class="text-base font-black text-foreground flex items-center gap-2 mt-0.5">
 										<TrendingUp class="size-4 text-blue-500" />
-										<span>ปริมาณการฝึก 7 วันล่าสุด (Practice Volume)</span>
+										<span>ปริมาณกิจกรรมการเรียนรู้รวม 7 วันล่าสุด</span>
 									</h2>
 									<p class="text-xs text-muted-foreground mt-0.5">
-										เปรียบเทียบจำนวนครั้งการฝึกด่านเควสต์ (Quest) กับคำเดี่ยว (Pitch)
+										รวมทุกพฤติกรรมการเรียน (ด่าน Quest, คำเดี่ยว Pitch, แฟลชการ์ด, คัดลายมือ, ข้อสอบ, สนทนา AI)
 									</p>
 								</div>
-								<!-- Chart Legends -->
-								<div class="flex items-center gap-3 text-xs shrink-0 bg-muted/20 p-2 rounded-xl border">
+								<!-- Chart Legend -->
+								<div class="flex items-center gap-2 text-xs shrink-0 bg-muted/20 px-3 py-1.5 rounded-xl border">
 									<span class="inline-flex items-center gap-1.5 font-bold text-blue-600 dark:text-blue-400">
-										<span class="size-2.5 rounded-sm bg-blue-500"></span> ด่าน Quest
-									</span>
-									<span class="inline-flex items-center gap-1.5 font-bold text-violet-600 dark:text-violet-400">
-										<span class="size-2.5 rounded-sm bg-violet-500"></span> คำเดี่ยว Pitch
+										<span class="size-2.5 rounded-sm bg-blue-500"></span> กิจกรรมรวม ({weeklyBreakdownTotals.total} ครั้ง)
 									</span>
 								</div>
 							</div>
 
-							<!-- SVG Bar Chart Canvas -->
-							{#if (data.participationTrend || []).some((point: any) => point.stagePracticeCount + point.wordPracticeCount + point.unclassifiedCount > 0)}
+							<!-- SVG Single-Bar Chart Canvas -->
+							{#if (data.participationTrend || []).some((point: any) => (point.totalActions ?? (point.stagePracticeCount + point.wordPracticeCount)) > 0)}
 								<div class="relative w-full overflow-x-auto">
-									<svg viewBox="0 0 520 200" role="img" aria-label="กราฟแท่งเปรียบเทียบปริมาณการฝึกด่านและคำเดี่ยว 7 วันล่าสุด" class="h-52 w-full min-w-[460px] overflow-visible">
+									<svg viewBox="0 0 520 200" role="img" aria-label="กราฟแท่งเดี่ยวแสดงปริมาณกิจกรรมการเรียนรู้รวมทุกโหมด 7 วันล่าสุด" class="h-52 w-full min-w-[460px] overflow-visible">
 										<!-- Background Grid Lines -->
 										{#each [0, 25, 50, 75, 100] as tick (tick)}
 											{@const y = 165 - (tick / 100) * 125}
@@ -1407,17 +1228,19 @@
 											<text x="34" y={y + 3.5} text-anchor="end" class="fill-muted-foreground font-mono text-[9px]">{Math.round((weeklyPracticeMax * tick) / 100)}</text>
 										{/each}
 
-										<!-- Bars Layer (Quest and Word Practice) -->
+										<!-- Single Bar per Day (All Activities Combined) -->
 										{#each data.participationTrend || [] as point, index (point.day)}
-											{@const x = 55 + index * 68}
-											{@const stageBarHeight = Math.max(3, (point.stagePracticeCount / weeklyPracticeMax) * 125)}
-											{@const wordBarHeight = Math.max(3, (point.wordPracticeCount / weeklyPracticeMax) * 125)}
+											{@const x = 62 + index * 66}
+											{@const totalCount = Number(point.totalActions ?? ((point.stagePracticeCount || 0) + (point.wordPracticeCount || 0) + (point.unclassifiedCount || 0)))}
+											{@const barHeight = totalCount > 0 ? Math.max(6, (totalCount / weeklyPracticeMax) * 125) : 3}
+											{@const bd = point.breakdown || { quest: point.stagePracticeCount || 0, pitch: point.wordPracticeCount || 0, flashcard: 0, hanzi: 0, exam: 0, dialogue: 0 }}
 											<g class="transition-opacity hover:opacity-90">
-												<title>{point.formattedDate}: ฝึกด่าน {point.stagePracticeCount} ครั้ง | คำเดี่ยว {point.wordPracticeCount} ครั้ง</title>
-												<!-- Stage Bar (Blue) -->
-												<rect x={x - 13} y={165 - stageBarHeight} width="12" height={stageBarHeight} rx="3" class="fill-blue-500 shadow-sm" />
-												<!-- Word Bar (Violet) -->
-												<rect x={x + 1} y={165 - wordBarHeight} width="12" height={wordBarHeight} rx="3" class="fill-violet-500 shadow-sm" />
+												<title>{point.formattedDate}: รวม {totalCount} ครั้ง (ด่าน Quest {bd.quest} | คำเดี่ยว Pitch {bd.pitch} | แฟลชการ์ด {bd.flashcard} | คัดลายมือ {bd.hanzi} | ข้อสอบ {bd.exam} | สนทนา AI {bd.dialogue})</title>
+												<!-- Single Combined Bar (Blue) -->
+												<rect x={x - 13} y={165 - barHeight} width="26" height={barHeight} rx="5" class={totalCount > 0 ? 'fill-blue-500 shadow-sm' : 'fill-muted-foreground/20'} />
+												{#if totalCount > 0}
+													<text x={x} y={165 - barHeight - 5} text-anchor="middle" class="fill-blue-600 dark:fill-blue-400 font-mono font-bold text-[10px]">{totalCount}</text>
+												{/if}
 												<!-- Day Label -->
 												<text x={x} y="185" text-anchor="middle" class="fill-muted-foreground font-medium text-[10px]">{point.formattedDate}</text>
 											</g>
@@ -1427,110 +1250,104 @@
 							{:else}
 								<div class="h-44 flex flex-col items-center justify-center text-center p-6 bg-muted/10 rounded-2xl border border-dashed">
 									<Activity class="size-8 text-muted-foreground mb-2 opacity-50" />
-									<div class="text-xs font-bold text-muted-foreground">ยังไม่มีประวัติการฝึกในรอบ 7 วันล่าสุด</div>
+									<div class="text-xs font-bold text-muted-foreground">ยังไม่มีประวัติการทำกิจกรรมในรอบ 7 วันล่าสุด</div>
 								</div>
 							{/if}
 
-							<!-- Bottom Mini Stats Bar -->
-							<div class="grid grid-cols-2 gap-2 pt-2 border-t text-xs">
-								<div class="rounded-xl bg-muted/20 p-2 text-center">
-									<span class="text-[10px] text-muted-foreground font-medium block">ฝึกด่าน Quest รวม 30 วัน</span>
-									<strong class="font-mono text-blue-600 dark:text-blue-400 text-sm font-bold">{data.practiceBreakdown?.summary?.stage?.attempts ?? 0} ครั้ง</strong>
+							<!-- Bottom Mini Category Pills (All 6 Modules) -->
+							<div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 pt-2 border-t text-xs">
+								<div class="rounded-xl bg-muted/20 px-2 py-1.5 text-center">
+									<span class="text-[10px] text-muted-foreground font-medium block truncate">ด่าน Quest</span>
+									<strong class="font-mono text-blue-600 dark:text-blue-400 text-xs font-bold">{weeklyBreakdownTotals.quest}</strong>
 								</div>
-								<div class="rounded-xl bg-muted/20 p-2 text-center">
-									<span class="text-[10px] text-muted-foreground font-medium block">ฝึกคำเดี่ยว Pitch รวม 30 วัน</span>
-									<strong class="font-mono text-violet-600 dark:text-violet-400 text-sm font-bold">{data.practiceBreakdown?.summary?.word?.attempts ?? 0} ครั้ง</strong>
+								<div class="rounded-xl bg-muted/20 px-2 py-1.5 text-center">
+									<span class="text-[10px] text-muted-foreground font-medium block truncate">คำเดี่ยว Pitch</span>
+									<strong class="font-mono text-violet-600 dark:text-violet-400 text-xs font-bold">{weeklyBreakdownTotals.pitch}</strong>
+								</div>
+								<div class="rounded-xl bg-muted/20 px-2 py-1.5 text-center">
+									<span class="text-[10px] text-muted-foreground font-medium block truncate">แฟลชการ์ด</span>
+									<strong class="font-mono text-sky-600 dark:text-sky-400 text-xs font-bold">{weeklyBreakdownTotals.flashcard}</strong>
+								</div>
+								<div class="rounded-xl bg-muted/20 px-2 py-1.5 text-center">
+									<span class="text-[10px] text-muted-foreground font-medium block truncate">คัดลายมือ</span>
+									<strong class="font-mono text-emerald-600 dark:text-emerald-400 text-xs font-bold">{weeklyBreakdownTotals.hanzi}</strong>
+								</div>
+								<div class="rounded-xl bg-muted/20 px-2 py-1.5 text-center">
+									<span class="text-[10px] text-muted-foreground font-medium block truncate">ข้อสอบ HSK</span>
+									<strong class="font-mono text-amber-600 dark:text-amber-400 text-xs font-bold">{weeklyBreakdownTotals.exam}</strong>
+								</div>
+								<div class="rounded-xl bg-muted/20 px-2 py-1.5 text-center">
+									<span class="text-[10px] text-muted-foreground font-medium block truncate">สนทนา AI</span>
+									<strong class="font-mono text-rose-600 dark:text-rose-400 text-xs font-bold">{weeklyBreakdownTotals.dialogue}</strong>
 								</div>
 							</div>
 						</div>
 
-						<!-- CHART 2: กราฟเส้นเฉพาะ "คะแนนความแม่นยำ GOP 7 วันล่าสุด" (0-100%) -->
+						<!-- CHART 2: กราฟแท่งเดี่ยวสีเขียวมรกต "จำนวนผู้เรียนที่เข้าใช้งานรายวัน 7 วันล่าสุด (Daily Active Learners)" -->
 						<div class="rounded-3xl border bg-card p-5 sm:p-6 shadow-xs flex flex-col justify-between space-y-4">
 							<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
 								<div>
-									<div class="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Mastery & Quality</div>
+									<div class="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Daily Active Learners (DAU)</div>
 									<h2 class="text-base font-black text-foreground flex items-center gap-2 mt-0.5">
-										<Sparkles class="size-4 text-emerald-500" />
-										<span>คะแนนความแม่นยำ GOP 7 วันล่าสุด (0–100%)</span>
+										<Users class="size-4 text-emerald-500" />
+										<span>ผู้เรียนที่เข้าใช้งานรายวัน 7 วันล่าสุด</span>
 									</h2>
 									<p class="text-xs text-muted-foreground mt-0.5">
-										ติดตามระดับคะแนนเสียงรายวันเทียบกับเกณฑ์ผ่านขั้นต่ำ 70%
+										จำนวนผู้เรียนที่ไม่ซ้ำกัน (Unique Learners) ที่เข้ามาฝึกในแต่ละวัน
 									</p>
 								</div>
-								<!-- Chart Legends -->
-								<div class="flex items-center gap-3 text-xs shrink-0 bg-muted/20 p-2 rounded-xl border">
+								<!-- Chart Legend -->
+								<div class="flex items-center gap-2 text-xs shrink-0 bg-muted/20 px-3 py-1.5 rounded-xl border">
 									<span class="inline-flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
-										<span class="size-2 rounded-full bg-emerald-500"></span> GOP ด่าน
-									</span>
-									<span class="inline-flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400">
-										<span class="size-2 rounded-full bg-amber-500"></span> GOP คำเดี่ยว
-									</span>
-									<span class="inline-flex items-center gap-1 font-bold text-rose-500/80">
-										<span class="w-3 border-t border-dashed border-rose-400"></span> 70%
+										<span class="size-2.5 rounded-sm bg-emerald-500"></span> จำนวนผู้เรียน (คน)
 									</span>
 								</div>
 							</div>
 
-							<!-- SVG Line Chart Canvas -->
-							{#if weeklyStageGopPoints.length > 0 || weeklyWordGopPoints.length > 0}
+							<!-- SVG Single-Bar Chart Canvas (Emerald) -->
+							{#if (data.participationTrend || []).some((point: any) => (point.activeLearners ?? 0) > 0)}
 								<div class="relative w-full overflow-x-auto">
-									<svg viewBox="0 0 520 200" role="img" aria-label="กราฟเส้นคะแนน GOP เฉลี่ย 7 วันล่าสุด" class="h-52 w-full min-w-[460px] overflow-visible">
+									<svg viewBox="0 0 520 200" role="img" aria-label="กราฟแท่งแสดงจำนวนผู้เรียนที่เข้าใช้งานรายวัน 7 วันล่าสุด" class="h-52 w-full min-w-[460px] overflow-visible">
 										<!-- Background Grid Lines -->
 										{#each [0, 25, 50, 75, 100] as tick (tick)}
 											{@const y = 165 - (tick / 100) * 125}
 											<line x1="40" x2="495" y1={y} y2={y} stroke="currentColor" class="text-border/50" stroke-dasharray={tick === 0 ? '0' : '3 4'} />
-											<text x="34" y={y + 3.5} text-anchor="end" class="fill-muted-foreground font-mono text-[9px]">{tick}%</text>
+											<text x="34" y={y + 3.5} text-anchor="end" class="fill-muted-foreground font-mono text-[9px]">{Math.round((weeklyDauMax * tick) / 100)}</text>
 										{/each}
 
-										<!-- Standard Pass Benchmark Line at 70% -->
-										<line x1="40" x2="495" y1="77.5" y2="77.5" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="4 3" class="opacity-60" />
-										<text x="498" y="80.5" text-anchor="start" class="fill-rose-500 font-mono font-bold text-[8px]">70% เกณฑ์</text>
-
-										<!-- Day Labels -->
+										<!-- Single Emerald Bar per Day (Active Learners) -->
 										{#each data.participationTrend || [] as point, index (point.day)}
-											{@const x = 55 + index * 68}
-											<text x={x} y="185" text-anchor="middle" class="fill-muted-foreground font-medium text-[10px]">{point.formattedDate}</text>
-										{/each}
-
-										<!-- Spline Polylines -->
-										{#if weeklyStageGopPoints.length > 1}
-											<polyline points={weeklyStageGopPath} fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-xs" />
-										{/if}
-										{#if weeklyWordGopPoints.length > 1}
-											<polyline points={weeklyWordGopPath} fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" class="drop-shadow-xs" />
-										{/if}
-
-										<!-- Data Point Circles with Tooltip -->
-										{#each weeklyStageGopPoints as point (point.day)}
-											<g>
-												<circle cx={point.x} cy={point.y} r="5" fill="#10b981" stroke="var(--card)" stroke-width="2" class="cursor-pointer transition-transform hover:scale-125" />
-												<title>{point.formattedDate}: GOP ด่านเฉลี่ย {point.stageAvgScore}%</title>
-											</g>
-										{/each}
-										{#each weeklyWordGopPoints as point (point.day)}
-											<g>
-												<circle cx={point.x} cy={point.y} r="4.5" fill="#f59e0b" stroke="var(--card)" stroke-width="2" class="cursor-pointer transition-transform hover:scale-125" />
-												<title>{point.formattedDate}: GOP คำเดี่ยวเฉลี่ย {point.wordAvgScore}%</title>
+											{@const x = 62 + index * 66}
+											{@const dauCount = Number(point.activeLearners ?? 0)}
+											{@const barHeight = dauCount > 0 ? Math.max(6, (dauCount / weeklyDauMax) * 125) : 3}
+											<g class="transition-opacity hover:opacity-90">
+												<title>{point.formattedDate}: ผู้เรียนเข้าใช้งาน {dauCount} คน (ทำกิจกรรมรวม {point.totalActions ?? 0} ครั้ง)</title>
+												<rect x={x - 13} y={165 - barHeight} width="26" height={barHeight} rx="5" class={dauCount > 0 ? 'fill-emerald-500 shadow-sm' : 'fill-muted-foreground/20'} />
+												{#if dauCount > 0}
+													<text x={x} y={165 - barHeight - 5} text-anchor="middle" class="fill-emerald-600 dark:fill-emerald-400 font-mono font-bold text-[10px]">{dauCount}</text>
+												{/if}
+												<!-- Day Label -->
+												<text x={x} y="185" text-anchor="middle" class="fill-muted-foreground font-medium text-[10px]">{point.formattedDate}</text>
 											</g>
 										{/each}
 									</svg>
 								</div>
 							{:else}
 								<div class="h-44 flex flex-col items-center justify-center text-center p-6 bg-muted/10 rounded-2xl border border-dashed">
-									<Activity class="size-8 text-muted-foreground mb-2 opacity-50" />
-									<div class="text-xs font-bold text-muted-foreground">ยังไม่มีผลคะแนน GOP ในรอบ 7 วันล่าสุด</div>
+									<Users class="size-8 text-muted-foreground mb-2 opacity-50" />
+									<div class="text-xs font-bold text-muted-foreground">ยังไม่มีผู้เรียนเข้าใช้งานในรอบ 7 วันล่าสุด</div>
 								</div>
 							{/if}
 
 							<!-- Bottom Mini Stats Bar -->
 							<div class="grid grid-cols-2 gap-2 pt-2 border-t text-xs">
 								<div class="rounded-xl bg-muted/20 p-2 text-center">
-									<span class="text-[10px] text-muted-foreground font-medium block">คะแนน GOP เฉลี่ยรวม</span>
-									<strong class="font-mono text-emerald-600 dark:text-emerald-400 text-sm font-bold">{data.classPhonemeStats?.avgGop ? data.classPhonemeStats.avgGop + '%' : '—'}</strong>
+									<span class="text-[10px] text-muted-foreground font-medium block">เข้าใช้งานวันนี้ (Active Today)</span>
+									<strong class="font-mono text-emerald-600 dark:text-emerald-400 text-sm font-bold">{weeklyBreakdownTotals.todayActive} คน</strong>
 								</div>
 								<div class="rounded-xl bg-muted/20 p-2 text-center">
-									<span class="text-[10px] text-muted-foreground font-medium block">ผู้เรียนที่มีผลประเมิน</span>
-									<strong class="font-mono text-foreground text-sm font-bold">{data.practiceBreakdown?.summary?.stage?.learners ?? 0} คน</strong>
+									<span class="text-[10px] text-muted-foreground font-medium block">ผู้เรียนที่แอคทีฟใน 7 วัน</span>
+									<strong class="font-mono text-foreground text-sm font-bold">{weeklyBreakdownTotals.weeklyUniqueLearners} คน</strong>
 								</div>
 							</div>
 						</div>
@@ -1639,33 +1456,32 @@
 
 					<!-- ROW 3: จัดกล่อง Minimal Pair & Tone Sandhi ให้กระชับ สวยงาม อ่านง่าย -->
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<!-- กล่อง 1: เสียงสับสนบ่อยสุด (Top Minimal Pairs Confusion) -->
+						<!-- กล่อง 1: คำศัพท์ที่คะแนนเฉลี่ยต่ำสุดในระบบ (Hardest Vocabulary Words) -->
 						<div class="rounded-3xl border bg-card p-5 sm:p-6 shadow-xs space-y-3">
 							<div class="flex items-center justify-between border-b pb-2">
 								<h3 class="font-extrabold text-xs text-foreground flex items-center gap-1.5">
 									<BrainCircuit class="size-4 text-amber-500" />
-									<span>เสียงที่คนไทยสับสนบ่อยสุด (Top Minimal Pairs Confusion)</span>
+									<span>คำศัพท์ที่คะแนนเฉลี่ยต่ำสุด (Hardest Words)</span>
 								</h3>
 								<span class="text-[10px] text-muted-foreground font-semibold">GOP Diagnostic</span>
 							</div>
 
 							<div class="divide-y text-xs">
-								{#each data.classPhonemeStats.frequentSubstitutions.slice(0, 3) as sub (sub.target + sub.recognized)}
-									<div class="py-2.5 flex items-center justify-between">
-										<div class="flex items-center gap-2">
-											<span class="font-mono font-bold text-rose-600 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20 text-xs">
-												/{sub.target}/
-											</span>
-											<span class="text-muted-foreground font-semibold">สับสนเป็น</span>
-											<span class="font-mono font-bold text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 text-xs">
-												/{sub.recognized}/
+								{#each (data.practiceBreakdown?.hardestWords || data.practiceBreakdown?.words || []).slice(0, 4) as hw (hw.word)}
+									<div class="py-2.5 flex items-center justify-between gap-2">
+										<div class="flex items-center gap-2 min-w-0">
+											<span class="font-bold text-foreground bg-muted/60 px-2.5 py-1 rounded-lg border text-sm">
+												{hw.word}
 											</span>
 										</div>
-										<span class="font-mono text-foreground font-extrabold text-xs bg-muted/40 px-2 py-0.5 rounded">{sub.count} ครั้ง</span>
+										<div class="flex items-center gap-2 shrink-0">
+											<span class="font-mono text-muted-foreground text-[11px]">{hw.count} ครั้ง</span>
+											<span class="font-mono font-extrabold text-xs px-2 py-0.5 rounded {hw.avgScore < 70 ? 'bg-rose-500/10 text-rose-600' : 'bg-amber-500/10 text-amber-600'}">{hw.avgScore}%</span>
+										</div>
 									</div>
 								{:else}
 									<div class="py-3 text-center text-muted-foreground text-xs">
-										ไม่พบข้อผิดพลาดร้ายแรงในระบบ
+										ยังไม่มีข้อมูลคะแนนคำศัพท์ในระบบ
 									</div>
 								{/each}
 							</div>
@@ -1707,7 +1523,7 @@
 						</div>
 					</div>
 
-					<!-- Plain-Thai Insight Box: 7-Day Consistency & 4 Tones -->
+					<!-- Plain-Thai Insight Box: 7-Day Consistency & 4 Tones (Dynamic Real Data) -->
 					<div class="rounded-3xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-500/10 p-5 space-y-2">
 						<div class="flex items-start gap-3">
 							<div class="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
@@ -1719,11 +1535,29 @@
 								</div>
 								<div class="text-muted-foreground leading-relaxed space-y-1">
 									<div class="flex flex-wrap items-center gap-2">
-										<span class="rounded-md bg-blue-500/15 text-blue-700 dark:text-blue-300 px-2 py-0.5 font-bold">ฝึกสม่ำเสมอ 7 วัน</span>
-										<span class="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-bold">เสียงเด่น: 1 &amp; 4</span>
-										<span class="rounded-md bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-bold">ควรเน้น: เสียง 3</span>
+										<span class="rounded-md bg-blue-500/15 text-blue-700 dark:text-blue-300 px-2 py-0.5 font-bold">
+											มีผู้ฝึก {dashboardToneInsight.activeDays}/7 วันล่าสุด
+										</span>
+										{#if dashboardToneInsight.strongest}
+											<span class="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-bold">
+												เสียงเด่นสุด: เสียง {dashboardToneInsight.strongest.tone} ({dashboardToneInsight.strongest.acc}%)
+											</span>
+										{/if}
+										{#if dashboardToneInsight.weakest}
+											<span class="rounded-md bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-bold">
+												ควรเน้น: เสียง {dashboardToneInsight.weakest.tone} ({dashboardToneInsight.weakest.acc}%)
+											</span>
+										{/if}
 									</div>
-									<p class="pt-0.5">ผู้เรียนออกเสียงวรรณยุกต์ 1 และ 4 ได้แม่นยำ ส่วนเสียง 3 แนะนำฝึกกดระดับเสียงต่ำสุดก่อนตวัดขึ้นเพื่อลดความสับสนกับเสียง 2</p>
+									<p class="pt-0.5">
+										{#if dashboardToneInsight.hasToneData && dashboardToneInsight.strongest && dashboardToneInsight.weakest}
+											ผู้เรียนทำคะแนนได้ดีที่สุดในวรรณยุกต์เสียง {dashboardToneInsight.strongest.tone} ({dashboardToneInsight.strongest.acc}%) ขณะที่เสียง {dashboardToneInsight.weakest.tone} ({dashboardToneInsight.weakest.acc}%) มีคะแนนเฉลี่ยต่ำที่สุดในชั้นเรียน
+										{:else if dashboardToneInsight.hasToneData && dashboardToneInsight.strongest}
+											กำลังสะสมข้อมูลเปรียบเทียบระหว่างวรรณยุกต์ (ปัจจุบันมีข้อมูลเสียง {dashboardToneInsight.strongest.tone} เฉลี่ย {dashboardToneInsight.strongest.acc}%)
+										{:else}
+											ยังไม่มีข้อมูลการประเมินวรรณยุกต์ในฐานข้อมูล ระบบจะสรุปจุดเด่น-จุดที่ควรเน้นให้อัตโนมัติเมื่อมีผู้เรียนฝึกพูด
+										{/if}
+									</p>
 								</div>
 							</div>
 						</div>
@@ -1740,9 +1574,9 @@
 							<div>
 								<h2 class="text-sm font-extrabold text-foreground flex items-center gap-2">
 									<AlertTriangle class="size-4 text-amber-600" />
-									<span>ผู้เรียนที่ควรได้รับการดูแล (At-Risk Intervention)</span>
+									<span>ผู้เรียนที่มีคะแนน GOP ต่ำกว่า 70% (Low-Score Learners)</span>
 								</h2>
-								<p class="text-[11px] text-muted-foreground mt-0.5">เรียงตาม GOP ต่ำสุด · เกณฑ์คะแนน &lt; 70% เพื่อส่งข้อเสนอแนะซ่อมเสริม</p>
+								<p class="text-[11px] text-muted-foreground mt-0.5">เรียงตาม GOP ต่ำสุด · กลุ่มผู้เรียนที่ทำคะแนนต่ำกว่าเกณฑ์ 70%</p>
 							</div>
 							<button
 								onclick={() => { activeTab = 'users'; userFilterStatus = 'at_risk'; userRoleFilter = 'learner'; }}
@@ -1770,6 +1604,9 @@
 												<button onclick={() => openUserDrilldown(u)} class="font-bold text-foreground hover:text-primary hover:underline cursor-pointer">
 													{u.username}
 												</button>
+												{#if u.username.startsWith('guest_')}
+													<span class="ml-1 rounded bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400">[Guest]</span>
+												{/if}
 												<span class="ml-1 text-[10px] text-muted-foreground">#{u.id}</span>
 											</td>
 											<td class="px-3 text-right font-mono tabular-nums font-bold text-rose-600">{u.avgGop ? u.avgGop.toFixed(1) + '%' : '—'}</td>
@@ -1780,7 +1617,7 @@
 													onclick={() => openUserDrilldown(u)}
 													class="font-extrabold text-primary hover:underline cursor-pointer inline-flex items-center gap-1"
 												>
-													<span>ดูชุดฝึก</span>
+													<span>ดูโปรไฟล์</span>
 												</button>
 											</td>
 										</tr>
@@ -1856,21 +1693,6 @@
 
 			<!-- OTHER TABS (Users / Stages / Learning / Audit / Export) -->
 			{#if activeTab === 'users'}
-				<FrontendActionBanner
-					tabTitle="2. ผู้เรียน"
-					headline={atRiskUsers.length > 0
-						? `พบผู้เรียนกลุ่มเสี่ยง (GOP < 70%) จำนวน ${atRiskUsers.length} คน`
-						: 'ผู้เรียนทั้งหมดมีระดับคะแนนอยู่ในเกณฑ์ปกติ'}
-					bullets={[
-						`ผู้เรียนทั้งหมด ${data.stats.totalLearners} คน (ใช้งานวันนี้ ${data.stats.activeToday} คน)`,
-						`ยังไม่ส่งชุดฝึกซ่อมเสริม ${atRiskNotContacted.length} คน`
-					]}
-					chips={[
-						{ label: 'กลุ่มเสี่ยง', value: `${atRiskUsers.length} คน`, tone: atRiskUsers.length > 0 ? 'rose' : 'emerald' },
-						{ label: 'ส่งชุดฝึกแล้ว', value: `${data.teacherInterventions?.length ?? 0} ชุด`, tone: 'blue' }
-					]}
-					onCopied={(m) => showAnalyticsToast(m, 'success')}
-				/>
 				<!-- SECTION 1: ALL LEARNERS -->
 				<div class="rounded-2xl border border-border bg-card p-6 space-y-4">
 					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border">
@@ -1923,7 +1745,10 @@
 												{u.username.charAt(0).toUpperCase()}
 												</div>
 												<button onclick={() => openUserDrilldown(u)} class="font-semibold text-foreground hover:underline">{u.username}</button>
-												<span class="text-[10px] text-muted-foreground">#{u.id} · 'ผู้เรียน'</span>
+												{#if u.username.startsWith('guest_')}
+													<span class="rounded bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400">[Guest]</span>
+												{/if}
+												<span class="text-[10px] text-muted-foreground">#{u.id} · {u.username.startsWith('guest_') ? 'ผู้เยี่ยมชม' : 'ผู้เรียน'}</span>
 												{#if !u.isAdmin && u.avgGop !== null && u.avgGop < 70}
 													<span class="text-[10px] font-semibold text-rose-600">ต้องดูแล</span>
 												{/if}
@@ -2062,65 +1887,18 @@
 
 			{#if activeTab === 'mock_exams'}
 				<div class="space-y-4">
-					<FrontendActionBanner
-						tabTitle="6. ข้อสอบ HSK"
-						headline={(data.skillsAnalytics?.exam?.totalAttempts ?? 0) > 0
-							? `พาร์ทที่คะแนนเฉลี่ยต่ำสุดคือ "${frontendInsights.weakestExamSkill.name}" (${Math.round(frontendInsights.weakestExamSkill.val)}%)`
-							: 'ยังไม่มีผลสอบ HSK ในระบบ'}
-						bullets={[
-							`จำนวนการสอบสะสม ${data.skillsAnalytics?.exam?.totalAttempts ?? 0} ครั้ง`,
-							`อัตราสอบผ่านรวม ${data.skillsAnalytics?.exam?.passRate ?? 0}% (เกณฑ์ 180/300)`
-						]}
-						chips={[
-							{ label: 'คะแนนเฉลี่ย', value: `${data.skillsAnalytics?.exam?.avgScore ?? 0}/300`, tone: 'amber' },
-							{ label: 'พาร์ทต่ำสุด', value: `${Math.round(frontendInsights.weakestExamSkill.val)}%`, tone: 'rose' }
-						]}
-						onCopied={(m) => showAnalyticsToast(m, 'success')}
-					/>
 					<ExamDiagnosticsView skillsAnalytics={data.skillsAnalytics} />
 				</div>
 			{/if}
 
 			{#if activeTab === 'hanzi_writing'}
 				<div class="space-y-4">
-					<FrontendActionBanner
-						tabTitle="7. คัดอักษรจีน"
-						headline={frontendInsights.topWeakChar
-							? `ตัวอักษรที่ผิดบ่อยสุดคือ "${frontendInsights.topWeakChar.character}" (${frontendInsights.topWeakChar.totalMistakes} ครั้ง)`
-							: `ความแม่นยำลำดับขีดรวม ${data.skillsAnalytics?.writing?.strokeAccuracyPct ?? 0}% (${data.skillsAnalytics?.writing?.totalAttempts ?? 0} ครั้ง)`}
-						bullets={[
-							`ลากขีดถูกรอบเดียว ${data.skillsAnalytics?.writing?.perfectSequenceRatePct ?? 0}%`,
-							`เวลาเฉลี่ยต่อตัว ${data.skillsAnalytics?.writing?.avgDurationSec ?? 0} วินาที`
-						]}
-						chips={[
-							{ label: 'แม่นยำขีด', value: `${data.skillsAnalytics?.writing?.strokeAccuracyPct ?? 0}%`, tone: 'emerald' },
-							{ label: 'จำนวนครั้ง', value: `${data.skillsAnalytics?.writing?.totalAttempts ?? 0}`, tone: 'blue' }
-						]}
-						onCopied={(m) => showAnalyticsToast(m, 'success')}
-					/>
 					<HanziWritingView skillsAnalytics={data.skillsAnalytics} />
 				</div>
 			{/if}
 
 			{#if activeTab === 'ai_dialogue'}
 				<div class="space-y-4">
-					<FrontendActionBanner
-						tabTitle="8. สนทนา"
-						headline={frontendInsights.leastScenario
-							? `สถานการณ์ที่เล่นน้อยสุดคือ "${frontendInsights.leastScenario.scenarioTitle}" (${frontendInsights.leastScenario.sessionsCount} รอบ)`
-							: 'ยังไม่มีประวัติการสนทนาในระบบ'}
-						bullets={[
-							`บทสนทนาสะสม ${data.skillsAnalytics?.chatbot?.totalSessions ?? 0} รอบ (${data.skillsAnalytics?.chatbot?.totalTurns ?? 0} ประโยค)`,
-							frontendInsights.lowestScoreScenario
-								? `คะแนนเฉลี่ยต่ำสุด: ${frontendInsights.lowestScoreScenario.scenarioTitle} (${Math.round(frontendInsights.lowestScoreScenario.avgScore)}%)`
-								: 'กำลังเก็บสถิติคะแนนรายสถานการณ์'
-						]}
-						chips={[
-							{ label: 'รอบสนทนา', value: `${data.skillsAnalytics?.chatbot?.totalSessions ?? 0}`, tone: 'blue' },
-							{ label: 'คะแนนเฉลี่ย', value: `${data.skillsAnalytics?.chatbot?.avgScore ?? 0}%`, tone: 'emerald' }
-						]}
-						onCopied={(m) => showAnalyticsToast(m, 'success')}
-					/>
 					<DialogueFluencyView skillsAnalytics={data.skillsAnalytics} />
 				</div>
 			{/if}
@@ -2128,23 +1906,6 @@
 			{#if activeTab === 'stages'}
 				<!-- STAGES MANAGEMENT & PROGRESSION FUNNEL VIEW -->
 				<div class="space-y-4">
-					<FrontendActionBanner
-						tabTitle="3. ด่านฝึกคำศัพท์"
-						headline={frontendInsights.lowestStage
-							? `ด่านคนเข้าน้อยสุดคือ "${frontendInsights.lowestStage.title}" (${frontendInsights.lowestStage.stats?.totalViews ?? 0} ครั้ง)${frontendInsights.hardestStage ? ` · ด่านหลุดสูงสุดคือ "${frontendInsights.hardestStage.title}" (${frontendInsights.hardestStage.stats?.dropRate ?? 0}%)` : ''}`
-							: 'สถิติการเข้าเล่นและอัตราผ่านรายด่าน'}
-						bullets={[
-							`อัตราออกกลางคันรวม ${activeLearningAnalytics?.dropOffFunnel?.overallDropOffRate ?? 0}%`,
-							frontendInsights.hardestStage
-								? `ด่าน ${frontendInsights.hardestStage.id} มีอัตราออกกลางคันสูงสุด`
-								: 'กดแก้ไขเพื่อปรับชุดคำศัพท์ของแต่ละด่านได้'
-						]}
-						chips={[
-							{ label: 'จำนวนด่านทั้งหมด', value: `${data.stages.length} ด่าน`, tone: 'blue' },
-							{ label: 'อัตราผ่านรวม', value: `${passRate}%`, tone: passRate >= 70 ? 'emerald' : 'amber' }
-						]}
-						onCopied={(m) => showAnalyticsToast(m, 'success')}
-					/>
 					<!-- Unified Top Header -->
 					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
 						<div class="flex items-center gap-3">
@@ -2292,47 +2053,12 @@
 
 			{#if activeTab === 'flashcards'}
 				<div class="space-y-4">
-					<FrontendActionBanner
-						tabTitle="4. แฟลชการ์ด"
-						headline={frontendInsights.lowestFcSet
-							? `ชุดที่ฝึกน้อยสุดคือ HSK ${frontendInsights.lowestFcSet.hskLevel} ชุดที่ ${frontendInsights.lowestFcSet.setIndex} (${frontendInsights.lowestFcSet.completionCount} รอบ) · HSK ${frontendInsights.lowestFcLevel.lvl} มีการใช้งานน้อยสุด`
-							: `ระดับ HSK ${frontendInsights.lowestFcLevel.lvl} มีรอบฝึกน้อยสุด (${frontendInsights.lowestFcLevel.totalCompletions} รอบ)`}
-						bullets={[
-							`ฝึกจบชุดสะสม ${data.flashcardAnalytics?.summary?.totalCompletions ?? 0} ครั้ง (${data.flashcardAnalytics?.summary?.uniqueLearners ?? 0} คน)`,
-							`อัตราจำแม่นเฉลี่ย ${data.flashcardAnalytics?.summary?.avgMasteryRatePct ?? 0}% (รอทวน ${data.flashcardAnalytics?.summary?.totalWordsReviewed ?? 0} คำ)`
-						]}
-						chips={[
-							{ label: 'ชุดที่ใช้งานน้อย', value: `HSK ${frontendInsights.lowestFcLevel.lvl}`, tone: 'blue' },
-							{ label: 'จำแม่นเฉลี่ย', value: `${data.flashcardAnalytics?.summary?.avgMasteryRatePct ?? 0}%`, tone: 'emerald' }
-						]}
-						onCopied={(m) => showAnalyticsToast(m, 'success')}
-					/>
 					<FlashcardAnalyticsView flashcardAnalytics={data.flashcardAnalytics} />
 				</div>
 			{/if}
 
 			{#if activeTab === 'tone_analytics' || activeTab === 'listening_analytics' || activeTab === 'learning'}
 				<div class="space-y-4">
-					<FrontendActionBanner
-						tabTitle="5. ออกเสียง & คำศัพท์"
-						headline={frontendInsights.hardestWord
-							? `คำที่คะแนนเฉลี่ยต่ำสุดคือ "${frontendInsights.hardestWord.word}" (GOP เฉลี่ย ${frontendInsights.hardestWord.avgScore}% จาก ${frontendInsights.hardestWord.count} ครั้ง)`
-							: 'สถิติความแม่นยำคำศัพท์และวรรณยุกต์ 4 เสียง'}
-						bullets={[
-							tone23Stats.confusionRate !== null
-								? `สับสนเสียงวรรณยุกต์ 2 ↔ 3: ${tone23Stats.confusionRate}%`
-								: 'กำลังเก็บสถิติเสียง 2 ↔ 3',
-							`ผลต่างคะแนนเมื่อฟังตัวอย่างก่อนพูด: ${(activeLearningAnalytics?.lq5ListeningImpact?.deltaGop ?? 0) >= 0 ? '+' : ''}${activeLearningAnalytics?.lq5ListeningImpact?.deltaGop ?? 0}% GOP`
-						]}
-						chips={[
-							frontendInsights.hardestWord
-								? { label: 'คำคะแนนต่ำสุด', value: `${frontendInsights.hardestWord.word} (${frontendInsights.hardestWord.avgScore}%)`, tone: 'rose' }
-								: { label: 'คำคะแนนต่ำสุด', value: 'รอข้อมูล', tone: 'blue' },
-							{ label: 'สับสน 2↔3', value: `${tone23Stats.confusionRate ?? 0}%`, tone: 'blue' }
-						]}
-						onCopied={(m) => showAnalyticsToast(m, 'success')}
-					/>
-
 					<!-- Clean Sub-Tab Switcher inside Tab 5 -->
 					<div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-2.5 shadow-2xs">
 						<span class="text-xs font-extrabold text-foreground">เลือกมุมมองย่อย:</span>
@@ -2355,12 +2081,7 @@
 					</div>
 
 					{#if activeTab === 'listening_analytics' || pronunciationSubTab === 'listening'}
-						<ListeningImpactView
-							{activeLearningAnalytics}
-							bind:listeningPolicySetting
-							onSaveListeningPolicy={handleSaveListeningPolicy}
-							onShowToast={showAnalyticsToast}
-						/>
+						<ListeningImpactView {activeLearningAnalytics} />
 					{:else}
 						<HardestWordsAnalyticsCard words={data.practiceBreakdown?.hardestWords || data.practiceBreakdown?.words || []} />
 						<ToneAnalyticsView
@@ -2371,9 +2092,7 @@
 							{tone4Accuracy}
 							{toneSamples}
 							{toneSandhiStats}
-							bind:pitchSensitivitySetting
 							{learningPracticeMode}
-							onSavePitchTuning={handleSavePitchTuning}
 							onShowToast={showAnalyticsToast}
 							onChangePracticeMode={(mode) => (learningPracticeMode = mode)}
 						/>
@@ -2445,9 +2164,8 @@
 								<option value="reset_stage">รีเซ็ตด่าน (Reset Stage)</option>
 								<option value="assign_teacher_intervention">มอบหมายชุดซ่อมเสริม (Intervention)</option>
 								<option value="impersonate_user">สวมบทบาท (Impersonate)</option>
-								<option value="update_listening_policy">เปลี่ยนนโยบายฟัง (Audio Gate)</option>
-								<option value="update_pitch_sensitivity">ปรับความไวเสียง (Pitch)</option>
-								<option value="delete_mock_learners">ลบผู้เรียนจำลอง (Delete Mock)</option>
+								<option value="EXPORT_RESEARCH_DATA">ส่งออกข้อมูลวิจัย (Export Data)</option>
+								<option value="export_audit_logs">ส่งออก Audit Logs</option>
 							</select>
 						</div>
 					</div>
@@ -2539,9 +2257,9 @@
 									<span class="rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 text-[11px] font-bold">Dataset 1 • CSV</span>
 									<span class="font-mono text-[11px] text-muted-foreground">pronunciation_evaluations</span>
 								</div>
-								<h4 class="font-extrabold text-sm text-foreground">1. ข้อมูลประเมินเสียง สัทศาสตร์ & พฤติกรรมการฟัง (Acoustic + LQ5/LQ6)</h4>
+								<h4 class="font-extrabold text-sm text-foreground">1. ข้อมูลประเมินเสียง สัทศาสตร์ & พฤติกรรมการฟัง (Acoustic + LQ5)</h4>
 								<p class="text-xs text-muted-foreground leading-relaxed">
-									ประกอบด้วย GOP, PER, Tone Score, ระดับความชัดเจน (Clarity), รูปทรงกราฟ (Slope Type), จำนวนครั้งที่กดฟังตัวอย่าง (LQ5) และเวลาลังเลก่อนพูด (Hesitation Latency ms - LQ6)
+									ประกอบด้วย GOP, PER, Tone Score, ระดับความชัดเจน (Clarity), รูปทรงกราฟ (Slope Type), และจำนวนครั้งที่กดฟังตัวอย่าง (LQ5)
 								</p>
 							</div>
 							<a
@@ -2617,130 +2335,10 @@
 						</div>
 					</div>
 				</div>
-
-				<!-- SYSTEM TESTING & MOCK DATA MANAGEMENT -->
-				{#if (data.users || []).some((u: any) => u.username?.startsWith('mock_learner_'))}
-					<div class="rounded-3xl border border-rose-500/20 bg-rose-500/5 p-6 shadow-xs space-y-3">
-						<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-							<div class="flex items-center gap-3">
-								<div class="flex size-10 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600">
-									<Trash2 class="size-5" />
-								</div>
-								<div>
-									<h3 class="font-extrabold text-sm text-foreground">จัดการข้อมูลทดสอบระบบ (100 Mock Users)</h3>
-									<p class="text-xs text-muted-foreground">พบบัญชีผู้เรียนจำลองสำหรับการทดสอบในฐานข้อมูล Turso & Neon</p>
-								</div>
-							</div>
-							<button
-								type="button"
-								onclick={() => (mockAlertModalOpen = true)}
-								class="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 text-xs transition shadow-xs flex items-center gap-2 shrink-0 cursor-pointer"
-							>
-								<Trash2 class="size-4" />
-								<span>ล้างข้อมูล 100 Mock Users</span>
-							</button>
-						</div>
-					</div>
-				{/if}
 			{/if}
 		</div>
 	</div>
 </div>
-
-<!-- SMART INTERVENTION MODAL -->
-{#if interventionModalOpen}
-	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-		<div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border bg-card shadow-2xl">
-			<div class="flex items-center justify-between border-b px-5 py-4 bg-muted/20">
-				<div>
-					<h2 class="text-base font-black">{editingIntervention ? 'แก้ไขคำแนะนำ' : 'ส่งคำแนะนำถึงผู้เรียน'}</h2>
-					{#if interventionModalUser}
-						<p class="text-xs text-muted-foreground mt-0.5">
-							@{interventionModalUser.username} · GOP {interventionModalUser.avgGop?.toFixed(1) ?? '—'}% · PER {interventionModalUser.avgPer?.toFixed(1) ?? '—'}%
-						</p>
-					{/if}
-				</div>
-				<button onclick={() => (interventionModalOpen = false)} class="rounded-xl border p-2 text-muted-foreground hover:bg-muted"><X class="size-4" /></button>
-			</div>
-			<form
-				method="POST"
-				action={editingIntervention ? '?/updateTeacherIntervention' : '?/assignTeacherIntervention'}
-				use:enhance={() => {
-					return async ({ result, update }) => {
-						await update();
-						if (result.type === 'success') {
-							showAnalyticsToast('บันทึกคำแนะนำเรียบร้อยแล้ว', 'success');
-							interventionModalOpen = false;
-						}
-					};
-				}}
-				class="p-5 space-y-4"
-			>
-				{#if editingIntervention}
-					<input type="hidden" name="interventionId" value={editingIntervention.id} />
-				{/if}
-				<input type="hidden" name="status" value={interventionStatus} />
-
-				{#if !editingIntervention}
-					<div>
-						<Label class="text-xs">ผู้เรียน</Label>
-						<select
-							name="targetUserId"
-							bind:value={interventionTargetUserId}
-							required
-							class="mt-1 h-9 w-full rounded-md border bg-background px-2 text-xs"
-						>
-							<option value="" disabled>— เลือกผู้เรียน —</option>
-							{#each atRiskUsers as u (u.id)}
-								<option value={String(u.id)}>{u.username} (GOP {u.avgGop?.toFixed(1)}%) — กลุ่มน่าเป็นห่วง</option>
-							{/each}
-							{#each (data.users || []).filter((u: any) => !u.isAdmin && !(u.avgGop !== null && u.avgGop < 70 && u.evaluationCount > 0)) as u (u.id)}
-								<option value={String(u.id)}>{u.username}</option>
-							{/each}
-						</select>
-					</div>
-				{:else}
-					<input type="hidden" name="targetUserId" value={interventionTargetUserId} />
-				{/if}
-
-				<div>
-					<div class="text-[11px] font-bold text-muted-foreground mb-1.5">⚡ ปุ่มลัดคำแนะนำสำเร็จรูป (Quick AI Presets)</div>
-					<div class="flex flex-wrap gap-1.5">
-						{#each AI_INTERVENTION_PRESETS as preset (preset.label)}
-							<button type="button" onclick={() => applyAiPreset(preset)} class="rounded-full border border-primary/30 bg-primary/5 text-primary px-3 py-1 text-[11px] font-bold hover:bg-primary/10 cursor-pointer">
-								{preset.label}
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				<div>
-					<Label class="text-xs">หัวข้อ</Label>
-					<Input name="title" bind:value={interventionTitle} required class="h-9 text-xs mt-1" />
-				</div>
-				<div>
-					<Label class="text-xs">คำศัพท์ที่ต้องฝึกซ้ำ (คั่นด้วยจุลภาค)</Label>
-					<Input name="remedialWords" bind:value={interventionRemedialWords} placeholder="好, 你, 我" class="h-9 text-xs mt-1" />
-				</div>
-				<div>
-					<Label class="text-xs">ข้อความคำแนะนำจากครู</Label>
-					<textarea name="message" bind:value={interventionMessage} required rows="4" class="mt-1 w-full rounded-md border bg-background px-3 py-2 text-xs"></textarea>
-				</div>
-				{#if editingIntervention}
-					<label class="flex items-center gap-2 text-xs font-semibold">
-						<input type="checkbox" checked={interventionStatus === 'improved'} onchange={(e) => (interventionStatus = e.currentTarget.checked ? 'improved' : 'pending')} />
-						ทำเครื่องหมายว่าพัฒนาขึ้นแล้ว
-					</label>
-				{/if}
-				<div class="flex justify-end gap-2 pt-1">
-					<Button type="button" variant="outline" class="text-xs h-9 rounded-xl" onclick={() => (interventionModalOpen = false)}>ยกเลิก</Button>
-					<Button type="submit" class="bg-primary text-white font-bold text-xs h-9 px-4 rounded-xl">{editingIntervention ? 'บันทึกการแก้ไข' : 'ส่งคำแนะนำ'}</Button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}
-
 
 <!-- 4. USER DRILLDOWN & DASHBOARD PREVIEW MODAL -->
 {#if selectedUserModal}
@@ -2755,6 +2353,9 @@
 					<div>
 						<div class="flex items-center gap-2">
 							<h2 class="text-lg font-black text-foreground">{selectedUserModal.username}</h2>
+							{#if selectedUserModal.username.startsWith('guest_')}
+								<span class="rounded bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400">[Guest]</span>
+							{/if}
 							<span class="rounded bg-muted px-2 py-0.5 text-[10px] font-mono text-muted-foreground">ID: #{selectedUserModal.id}</span>
 						</div>
 						<div class="text-xs text-muted-foreground">
@@ -2853,7 +2454,6 @@
 						<Learner360ProfileModal
 							userModal={selectedUserModal}
 							classRadarBenchmark={data.skillsAnalytics?.classRadar6Axis}
-							onAssignRemedial={(u, words) => openCreateIntervention(u, words)}
 						/>
 					{/if}
 				{/if}
@@ -3044,7 +2644,6 @@
 					bind:value={quickNavQuery}
 					placeholder="ค้นหาเมนู ด่าน หรือชื่อผู้เรียน..."
 					class="w-full rounded-xl bg-muted/40 pl-9 pr-8 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
-					autofocus
 				/>
 				<button onclick={() => (quickNavOpen = false)} class="absolute right-2 text-muted-foreground hover:text-foreground">
 					<X class="size-4" />
@@ -3129,72 +2728,6 @@
 {/if}
 
 
-
-<!-- MODAL CONFIRMATION: DELETE MOCK USERS -->
-{#if mockAlertModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-		<div class="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
-			<div class="flex items-center gap-3 text-rose-600 dark:text-rose-400">
-				<div class="flex size-12 items-center justify-center rounded-2xl bg-rose-500/10">
-					<AlertTriangle class="size-6" />
-				</div>
-				<div>
-					<h3 class="font-black text-base text-foreground">ยืนยันการล้างข้อมูลจำลอง 100 คน?</h3>
-					<p class="text-xs text-muted-foreground">การดำเนินการนี้จะลบข้อมูลชุดทดสอบ mock_learner_* ทั้งหมด</p>
-				</div>
-			</div>
-
-			<div class="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-xs space-y-2 text-rose-800 dark:text-rose-300 font-medium">
-				<p>⚠️ <strong>ข้อมูลที่จะถูกลบออกจากฐานข้อมูล Turso & Neon:</strong></p>
-				<ul class="list-disc list-inside space-y-1 text-[11px] opacity-90">
-					<li>บัญชีผู้เรียนจำลอง: <code>mock_learner_001</code> ถึง <code>mock_learner_100</code></li>
-					<li>ประวัติการประเมินออกเสียง GOP และวรรณยุกต์ทั้งหมดของ mock users</li>
-					<li>ประวัติผลสอบ Pre-test และบันทึกคำศัพท์ของ mock users</li>
-					<li>คะแนน XP, หัวใจ, สถิติ Streak และด่าน Telemetry ที่เกี่ยวข้อง</li>
-				</ul>
-				<p class="text-[10px] text-muted-foreground pt-1 border-t border-rose-500/20">
-					✓ บัญชีผู้เรียนจริงและบัญชีแอดมินทั้งหมดจะปลอดภัย 100% ไม่ได้รับผลกระทบ
-				</p>
-			</div>
-
-			<div class="flex items-center justify-end gap-2 pt-2">
-				<button
-					type="button"
-					onclick={() => (mockAlertModalOpen = false)}
-					disabled={isDeletingMock}
-					class="rounded-xl border bg-background hover:bg-muted px-4 py-2 text-xs font-bold transition disabled:opacity-50"
-				>
-					ยกเลิก
-				</button>
-
-				<form
-					method="POST"
-					action="?/deleteMockLearners"
-					use:enhance={() => {
-						isDeletingMock = true;
-						return async ({ update, result }) => {
-							await update();
-							isDeletingMock = false;
-							mockAlertModalOpen = false;
-							if (result.type === 'success') {
-								analyticsToast = { type: 'success', message: 'ล้างข้อมูลจำลอง 100 คนออกจากระบบสำเร็จเรียบร้อย!' };
-							}
-						};
-					}}
-				>
-					<button
-						type="submit"
-						disabled={isDeletingMock}
-						class="flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 text-xs font-bold transition shadow-xs disabled:opacity-50"
-					>
-						<Trash2 class="size-3.5" />
-						<span>{isDeletingMock ? 'กำลังลบข้อมูล...' : 'ยืนยันล้างข้อมูล 100 ผู้ใช้'}</span>
-					</button>
-				</form>
-			</div>
-		</div>
-	</div>
-{/if}
 
 <!-- FLOATING ANALYTICS TOAST NOTIFICATION -->
 {#if analyticsToast}

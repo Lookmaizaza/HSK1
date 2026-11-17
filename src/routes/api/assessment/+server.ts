@@ -1,4 +1,4 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { 
 	recordAssessmentWord, 
@@ -11,6 +11,13 @@ import {
 	getProgress
 } from '$lib/server/db';
 import { extractTargetPhonemes } from '$lib/pronunciation';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
+
+const clampScore = (val: unknown, min = 0, max = 100): number => {
+	const num = Number(val);
+	if (!Number.isFinite(num)) return min;
+	return Math.min(max, Math.max(min, num));
+};
 
 export const GET: RequestHandler = async ({ locals }) => {
 	const user = locals.user;
@@ -28,10 +35,24 @@ export const GET: RequestHandler = async ({ locals }) => {
 	}
 };
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async (event) => {
+	const { request, locals } = event;
 	const user = locals.user;
 	if (!user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	const rate = consumeRateLimit(
+		`assessment:u${user.id}:${extractClientIp(event)}`,
+		120,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		return json({ error: `Too many requests. Please retry in ${rate.remainingSeconds}s.` }, { status: 429 });
+	}
+
+	if (user.isAdmin || user.isImpersonated || isUserAdmin(user.username)) {
+		return json({ success: true, skipped: true, reason: 'admin_or_impersonated' });
 	}
 
 	try {
@@ -51,6 +72,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				perOverall 
 			} = body;
 
+			const safeToneConfidence = clampScore(toneConfidence, 0, 100);
+			const safeToneScore = clampScore(toneScore, 0, 100);
+			const safeGopOverall = clampScore(gopOverall, 0, 100);
+			const safePerOverall = clampScore(perOverall, 0, 100);
+
 			await recordAssessmentWord({
 				userId: String(user.id),
 				testType,
@@ -58,10 +84,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				pinyin,
 				targetTone,
 				detectedTone,
-				toneConfidence: toneConfidence ?? 0,
-				toneScore: toneScore ?? 0,
-				gopOverall: gopOverall ?? 0,
-				perOverall: perOverall ?? 0
+				toneConfidence: safeToneConfidence,
+				toneScore: safeToneScore,
+				gopOverall: safeGopOverall,
+				perOverall: safePerOverall
 			});
 
 			// If not admin, mirror evaluation into main pronunciation & phoneme tables for analytics
@@ -120,14 +146,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		if (action === 'finish_assessment') {
 			const { testType, totalWords, correctTones, avgToneScore, avgGop, avgPer } = body;
 
+			const safeTotalWords = Math.min(200, Math.max(1, Math.round(Number(totalWords ?? 20)) || 20));
+			const safeCorrectTones = Math.min(safeTotalWords, Math.max(0, Math.round(Number(correctTones ?? 0)) || 0));
+
 			await saveAssessmentSummary({
 				userId: String(user.id),
 				testType,
-				totalWords: totalWords ?? 20,
-				correctTones: correctTones ?? 0,
-				avgToneScore: avgToneScore ?? 0,
-				avgGop: avgGop ?? 0,
-				avgPer: avgPer ?? 0
+				totalWords: safeTotalWords,
+				correctTones: safeCorrectTones,
+				avgToneScore: clampScore(avgToneScore, 0, 100),
+				avgGop: clampScore(avgGop, 0, 100),
+				avgPer: clampScore(avgPer, 0, 100)
 			});
 
 			// If not admin, backfill and ensure all words from this assessment are in pronunciation & phoneme tables

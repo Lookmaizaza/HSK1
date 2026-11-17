@@ -104,11 +104,12 @@ export const POST = async (event: RequestEvent) => {
 		learnerName: username
 	});
 
-	// Persist only for logged-in learners who granted research telemetry consent.
-	const consented = userId
+	// Persist only for non-admin, non-impersonated logged-in learners who granted research telemetry consent.
+	const isAdminOrImpersonated = Boolean(locals.user?.isAdmin || locals.user?.isImpersonated);
+	const consented = userId && !isAdminOrImpersonated
 		? await getUserConsent(userId, 'pdpa_research_telemetry').catch(() => false)
 		: false;
-	if (userId && consented) {
+	if (userId && consented && !isAdminOrImpersonated) {
 		try {
 			const phonemeDetails = telemetry.assessment.syllableResults.map((s) => ({
 				phoneme: s.hanzi,
@@ -126,6 +127,7 @@ export const POST = async (event: RequestEvent) => {
 				stage_id: stageId ?? null,
 				attempt_number: 1,
 				audio_duration_sec: Math.round((telemetry.assessment.acoustics.totalDurationMs / 1000) * 100) / 100,
+				listen_count: telemetry.behavior.listenCount,
 				scores: {
 					gop_overall: telemetry.assessment.overallScore,
 					per_overall: telemetry.assessment.isPassed ? 0 : 25,
@@ -184,6 +186,7 @@ export const POST = async (event: RequestEvent) => {
 
 	return json({
 		success: true,
+		...(isAdminOrImpersonated ? { skipped: true, reason: 'admin_or_impersonated' } : {}),
 		message: 'Telemetry ingested successfully and converted to xAPI Statement',
 		receivedAt: new Date().toISOString(),
 		telemetrySummary: {

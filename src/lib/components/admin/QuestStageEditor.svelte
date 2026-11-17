@@ -233,21 +233,30 @@
 		return { words, challenges, error: '' };
 	}
 
-	const loaded = parseContent(stage);
-
-	let title = $state(String(stage.title ?? ''));
-	let category = $state(String(stage.category ?? ''));
-	let description = $state(String(stage.description ?? ''));
-	let isActive = $state(stage.isActive !== false);
-	let words = $state<WordDraft[]>(loaded.words);
-	let challenges = $state<ChallengeDraft[]>(loaded.challenges);
-	let parseError = $state(loaded.error);
+	let title = $state('');
+	let category = $state('');
+	let description = $state('');
+	let isActive = $state(true);
+	let words = $state<WordDraft[]>([]);
+	let challenges = $state<ChallengeDraft[]>([]);
+	let parseError = $state('');
 	let activeTab = $state<'words' | 'challenges'>('words');
 	let issues = $state<Issue[]>([]);
 	let serverError = $state('');
 	let submitting = $state(false);
 	let dialogEl = $state<HTMLDivElement | null>(null);
 	let resetForm = $state<HTMLFormElement | null>(null);
+
+	$effect(() => {
+		const loaded = parseContent(stage);
+		title = String(stage.title ?? '');
+		category = String(stage.category ?? '');
+		description = String(stage.description ?? '');
+		isActive = stage.isActive !== false;
+		words = loaded.words;
+		challenges = loaded.challenges;
+		parseError = loaded.error;
+	});
 	let confirmOptions = $state<ConfirmOptions | null>(null);
 	let confirmResolver: ((confirmed: boolean) => void) | null = null;
 

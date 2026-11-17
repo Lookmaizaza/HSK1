@@ -245,12 +245,23 @@
 				<SettingsIcon class="size-5" />
 			</Button>
 			{#if user}
+				{@const isGuest = Boolean((user as any).isGuest || user.username.startsWith('guest_'))}
+				{#if isGuest}
+					<Button
+						variant="outline"
+						size="sm"
+						href="/auth?mode=register"
+						class="hidden sm:inline-flex h-9 rounded-xl border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 text-xs font-bold"
+					>
+						<LogIn class="size-3.5" /> บันทึกบัญชี / เข้าสู่ระบบ
+					</Button>
+				{/if}
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
 							<button
 								{...props}
-								class="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold uppercase text-primary-foreground cursor-pointer"
+								class="flex size-9 items-center justify-center rounded-full {isGuest ? 'bg-sky-600 text-white' : 'bg-primary text-primary-foreground'} text-sm font-bold uppercase cursor-pointer"
 								aria-label="Account"
 							>
 								{user.username.charAt(0)}
@@ -264,8 +275,36 @@
 					>
 						<DropdownMenu.Item disabled>
 							<User class="size-4" />
-							{user.username}
+							<span>{user.username}</span>
+							{#if isGuest}
+								<span class="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">Guest</span>
+							{/if}
 						</DropdownMenu.Item>
+						{#if isGuest}
+							<DropdownMenu.Separator />
+							<DropdownMenu.Item>
+								{#snippet child({ props })}
+									<a
+										{...props}
+										href="/auth?mode=register"
+										class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-semibold text-sky-700 hover:bg-accent"
+									>
+										<User class="size-4" /> บันทึกบัญชีถาวร (Sign up)
+									</a>
+								{/snippet}
+							</DropdownMenu.Item>
+							<DropdownMenu.Item>
+								{#snippet child({ props })}
+									<a
+										{...props}
+										href="/auth?mode=login"
+										class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+									>
+										<LogIn class="size-4" /> เข้าสู่ระบบบัญชีเดิม
+									</a>
+								{/snippet}
+							</DropdownMenu.Item>
+						{/if}
 						{#if user.isAdmin}
 							<DropdownMenu.Separator />
 							<DropdownMenu.Item>

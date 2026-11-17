@@ -1,12 +1,17 @@
 <script lang="ts">
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import { page } from '$app/state';
 	import { initProgress } from '$lib/progress.svelte';
 	import InAppBrowserGuard from '$lib/components/InAppBrowserGuard.svelte';
 	import AssessmentPromptModal from '$lib/components/AssessmentPromptModal.svelte';
 	import PdpaConsentModal from '$lib/components/PdpaConsentModal.svelte';
 
 	let { children, data } = $props();
+
+	let isAuthOrAdminPage = $derived(
+		page.url.pathname.startsWith('/auth') || page.url.pathname.startsWith('/admin')
+	);
 
 	$effect(() => {
 		initProgress(!!data.user);
@@ -35,7 +40,7 @@
 {@render children()}
 <InAppBrowserGuard />
 
-{#if data.showConsent && data.user && !data.user.isAdmin && !data.user.isImpersonated}
+{#if data.showConsent && !data.user?.isAdmin && !data.user?.isImpersonated && !isAuthOrAdminPage}
 	<PdpaConsentModal user={data.user} initiallyOpen={data.showConsent} />
 {/if}
 

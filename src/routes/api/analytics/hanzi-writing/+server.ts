@@ -3,6 +3,7 @@ import {
 	recordHanziWritingAttempt,
 	type HanziWritingAttemptRecord
 } from '$lib/server/db';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -14,7 +15,16 @@ function isIntegerInRange(value: unknown, min: number, max: number): value is nu
 	return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
 }
 
-export const POST: RequestHandler = async ({ locals, request }) => {
+export const POST: RequestHandler = async (event) => {
+	const { locals, request } = event;
+	const rate = consumeRateLimit(
+		`hanzi:${locals.user ? `u${locals.user.id}` : extractClientIp(event)}`,
+		120,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many writing submissions. Please retry in ${rate.remainingSeconds}s.`);
+	}
 	let body: unknown;
 	try {
 		body = await request.json();

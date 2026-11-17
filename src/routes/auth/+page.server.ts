@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import {
 	createSession,
 	createUser,
+	upgradeGuestUser,
 	findUserByUsername,
 	verifyPassword,
 	getProgress,
@@ -14,7 +15,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = (event) => {
 	const { locals, url } = event;
-	if (locals.user) {
+	if (locals.user && !locals.user.isGuest) {
 		if (locals.user.isAdmin) {
 			throw redirect(303, '/admin');
 		}
@@ -23,6 +24,7 @@ export const load: PageServerLoad = (event) => {
 	const protection = checkLoginProtection(event, '');
 	return {
 		mode: url.searchParams.get('mode') === 'register' ? 'register' : 'login',
+		guestUser: locals.user?.isGuest ? { id: locals.user.id, username: locals.user.username } : null,
 		isBlocked: protection.isBlocked,
 		remainingSeconds: protection.remainingSeconds
 	};
@@ -105,7 +107,9 @@ export const actions: Actions = {
 				return fail(400, { error: 'ชื่อผู้ใช้นี้มีผู้ใช้งานแล้ว', username });
 			}
 
-			const user = await createUser(username, password);
+			const user = event.locals.user?.isGuest
+				? await upgradeGuestUser(event.locals.user.id, username, password)
+				: await createUser(username, password);
 			handleLoginSuccess(event, username);
 			await mergeLocalProgress(user.id, local);
 			const session = await createSession(user.id);

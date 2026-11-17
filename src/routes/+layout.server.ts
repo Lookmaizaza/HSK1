@@ -6,7 +6,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	let showConsent = false;
 
 	// Admin accounts and impersonation mode MUST NEVER see the consent or assessment prompt modal
-	if (user && !user.isAdmin && !user.isImpersonated) {
+	if (!user) {
+		showConsent = true;
+	} else if (!user.isAdmin && !user.isImpersonated) {
 		try {
 			const userId = String(user.id);
 			const audio = await getUserConsent(userId, 'audio_processing');

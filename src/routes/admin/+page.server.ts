@@ -80,8 +80,6 @@ export const load: PageServerLoad = async (event) => {
 		selectedUserDetail,
 		questAnalytics,
 		pitchAnalytics,
-		listeningPolicy,
-		pitchSensitivity,
 		flashcardAnalytics
 	] = await Promise.all([
 		getSkillsAnalyticsSummary(),
@@ -98,8 +96,6 @@ export const load: PageServerLoad = async (event) => {
 		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
 		getAdvancedLearningAnalytics('stage'),
 		getAdvancedLearningAnalytics('word'),
-		getSystemSetting('listening_policy', 'low_pass'),
-		getSystemSetting('pitch_sensitivity', 'standard'),
 		getFlashcardAnalytics()
 	]);
 
@@ -279,8 +275,6 @@ export const load: PageServerLoad = async (event) => {
 			stage: questAnalytics,
 			word: pitchAnalytics
 		},
-		listeningPolicy,
-		pitchSensitivity,
 		flashcardAnalytics,
 		selectedUserId,
 		selectedUserDetail,
@@ -553,88 +547,6 @@ export const actions: Actions = {
 		return { success: true, resetStageId: stageId };
 	},
 
-	saveListeningPolicy: async ({ request, locals }) => {
-		const admin = locals.realAdmin || locals.user;
-		if (!admin?.isAdmin) throw error(403, 'Forbidden');
-		const data = await request.formData();
-		const policy = String(data.get('policy') ?? 'low_pass').trim();
-		await setSystemSetting('listening_policy', policy);
-		await recordAuditLog({
-			actorUsername: admin.username,
-			action: 'update_listening_policy',
-			resourceType: 'system_setting',
-			resourceId: 'listening_policy',
-			details: `เปลี่ยนนโยบายการฟังตัวอย่าง (Audio Gate) เป็น "${policy}"`
-		});
-		return { success: true, policy };
-	},
-
-	assignTeacherIntervention: async ({ request, locals }) => {
-		const admin = locals.realAdmin || locals.user;
-		if (!admin?.isAdmin) throw error(403, 'Forbidden');
-		const data = await request.formData();
-		const targetUserId = String(data.get('targetUserId') ?? '').trim();
-		const title = String(data.get('title') ?? '').trim();
-		const message = String(data.get('message') ?? '').trim();
-		const remedialWords = String(data.get('remedialWords') ?? '').trim();
-		const status = (String(data.get('status') ?? 'pending') as 'pending' | 'improved');
-
-		if (!targetUserId || !title || !message) {
-			return fail(400, { error: 'กรุณากรอกรหัสผู้เรียน หัวข้อ และข้อความคำแนะนำให้ครบถ้วน' });
-		}
-
-		await createTeacherIntervention(targetUserId, title, message, remedialWords, admin.username, status);
-		await recordAuditLog({
-			actorUsername: admin.username,
-			action: 'assign_teacher_intervention',
-			resourceType: 'user',
-			resourceId: targetUserId,
-			details: `มอบหมายชุดซ่อมเสริมให้นักเรียน #${targetUserId}: "${title}" (คำศัพท์: ${remedialWords || 'ไม่มี'})`
-		});
-		return { success: true, targetUserId };
-	},
-
-	updateTeacherIntervention: async ({ request, locals }) => {
-		const admin = locals.realAdmin || locals.user;
-		if (!admin?.isAdmin) throw error(403, 'Forbidden');
-		const data = await request.formData();
-		const interventionId = Number(data.get('interventionId'));
-		const title = String(data.get('title') ?? '').trim();
-		const message = String(data.get('message') ?? '').trim();
-		const remedialWords = String(data.get('remedialWords') ?? '').trim();
-		const status = (String(data.get('status') ?? 'pending') as 'pending' | 'improved');
-
-		if (!interventionId || isNaN(interventionId) || !title || !message) {
-			return fail(400, { error: 'กรุณากรอกรหัสคำแนะนำ หัวข้อ และข้อความคำแนะนำให้ครบถ้วน' });
-		}
-
-		await updateTeacherIntervention(interventionId, title, message, remedialWords, status);
-		await recordAuditLog({
-			actorUsername: admin.username,
-			action: 'update_teacher_intervention',
-			resourceType: 'intervention',
-			resourceId: String(interventionId),
-			details: `อัปเดตคำแนะนำ #${interventionId}: "${title}" สถานะ: ${status === 'improved' ? 'พัฒนาแล้ว' : 'รอดำเนินการ'}`
-		});
-		return { success: true, interventionId };
-	},
-
-	savePitchTuning: async ({ request, locals }) => {
-		const admin = locals.realAdmin || locals.user;
-		if (!admin?.isAdmin) throw error(403, 'Forbidden');
-		const data = await request.formData();
-		const sensitivity = String(data.get('sensitivity') ?? 'standard').trim();
-		await setSystemSetting('pitch_sensitivity', sensitivity);
-		await recordAuditLog({
-			actorUsername: admin.username,
-			action: 'update_pitch_sensitivity',
-			resourceType: 'system_setting',
-			resourceId: 'pitch_sensitivity',
-			details: `ปรับความไวในการวิเคราะห์วรรณยุกต์ (Pitch Sensitivity) เป็น "${sensitivity}"`
-		});
-		return { success: true, sensitivity };
-	},
-
 	syncTursoToNeon: async ({ locals }) => {
 		const admin = locals.realAdmin || locals.user;
 		if (!admin?.isAdmin) throw error(403, 'Forbidden');
@@ -657,16 +569,17 @@ export const actions: Actions = {
 		const db = getDb();
 		if (!db) throw error(500, 'Database unavailable');
 
-		// 1. Delete all mock records from Turso (handles both string names and integer IDs >= 1000)
-		await db.execute("DELETE FROM phoneme_evaluations WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000");
-		await db.execute("DELETE FROM pronunciation_evaluations WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000");
-		await db.execute("DELETE FROM assessment_records WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000 OR id >= 100000");
-		await db.execute("DELETE FROM assessment_summaries WHERE user_id LIKE 'mock_learner_%' OR CAST(user_id AS integer) >= 1000 OR id >= 1000");
-		await db.execute("DELETE FROM stage_telemetry WHERE user_id LIKE 'mock_learner_%' OR (user_id IS NOT NULL AND user_id != 'anonymous' AND CAST(user_id AS integer) >= 1000)");
-		await db.execute("DELETE FROM lesson_completions WHERE CAST(user_id AS integer) >= 1000");
-		await db.execute("DELETE FROM user_mistakes WHERE CAST(user_id AS integer) >= 1000");
-		await db.execute("DELETE FROM progress WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'mock_learner_%' OR CAST(id AS integer) >= 1000)");
-		const delUsers = await db.execute("DELETE FROM users WHERE username LIKE 'mock_learner_%' OR CAST(id AS integer) >= 1000");
+		// 1. Delete only mock_learner_% records from Turso (never match real users by numeric ID threshold)
+		const mockUserIdSubquery = "SELECT CAST(id AS TEXT) FROM users WHERE username LIKE 'mock_learner_%'";
+		await db.execute(`DELETE FROM phoneme_evaluations WHERE user_id LIKE 'mock_learner_%' OR user_id IN (${mockUserIdSubquery})`);
+		await db.execute(`DELETE FROM pronunciation_evaluations WHERE user_id LIKE 'mock_learner_%' OR user_id IN (${mockUserIdSubquery})`);
+		await db.execute(`DELETE FROM assessment_records WHERE user_id LIKE 'mock_learner_%' OR user_id IN (${mockUserIdSubquery})`);
+		await db.execute(`DELETE FROM assessment_summaries WHERE user_id LIKE 'mock_learner_%' OR user_id IN (${mockUserIdSubquery})`);
+		await db.execute(`DELETE FROM stage_telemetry WHERE user_id LIKE 'mock_learner_%' OR user_id IN (${mockUserIdSubquery})`);
+		await db.execute(`DELETE FROM lesson_completions WHERE user_id LIKE 'mock_learner_%' OR user_id IN (${mockUserIdSubquery})`);
+		await db.execute(`DELETE FROM user_mistakes WHERE user_id LIKE 'mock_learner_%' OR user_id IN (${mockUserIdSubquery})`);
+		await db.execute("DELETE FROM progress WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'mock_learner_%')");
+		const delUsers = await db.execute("DELETE FROM users WHERE username LIKE 'mock_learner_%'");
 
 		// 2. Also directly purge mock records from Neon PostgreSQL
 		try {

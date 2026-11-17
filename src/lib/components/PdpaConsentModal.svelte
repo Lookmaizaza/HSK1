@@ -1,17 +1,19 @@
 <!-- src/lib/components/PdpaConsentModal.svelte -->
 <script lang="ts">
-	import { ShieldCheck, Mic, Lock, CheckCircle2, AlertCircle, Volume2, Sparkles } from '@lucide/svelte';
+	import { invalidateAll } from '$app/navigation';
+	import { ShieldCheck, Mic, Lock, AlertCircle, LogIn } from '@lucide/svelte';
 
 	let {
 		user = null,
 		initiallyOpen = false
 	}: {
-		user?: { id: number; username: string; isAdmin?: boolean; isImpersonated?: boolean } | null;
+		user?: { id: number; username: string; isAdmin?: boolean; isGuest?: boolean; isImpersonated?: boolean } | null;
 		initiallyOpen?: boolean;
 	} = $props();
 
 	let isOpen = $state(false);
 	let isRequestingMic = $state(false);
+	let isSubmitting = $state(false);
 	let micGranted = $state(false);
 	let micError = $state<string | null>(null);
 
@@ -20,14 +22,13 @@
 	let audioConsent = $state(true);
 	let researchConsent = $state(true);
 
-	// The server is the source of truth:
-	// Only render when user is logged in, is a learner (not admin, not impersonated), and hasn't consented
+	// Render for both unauthenticated Visitors (Guest) and logged-in Learners who haven't consented yet
 	$effect(() => {
-		if (!user || user.isAdmin || user.isImpersonated) {
+		if (user?.isAdmin || user?.isImpersonated) {
 			isOpen = false;
 			return;
 		}
-		isOpen = Boolean(initiallyOpen && user.id);
+		isOpen = Boolean(initiallyOpen);
 	});
 
 	async function requestMicrophonePermission(): Promise<boolean> {
@@ -58,16 +59,40 @@
 	}
 
 	async function handleAccept(requestMic = true) {
+		if (isSubmitting) return;
+		isSubmitting = true;
+
 		if (requestMic) {
 			await requestMicrophonePermission();
 		}
 
-		const userId = user?.id ? String(user.id) : 'usr_uuid_local';
-		const userStorageKey = `yupakjeen_pdpa_consent_user_${userId}`;
+		let resolvedUserId = user?.id ? String(user.id) : 'usr_uuid_local';
+
+		// Send consent log to backend API (also provisions guest_xxxxxx account + session cookie if unauthenticated)
+		try {
+			const res = await fetch('/api/v1/consent', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					user_id: user?.id ? String(user.id) : undefined,
+					terms_accepted: termsAccepted,
+					audio_consent: audioConsent,
+					research_consent: researchConsent,
+					consent_version: 'v1.0'
+				})
+			});
+			if (res.ok) {
+				const data = await res.json();
+				if (data?.userId) {
+					resolvedUserId = String(data.userId);
+				}
+			}
+		} catch {}
 
 		// Save consent record locally per user
+		const userStorageKey = `yupakjeen_pdpa_consent_user_${resolvedUserId}`;
 		const consentData = {
-			userId,
+			userId: resolvedUserId,
 			termsAccepted,
 			audioConsent,
 			researchConsent,
@@ -75,26 +100,17 @@
 			version: 'v1.0',
 			consentedAt: new Date().toISOString()
 		};
-
-		localStorage.setItem(userStorageKey, JSON.stringify(consentData));
-
-		// Send consent log to backend API
 		try {
-			fetch('/api/v1/consent', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					user_id: userId,
-					terms_accepted: termsAccepted,
-					audio_consent: audioConsent,
-					research_consent: researchConsent,
-					consent_version: 'v1.0'
-				})
-			}).catch(() => {});
+			localStorage.setItem(userStorageKey, JSON.stringify(consentData));
 		} catch {}
 
-		// Close modal
 		isOpen = false;
+		isSubmitting = false;
+
+		// Reload layout data so newly provisioned guest_xxxxxx session is active immediately across the app
+		try {
+			await invalidateAll();
+		} catch {}
 	}
 </script>
 
@@ -196,12 +212,12 @@
 				<button
 					type="button"
 					onclick={() => handleAccept(true)}
-					disabled={isRequestingMic || !audioConsent}
+					disabled={isRequestingMic || isSubmitting || !audioConsent}
 					class="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs sm:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:opacity-90 active:scale-95 disabled:opacity-50 cursor-pointer"
 				>
-					{#if isRequestingMic}
+					{#if isRequestingMic || isSubmitting}
 						<span class="size-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></span>
-						<span>กำลังขอสิทธิ์ไมโครโฟน...</span>
+						<span>กำลังบันทึกข้อมูล...</span>
 					{:else}
 						<Mic class="size-4" />
 						<span>ยินยอมและเปิดใช้งานไมโครโฟน</span>
@@ -211,11 +227,24 @@
 				<button
 					type="button"
 					onclick={() => handleAccept(false)}
-					class="rounded-2xl border bg-background hover:bg-muted px-4 py-3 text-xs font-bold text-muted-foreground hover:text-foreground transition active:scale-95 cursor-pointer"
+					disabled={isRequestingMic || isSubmitting || !audioConsent}
+					class="rounded-2xl border bg-background hover:bg-muted px-4 py-3 text-xs font-bold text-muted-foreground hover:text-foreground transition active:scale-95 disabled:opacity-50 cursor-pointer"
 				>
-					ยินยอมภายหลัง
+					ยินยอม (เปิดไมค์ภายหลัง)
 				</button>
 			</div>
+
+			{#if !user}
+				<div class="border-t border-border/60 pt-3 text-center">
+					<a
+						href="/auth"
+						class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition"
+					>
+						<LogIn class="size-3.5" />
+						<span>มีบัญชีผู้เรียนอยู่แล้ว? เข้าสู่ระบบ / สมัครสมาชิก</span>
+					</a>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}

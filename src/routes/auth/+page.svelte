@@ -35,6 +35,17 @@
 
 	<main class="mx-auto max-w-md px-4 pb-16">
 		<div class="rounded-3xl border bg-card p-6 shadow-sm">
+			{#if (data as any)?.guestUser}
+				<div class="mb-4 rounded-2xl border border-sky-200 bg-sky-50/80 p-3.5 text-xs text-sky-900">
+					<div class="font-bold text-sky-800">
+						บัญชีผู้เยี่ยมชมปัจจุบัน: <span class="font-mono">{(data as any).guestUser.username}</span>
+					</div>
+					<div class="mt-1 text-sky-700 leading-relaxed">
+						เลือก <strong>Sign up</strong> เพื่อเปลี่ยนชื่อผู้ใช้และตั้งรหัสผ่านถาวร (XP และประวัติการฝึกทั้งหมดจะถูกเก็บไว้ครบ 100%) หรือเลือก <strong>Log in</strong> เพื่อเข้าบัญชีเดิมของคุณ
+					</div>
+				</div>
+			{/if}
+
 			<div class="mb-5 flex gap-1 rounded-xl bg-muted p-1">
 				<button
 					type="button"

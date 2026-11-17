@@ -19,9 +19,7 @@
 			t3AsT2Count?: number;
 			confusionRate: number | null;
 		};
-		pitchSensitivitySetting: 'standard' | 'strict' | 'forgiving';
 		learningPracticeMode: 'stage' | 'word';
-		onSavePitchTuning: (sensitivity: 'standard' | 'strict' | 'forgiving') => void;
 		onShowToast: (message: string, type?: 'success' | 'info') => void;
 		onChangePracticeMode: (mode: 'stage' | 'word') => void;
 	}
@@ -34,9 +32,7 @@
 		tone4Accuracy,
 		toneSamples,
 		toneSandhiStats,
-		pitchSensitivitySetting = $bindable('standard'),
 		learningPracticeMode,
-		onSavePitchTuning,
 		onShowToast,
 		onChangePracticeMode
 	}: Props = $props();
@@ -269,30 +265,6 @@
 						</span>
 					</div>
 				</div>
-
-				<!-- Actionable Pitch Tuning Panel -->
-				<div class="pt-2 border-t space-y-2">
-					<div class="flex items-center justify-between text-xs">
-						<span class="font-bold text-foreground">ปรับเกณฑ์ความแม่นยำ F0 (Pitch Margin Tolerance):</span>
-						<select
-							bind:value={pitchSensitivitySetting}
-							class="rounded-lg border bg-background px-2.5 py-1 text-xs font-bold"
-						>
-							<option value="standard">มาตรฐานสำหรับผู้เรียนไทย (±25Hz)</option>
-							<option value="strict">เข้มงวด (Strict Mode ±15Hz)</option>
-							<option value="forgiving">ผ่อนปรนมือใหม่ (Forgiving ±35Hz)</option>
-						</select>
-					</div>
-					<div class="flex justify-end">
-						<button
-							onclick={() => onSavePitchTuning(pitchSensitivitySetting)}
-							class="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1.5 text-xs transition shadow-xs flex items-center gap-1.5"
-						>
-							<Check class="size-3.5" />
-							<span>บันทึกการปรับจูน Pitch Feedback</span>
-						</button>
-					</div>
-				</div>
 			</div>
 		</div>
 
@@ -341,7 +313,7 @@
 			<div class="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-mono">
 				<span class="text-muted-foreground">ตัวอย่าง:</span>
 				<span class="font-semibold text-foreground">N = {toneSandhiStats.samples}</span>
-				<span class="text-muted-foreground">({toneSandhiStats.confusionRate ?? 27}%)</span>
+				<span class="text-muted-foreground">({toneSandhiStats.confusionRate !== null ? `${toneSandhiStats.confusionRate}%` : '—'})</span>
 			</div>
 		</div>
 
@@ -363,10 +335,10 @@
 
 				<div class="flex items-baseline gap-3 pt-1">
 					<span class="text-3xl font-bold font-mono text-primary">
-						{toneSandhiStats.t2AsT3Pct ?? 33}%
+						{toneSandhiStats.t2AsT3Pct !== null ? `${toneSandhiStats.t2AsT3Pct}%` : '—'}
 					</span>
 					<div class="text-xs text-muted-foreground">
-						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t2AsT3Count ?? 2}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples2 ?? 6}</strong> ครั้ง
+						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t2AsT3Count ?? 0}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples2 ?? 0}</strong> ครั้ง
 					</div>
 				</div>
 
@@ -414,10 +386,10 @@
 
 				<div class="flex items-baseline gap-3 pt-1">
 					<span class="text-3xl font-bold font-mono text-foreground">
-						{toneSandhiStats.t3AsT2Pct ?? 20}%
+						{toneSandhiStats.t3AsT2Pct !== null ? `${toneSandhiStats.t3AsT2Pct}%` : '—'}
 					</span>
 					<div class="text-xs text-muted-foreground">
-						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t3AsT2Count ?? 1}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples3 ?? 5}</strong> ครั้ง
+						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t3AsT2Count ?? 0}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples3 ?? 0}</strong> ครั้ง
 					</div>
 				</div>
 
@@ -461,7 +433,7 @@
 						คู่เทียบเสียง: 麻 (má) vs 马 (mǎ)
 					</div>
 					<div class="text-xs text-muted-foreground">
-						({toneSandhiStats.t2AsT3Count ?? 2} + {toneSandhiStats.t3AsT2Count ?? 1}) ÷ {toneSandhiStats.samples} = <strong>{toneSandhiStats.confusionRate ?? 27}%</strong>
+						({toneSandhiStats.t2AsT3Count ?? 0} + {toneSandhiStats.t3AsT2Count ?? 0}) ÷ {toneSandhiStats.samples} = <strong>{toneSandhiStats.confusionRate !== null ? `${toneSandhiStats.confusionRate}%` : '—'}</strong>
 					</div>
 				</div>
 			</div>

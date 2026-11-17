@@ -7,6 +7,7 @@ declare global {
 				id: number;
 				username: string;
 				isAdmin: boolean;
+				isGuest?: boolean;
 				role: 'admin' | 'user';
 				isImpersonated?: boolean;
 				realAdminUsername?: string;
@@ -18,6 +19,7 @@ declare global {
 				id: number;
 				username: string;
 				isAdmin: boolean;
+				isGuest?: boolean;
 				role: 'admin' | 'user';
 				isImpersonated?: boolean;
 				realAdminUsername?: string;

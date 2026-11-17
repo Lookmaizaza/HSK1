@@ -7,8 +7,12 @@ import {
 	getPronunciationEvaluations,
 	getUserAssessmentStatus,
 	syncPretestToEvaluations,
-	getTeacherInterventions
+	getStudentCrossSkillSummary
 } from '$lib/server/db';
+import {
+	buildStudentRadarAxes,
+	generateSmartCoachRecommendations
+} from '$lib/analytics/studentCoachEngine';
 import { generateRemedialVocab, type RemedialCard } from '$lib/analytics/remedialEngine';
 import {
 	generateMistakeArticulationGuides,
@@ -83,20 +87,20 @@ export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user && assessmentStatus.hasPre && !locals.user.isAdmin && !locals.user.isImpersonated) {
 		await syncPretestToEvaluations(String(locals.user.id)).catch(() => {});
 	}
-	// Support querying both the user account and local/guest fallbacks
-	const queryUserIds = Array.from(
-		new Set([currentUserId, '1', 'usr_uuid_local', 'usr_uuid_guest'].filter(Boolean))
-	);
+	// Strict data isolation: logged-in users only see their own records; guests only see guest sample data (never User #1).
+	const queryUserIds = locals.user?.id
+		? [String(locals.user.id)]
+		: ['usr_uuid_guest'];
 
 	// Fetch historical diagnostic data & evaluations (up to 1,000 recent evaluations for full coverage analysis)
-	const [diagnosticData, topMistakes, recentMistakes, mistakeStats, learningEvents, evaluations, teacherInterventions] = await Promise.all([
+	const [diagnosticData, topMistakes, recentMistakes, mistakeStats, learningEvents, evaluations, crossSkillSummary] = await Promise.all([
 		getDiagnosticAnalytics(queryUserIds),
 		locals.user ? getTopMistakes(locals.user.id, 15) : Promise.resolve([]),
 		locals.user ? getUserMistakes(locals.user.id, 20) : Promise.resolve([]),
 		locals.user ? getMistakeStats(locals.user.id) : Promise.resolve({ totalMistakes: 0, uniqueWords: 0, toneErrors: {} }),
 		getLearningEvents(queryUserIds, undefined, 100),
 		getPronunciationEvaluations(queryUserIds, 1000),
-		locals.user ? getTeacherInterventions(String(locals.user.id)) : Promise.resolve([])
+		getStudentCrossSkillSummary(queryUserIds)
 	]);
 
 	// Build map of word evaluation statistics
@@ -277,11 +281,26 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const allWords = [...hsk1Summary.words, ...hsk2Summary.words, ...hsk3Summary.words];
 	const overallArticulationGuides = generateMistakeArticulationGuides(allWords, 4);
 
+	const radarAxes = buildStudentRadarAxes(diagnosticData, crossSkillSummary, evaluations.length);
+	const practicedAxes = radarAxes.filter((a) => a.score !== null);
+	const holisticReadinessScore =
+		practicedAxes.length > 0
+			? Math.round(practicedAxes.reduce((sum, a) => sum + (a.score ?? 0), 0) / practicedAxes.length)
+			: null;
+	const coachRecommendations = generateSmartCoachRecommendations(
+		diagnosticData,
+		crossSkillSummary,
+		Boolean(assessmentStatus.hasPre)
+	);
+
 	return {
 		user: locals.user || null,
 		hasPre: Boolean(assessmentStatus.hasPre),
-		teacherInterventions: teacherInterventions || [],
 		diagnostic: diagnosticData,
+		crossSkillSummary,
+		radarAxes,
+		holisticReadinessScore,
+		coachRecommendations,
 		levels,
 		vocabOverview: {
 			totalWords: totalVocabularyCount,

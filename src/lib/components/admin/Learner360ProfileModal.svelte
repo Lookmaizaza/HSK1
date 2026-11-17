@@ -27,12 +27,10 @@
 
 	let {
 		userModal,
-		classRadarBenchmark = null,
-		onAssignRemedial
+		classRadarBenchmark = null
 	}: {
 		userModal: any;
 		classRadarBenchmark?: any;
-		onAssignRemedial?: (userModal: any, suggestedWords?: string[]) => void;
 	} = $props();
 
 	// Defensive detail unpacker (supports userModal directly or userModal.fullDetail)
@@ -43,7 +41,6 @@
 	const writing = $derived(detail?.writingPortfolio || userModal?.writingPortfolio || null);
 	const exam = $derived(detail?.examPortfolio || userModal?.examPortfolio || null);
 	const chatbot = $derived(detail?.chatbotPortfolio || userModal?.chatbotPortfolio || null);
-	const interventions = $derived(detail?.interventions || userModal?.interventions || []);
 
 	// ==========================================
 	// Helper functions
@@ -85,7 +82,7 @@
 		switch (riskLevel) {
 			case 'at_risk':
 				return {
-					label: 'ต้องดูแลเร่งด่วน (Urgent Intervention)',
+					label: 'คะแนนต่ำกว่าเกณฑ์ (Low Score)',
 					icon: AlertTriangle,
 					bg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
 				};
@@ -550,16 +547,6 @@
 						{/if}
 					</div>
 				</div>
-
-				<!-- 1-Click Remedial CTA -->
-				<button
-					type="button"
-					onclick={() => onAssignRemedial?.(userModal, recommendedRemedialWords)}
-					class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-5 py-3 text-xs font-black shadow-md transition transform active:scale-98 cursor-pointer shrink-0"
-				>
-					<Target class="size-4" />
-					<span>🎯 สั่งการบ้านซ่อมเสริมให้ผู้เรียนคนนี้ทันที</span>
-				</button>
 			</div>
 		</div>
 	</section>
@@ -1315,125 +1302,4 @@
 		</section>
 	</div>
 
-	<!-- ========================================================================= -->
-	<!-- BLOCK 7: Teacher Intervention History for This Learner                    -->
-	<!-- ========================================================================= -->
-	<section class="rounded-3xl border border-border/70 bg-card p-6 shadow-xs space-y-6">
-		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-border/60">
-			<div class="flex items-center gap-3">
-				<div class="flex size-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-					<History class="size-6" />
-				</div>
-				<div>
-					<h3 class="text-lg font-black text-foreground">ประวัติการสั่งการบ้านซ่อมเสริม (Teacher Interventions)</h3>
-					<p class="text-xs text-muted-foreground mt-0.5">
-						บันทึกคำแนะนำและการบ้านเฉพาะบุคคลที่ครูเคยส่งให้ผู้เรียนคนนี้
-					</p>
-				</div>
-			</div>
-
-			<!-- Action Button -->
-			<button
-				type="button"
-				onclick={() => onAssignRemedial?.(userModal)}
-				class="inline-flex items-center gap-2 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
-			>
-				<Send class="size-3.5" />
-				<span>➕ มอบหมายชุดฝึกซ่อมเสริมใหม่</span>
-			</button>
-		</div>
-
-		<!-- Interventions List or Empty State -->
-		{#if Array.isArray(interventions) && interventions.length > 0}
-			<div class="space-y-3">
-				{#each interventions as item}
-					<div class="rounded-2xl border border-border/70 bg-muted/20 p-4 space-y-2">
-						<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-							<div class="flex items-center gap-2">
-								<span class="text-sm font-bold text-foreground">{item.title}</span>
-								<!-- Status badge -->
-								<span class="rounded-full px-2 py-0.5 text-[10px] font-bold {item.status === 'improved' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}">
-									{item.status === 'improved' ? '✓ ฝึกสำเร็จแล้ว' : '⏳ กำลังฝึกฝน'}
-								</span>
-								<span class="rounded-full px-2 py-0.5 text-[10px] font-bold {item.is_read ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}">
-									{item.is_read ? '👁️ อ่านแล้ว' : '✉️ ยังไม่อ่าน'}
-								</span>
-							</div>
-							<span class="text-xs font-mono text-muted-foreground">{fmtDate(item.created_at)}</span>
-						</div>
-
-						<p class="text-xs text-muted-foreground leading-relaxed">
-							{item.message}
-						</p>
-
-						{#if typeof item.totalWordsCount === 'number' && item.totalWordsCount > 0}
-							<div class="space-y-1.5 pt-1">
-								<div class="flex items-center justify-between text-[11px] font-semibold">
-									<span class="text-foreground">ความคืบหน้าการฝึกซ่อมเสริมรายคำ (Closed-Loop Remediation):</span>
-									<span class="font-mono font-bold {item.progressPct >= 100 ? 'text-emerald-600' : 'text-indigo-600'}">
-										ผ่านแล้ว {item.completedCount || 0} / {item.totalWordsCount} คำ ({item.progressPct || 0}%)
-									</span>
-								</div>
-								<div class="h-2 w-full rounded-full bg-muted overflow-hidden">
-									<div
-										class="h-full rounded-full transition-all duration-500 {item.progressPct >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}"
-										style="width: {Math.min(100, item.progressPct || 0)}%"
-									></div>
-								</div>
-							</div>
-						{/if}
-
-						{#if Array.isArray(item.wordProgress) && item.wordProgress.length > 0}
-							<div class="pt-2 flex flex-wrap items-center gap-1.5">
-								<span class="text-[11px] font-bold text-foreground">สถานะรายคำ:</span>
-								{#each item.wordProgress as wp (wp.word)}
-									<button
-										type="button"
-										onclick={() => playWord(wp.word)}
-										class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono font-bold transition cursor-pointer {wp.passed
-											? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-											: 'bg-background text-foreground hover:bg-muted'}"
-									>
-										<span>{wp.word}</span>
-										{#if wp.passed}
-											<span class="text-[10px] font-sans font-extrabold text-emerald-600">✓ {wp.bestGop}%</span>
-										{:else if wp.attemptsAfterAssigned > 0}
-											<span class="text-[10px] font-sans text-amber-600">ฝึก {wp.attemptsAfterAssigned} ครั้ง ({wp.bestGop}%)</span>
-										{:else}
-											<span class="text-[10px] font-sans text-muted-foreground">รอฝึก</span>
-										{/if}
-									</button>
-								{/each}
-							</div>
-						{:else if item.remedial_words}
-							<div class="pt-2 flex flex-wrap items-center gap-1.5">
-								<span class="text-[11px] font-bold text-foreground">คำศัพท์:</span>
-								{#each item.remedial_words.split(',').map((w: string) => w.trim()).filter(Boolean) as rw}
-									<button
-										type="button"
-										onclick={() => playWord(rw)}
-										class="rounded-lg bg-background border px-2 py-0.5 text-xs font-mono font-bold text-foreground hover:bg-muted transition cursor-pointer"
-									>
-										{rw}
-									</button>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{:else}
-			<div class="rounded-2xl border border-dashed border-border/70 bg-muted/10 p-8 text-center space-y-3">
-				<div class="size-12 rounded-2xl bg-muted/40 text-muted-foreground flex items-center justify-center mx-auto">
-					<History class="size-6" />
-				</div>
-				<div class="space-y-1">
-					<div class="text-sm font-bold text-foreground">ยังไม่เคยมีการมอบหมายการบ้านซ่อมเสริมให้ผู้เรียนคนนี้</div>
-					<div class="text-xs text-muted-foreground max-w-md mx-auto">
-						ครูสามารถใช้ปุ่ม "สั่งการบ้านซ่อมเสริม" เพื่อส่งชุดคำศัพท์ที่ผู้เรียนยังออกเสียงไม่ชัดเจนให้ไปฝึกซ้อมต่อได้ทันที
-					</div>
-				</div>
-			</div>
-		{/if}
-	</section>
 </div>
