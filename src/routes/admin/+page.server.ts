@@ -5,6 +5,7 @@ import {
 	findUserByUsername,
 	verifyPassword,
 	createSession,
+	deleteSession,
 	getResearchExportStats,
 	getUserFullDetail,
 	getStageTelemetryStats,
@@ -49,7 +50,13 @@ export const load: PageServerLoad = async (event) => {
 		};
 	}
 	if (!currentUser.isAdmin) {
-		throw error(403, `Account "${currentUser.username}" is not an admin.`);
+		const token = cookies.get('session');
+		if (token) {
+			await deleteSession(token).catch(() => {});
+		}
+		cookies.delete('session', { path: '/' });
+		cookies.delete('impersonate_user_id', { path: '/' });
+		throw redirect(303, '/admin');
 	}
 
 	const selectedUserId = url.searchParams.get('userId')
