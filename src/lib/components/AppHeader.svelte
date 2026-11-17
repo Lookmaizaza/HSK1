@@ -53,70 +53,63 @@
 			label: "หน้าแรก",
 			desc: "เทียบเสียงและคลังคำศัพท์",
 			icon: Home,
-			color: "text-emerald-600 dark:text-emerald-400",
-			bg: "bg-emerald-500/10 border-emerald-500/20",
-			activeBg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-800 dark:text-emerald-200",
-			dotColor: "bg-emerald-500",
+			iconBg: "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-400",
+			activeBg: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+			dotColor: "bg-rose-500",
 		},
 		{
 			href: "/flashcard",
 			label: "ฝึกคำศัพท์",
 			desc: "แฟลชการ์ด HSK 1–3",
 			icon: BookOpen,
-			color: "text-amber-600 dark:text-amber-400",
-			bg: "bg-amber-500/10 border-amber-500/20",
-			activeBg: "bg-amber-500/15 border-amber-500/30 text-amber-800 dark:text-amber-200",
-			dotColor: "bg-amber-500",
+			iconBg: "border-sky-200 bg-sky-50 text-sky-600 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-400",
+			activeBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+			dotColor: "bg-sky-500",
 		},
 		{
 			href: "/quest",
 			label: "เล่นเป็นด่าน",
 			desc: "บทเรียนคำศัพท์เป็นด่าน",
 			icon: Compass,
-			color: "text-sky-600 dark:text-sky-400",
-			bg: "bg-sky-500/10 border-sky-500/20",
-			activeBg: "bg-sky-500/15 border-sky-500/30 text-sky-800 dark:text-sky-200",
-			dotColor: "bg-sky-500",
+			iconBg: "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400",
+			activeBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+			dotColor: "bg-emerald-500",
 		},
 		{
 			href: "/exam",
 			label: "ลองทำข้อสอบ",
 			desc: "แบบทดสอบ HSK 1–3",
 			icon: FileText,
-			color: "text-indigo-600 dark:text-indigo-400",
-			bg: "bg-indigo-500/10 border-indigo-500/20",
-			activeBg: "bg-indigo-500/15 border-indigo-500/30 text-indigo-800 dark:text-indigo-200",
-			dotColor: "bg-indigo-500",
+			iconBg: "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400",
+			activeBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+			dotColor: "bg-amber-500",
 		},
 		{
 			href: "/talk",
 			label: "สนทนา",
 			desc: "ฝึกพูดตามสถานการณ์",
 			icon: MessageSquare,
-			color: "text-rose-600 dark:text-rose-400",
-			bg: "bg-rose-500/10 border-rose-500/20",
-			activeBg: "bg-rose-500/15 border-rose-500/30 text-rose-800 dark:text-rose-200",
-			dotColor: "bg-rose-500",
+			iconBg: "border-violet-200 bg-violet-50 text-violet-600 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-400",
+			activeBg: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+			dotColor: "bg-violet-500",
 		},
 		{
 			href: "/assessment?type=boss",
 			label: "ประเมินผล",
 			desc: "ทดสอบเลื่อนระดับ",
 			icon: Award,
-			color: "text-amber-500 dark:text-amber-400",
-			bg: "bg-amber-500/15 border-amber-500/30",
-			activeBg: "bg-amber-500/20 border-amber-500/40 text-amber-800 dark:text-amber-200",
-			dotColor: "bg-amber-500",
+			iconBg: "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900/50 dark:bg-yellow-950/30 dark:text-yellow-400",
+			activeBg: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
+			dotColor: "bg-yellow-500",
 		},
 		{
 			href: "/analytics",
 			label: "วิเคราะห์",
 			desc: "สถิติการฝึกและกราฟ",
 			icon: BarChart3,
-			color: "text-teal-600 dark:text-teal-400",
-			bg: "bg-teal-500/10 border-teal-500/20",
-			activeBg: "bg-teal-500/15 border-teal-500/30 text-teal-800 dark:text-teal-200",
-			dotColor: "bg-teal-500",
+			iconBg: "border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-400",
+			activeBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+			dotColor: "bg-indigo-500",
 		},
 	] as const;
 
@@ -130,7 +123,7 @@
 <header
 	class="fixed inset-x-0 z-20 {user?.isImpersonated
 		? 'top-10'
-		: 'top-0'} border-b border-border bg-card/95 backdrop-blur"
+		: 'top-0'} border-b bg-background/80 backdrop-blur"
 >
 	<!-- 3-Zone Balanced Top Bar: Brand Left | Centered Nav | Controls Right -->
 	<div
@@ -141,7 +134,7 @@
 			<button
 				type="button"
 				onclick={() => (mobileMenuOpen = true)}
-				class="xl:hidden inline-flex size-9 items-center justify-center rounded-xl border border-border/80 bg-muted/40 text-foreground hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs"
+				class="xl:hidden inline-flex size-9 items-center justify-center rounded-lg text-foreground hover:bg-muted transition cursor-pointer"
 				aria-label="เปิดเมนู"
 			>
 				<Menu class="size-5" />
@@ -182,18 +175,18 @@
 		<!-- Center: Desktop Nav Links -->
 		<nav
 			aria-label="เมนูหลัก"
-			class="hidden xl:flex flex-1 min-w-0 items-center justify-center gap-1 px-2 overflow-x-auto scrollbar-none"
+			class="hidden xl:flex flex-1 min-w-0 items-center justify-center gap-0.5 2xl:gap-1 px-1"
 		>
 			{#each NAV_LINKS as item (item.href)}
 				{@const active = isNavActive(item.href)}
 				<a
 					href={item.href}
-					class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition {active
-						? 'bg-primary/10 text-primary font-semibold'
-						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+					class="flex shrink-0 items-center gap-1 2xl:gap-1.5 whitespace-nowrap rounded-xl px-1.5 2xl:px-3 py-1.5 text-xs 2xl:text-sm font-semibold transition {active
+						? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 shadow-xs'
+						: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'}"
 				>
 					<span
-						class="size-1.5 shrink-0 rounded-full bg-primary {active
+						class="size-1.5 shrink-0 rounded-full bg-rose-500 {active
 							? 'opacity-100'
 							: 'opacity-0'}"
 					></span>
@@ -204,14 +197,14 @@
 
 		<!-- Right: Streak Pill, Learner Stage XP Bar Pill, Settings, Profile -->
 		<div
-			class="flex shrink-0 items-center gap-1.5 text-xs font-medium sm:gap-2"
+			class="flex shrink-0 items-center gap-1 text-xs font-semibold sm:gap-2"
 		>
 			<div
 				class="inline-flex h-9 items-center gap-1 rounded-xl border border-orange-200 bg-orange-50 px-1.5 text-orange-600 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-400 sm:gap-1.5 sm:px-2.5"
 				title="สตรีคฝึกต่อเนื่อง"
 			>
-				<Flame class="size-4 fill-orange-500 text-orange-500" />
-				<span class="font-bold tabular-nums max-[380px]:hidden"
+				<Flame class="size-4 fill-orange-500" />
+				<span class="tabular-nums max-[380px]:hidden"
 					>{progress.streak}</span
 				>
 			</div>
@@ -219,7 +212,7 @@
 				class="flex h-9 items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-1.5 text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-300 sm:gap-2 sm:px-2.5"
 				title={`XP (Experience Points) คือแต้มประสบการณ์ • ${learnerStage.name} • HSK ${learnerStage.hskLevel}`}
 			>
-				<Award class="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
+				<Award class="size-4 shrink-0" />
 				<div class="hidden min-w-0 sm:block">
 					<div
 						class="max-w-24 truncate text-[11px] font-extrabold leading-tight sm:max-w-32 sm:text-xs"
@@ -249,7 +242,7 @@
 				onclick={openSettings}
 				aria-label="Settings"
 			>
-				<SettingsIcon class="size-4.5" />
+				<SettingsIcon class="size-5" />
 			</Button>
 			{#if user}
 				<DropdownMenu.Root>
@@ -257,7 +250,7 @@
 						{#snippet child({ props })}
 							<button
 								{...props}
-								class="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold uppercase text-primary-foreground cursor-pointer"
+								class="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold uppercase text-primary-foreground cursor-pointer"
 								aria-label="Account"
 							>
 								{user.username.charAt(0)}
@@ -328,11 +321,11 @@
 
 <!-- Mobile Left Side Drawer -->
 <Sheet.Root bind:open={mobileMenuOpen}>
-	<Sheet.Content side="left" class="w-[84vw] max-w-[320px] p-0 flex flex-col bg-card border-r border-border">
+	<Sheet.Content side="left" class="w-[82vw] max-w-[320px] p-0 flex flex-col">
 		<Sheet.Header
-			class="flex flex-row items-center gap-2.5 border-b border-border bg-muted/30 px-4 py-4 pr-12 text-left"
+			class="flex flex-row items-center gap-2.5 border-b border-border px-4 py-4 pr-12 text-left"
 		>
-			<div class="relative size-10 shrink-0 flex items-center justify-center transition-transform hover:scale-105">
+			<div class="size-9 shrink-0 flex items-center justify-center">
 				<img
 					src="/mascot_avatar.png"
 					alt="น้องช้างน้อย ปากจีน"
@@ -340,24 +333,19 @@
 				/>
 			</div>
 			<div class="min-w-0 leading-tight">
-				<div class="flex items-center gap-1.5 whitespace-nowrap">
-					<Sheet.Title class="text-base font-black tracking-tight text-foreground"
-						>ปากจีน</Sheet.Title
-					>
-					<span
-						class="inline-flex rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[11px] font-bold text-sky-600 dark:text-sky-400 shadow-2xs"
-						>ช้างน้อย 🐘</span
-					>
-				</div>
-				<Sheet.Description class="text-xs font-medium text-muted-foreground mt-0.5">
-					ห้องเรียนภาษาจีน HSK
+				<Sheet.Title class="flex items-center gap-1.5 text-base font-black text-foreground">
+					<span>ปากจีน</span>
+					<span class="rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400">ช้างน้อย 🐘</span>
+				</Sheet.Title>
+				<Sheet.Description class="text-xs text-muted-foreground">
+					ห้องเรียนภาษาจีน HSK · เมนู ({NAV_LINKS.length})
 				</Sheet.Description>
 			</div>
 		</Sheet.Header>
 
 		<nav
 			aria-label="เมนูมือถือ"
-			class="flex-1 overflow-y-auto px-3 py-3 space-y-1.5"
+			class="flex-1 overflow-y-auto px-3 py-3 space-y-1"
 		>
 			{#each NAV_LINKS as item (item.href)}
 				{@const active = isNavActive(item.href)}
@@ -365,23 +353,23 @@
 				<a
 					href={item.href}
 					onclick={() => (mobileMenuOpen = false)}
-					class="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-150 {active
-						? `${item.activeBg} font-semibold shadow-2xs`
+					class="flex items-center gap-3 rounded-xl px-3 py-2.5 transition {active
+						? `${item.activeBg} font-semibold shadow-xs`
 						: 'hover:bg-muted/70 text-foreground'}"
 				>
 					<div
-						class="size-9 shrink-0 rounded-xl border flex items-center justify-center transition-transform duration-150 group-hover:scale-105 {item.bg} {item.color} {active ? 'shadow-xs' : ''}"
+						class="size-9 shrink-0 rounded-xl border flex items-center justify-center transition-transform {item.iconBg}"
 					>
 						<IconComp class="size-4.5" />
 					</div>
 					<div class="min-w-0 flex-1">
 						<div class="flex items-center justify-between gap-2">
-							<span class="text-sm font-bold tracking-tight truncate"
+							<span class="text-sm font-semibold truncate"
 								>{item.label}</span
 							>
 							{#if active}
 								<span
-									class="size-2 shrink-0 rounded-full {item.dotColor} shadow-xs animate-pulse"
+									class="size-1.5 shrink-0 rounded-full {item.dotColor}"
 								></span>
 							{/if}
 						</div>
@@ -394,63 +382,24 @@
 				</a>
 			{/each}
 		</nav>
-
-		<!-- Bottom Drawer Footer: Quick Gamified Stats & Settings -->
-		<div class="border-t border-border bg-muted/20 p-3 space-y-2">
-			<div class="grid grid-cols-2 gap-2 text-xs">
-				<!-- Streak Quick Pill -->
-				<div
-					class="flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50/90 px-2 py-1.5 text-orange-600 dark:border-orange-900/50 dark:bg-orange-950/40 dark:text-orange-400"
-				>
-					<Flame class="size-4 fill-orange-500 text-orange-500 shrink-0" />
-					<div class="min-w-0">
-						<div class="text-[10px] text-orange-700/75 dark:text-orange-300/75 leading-none">สตรีค</div>
-						<div class="font-extrabold text-xs tabular-nums mt-0.5">{progress.streak} วัน</div>
-					</div>
-				</div>
-
-				<!-- XP Level Quick Pill -->
-				<div
-					class="flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/90 px-2 py-1.5 text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-300"
-				>
-					<Award class="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
-					<div class="min-w-0">
-						<div class="text-[10px] text-violet-700/75 dark:text-violet-300/75 leading-none truncate">{learnerStage.name}</div>
-						<div class="font-extrabold text-xs tabular-nums mt-0.5">{progress.levelExp} XP</div>
-					</div>
-				</div>
-			</div>
-
-			<button
-				type="button"
-				onclick={() => {
-					mobileMenuOpen = false;
-					openSettings();
-				}}
-				class="w-full flex items-center justify-center gap-2 rounded-lg border border-border/80 bg-background/80 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer"
-			>
-				<SettingsIcon class="size-3.5" />
-				ตั้งค่าโมเดล AI
-			</button>
-		</div>
 	</Sheet.Content>
 </Sheet.Root>
 
 <Dialog.Root bind:open={settingsOpen}>
 	<Dialog.Content>
 		<Dialog.Header>
-			<Dialog.Title>ตั้งค่า</Dialog.Title>
+			<Dialog.Title>ตั้งค่า / Settings</Dialog.Title>
 			<Dialog.Description
-				>เลือกโมเดลสำหรับตรวจการออกเสียง</Dialog.Description
+				>เลือกโมเดล AI ที่ใช้ตรวจการออกเสียง</Dialog.Description
 			>
 		</Dialog.Header>
 
 		<div class="grid gap-4 py-2">
 			<fieldset class="grid gap-2">
-				<legend class="text-sm font-semibold">โมเดล</legend>
+				<legend class="text-sm font-semibold">โมเดล AI</legend>
 				{#each MODELS as opt (opt.id)}
 					<label
-						class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition {modelDraft ===
+						class="flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3 transition {modelDraft ===
 						opt.id
 							? 'border-primary bg-primary/5'
 							: 'border-border'}"
