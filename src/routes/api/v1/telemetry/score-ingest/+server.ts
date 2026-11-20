@@ -61,6 +61,21 @@ export const POST = async (event: RequestEvent) => {
 		throw error(400, 'Stage practice telemetry must include a valid stageId.');
 	}
 
+	const rawListenTimestamps = Array.isArray(body.behavior.listenTimestamps)
+		? body.behavior.listenTimestamps.slice(0, 100)
+		: [];
+	const rawSpeechCandidates = Array.isArray(body.assessment.speechCandidates)
+		? body.assessment.speechCandidates.slice(0, 20)
+		: [];
+	const rawSyllableResults = Array.isArray(body.assessment.syllableResults)
+		? body.assessment.syllableResults.slice(0, 32)
+		: [];
+	const clampedOverallScore = Math.max(0, Math.min(100, Number(body.assessment.overallScore) || 0));
+	const clampedRawScore = Math.max(
+		0,
+		Math.min(100, Number(body.assessment.rawScore) || clampedOverallScore)
+	);
+
 	const telemetry: PronunciationAssessmentTelemetry = {
 		eventType: 'pronunciation_evaluation',
 		timestamp: body.timestamp || new Date().toISOString(),
@@ -69,32 +84,39 @@ export const POST = async (event: RequestEvent) => {
 		practiceMode,
 		stageId,
 		word: {
-			id: body.word.id || body.word.hanzi,
-			hanzi: body.word.hanzi,
-			pinyin: body.word.pinyin,
-			meaning: body.word.meaning,
+			id: String(body.word.id || body.word.hanzi || '').slice(0, 64),
+			hanzi: String(body.word.hanzi || '').slice(0, 64),
+			pinyin: String(body.word.pinyin || '').slice(0, 128),
+			meaning: String(body.word.meaning || '').slice(0, 256),
 			expectedTone: body.word.expectedTone,
 			tonePattern: body.word.tonePattern
 		},
 		behavior: {
 			listenedToExample: Boolean(body.behavior.listenedToExample),
-			listenCount: Number(body.behavior.listenCount) || 0,
-			listenTimestamps: Array.isArray(body.behavior.listenTimestamps) ? body.behavior.listenTimestamps : []
+			listenCount: Math.max(0, Math.min(1000, Math.round(Number(body.behavior.listenCount) || 0))),
+			listenTimestamps: rawListenTimestamps
 		},
 		assessment: {
 			isPassed: Boolean(body.assessment.isPassed),
-			overallScore: Number(body.assessment.overallScore) || 0,
-			rawScore: Number(body.assessment.rawScore) || Number(body.assessment.overallScore) || 0,
+			overallScore: clampedOverallScore,
+			rawScore: clampedRawScore,
 			isToneMatch: Boolean(body.assessment.isToneMatch),
 			isWordMatch: Boolean(body.assessment.isWordMatch),
-			recognizedWord: body.assessment.recognizedWord,
-			speechCandidates: Array.isArray(body.assessment.speechCandidates) ? body.assessment.speechCandidates : [],
-			syllableResults: Array.isArray(body.assessment.syllableResults) ? body.assessment.syllableResults : [],
+			recognizedWord: body.assessment.recognizedWord
+				? String(body.assessment.recognizedWord).slice(0, 64)
+				: undefined,
+			speechCandidates: rawSpeechCandidates,
+			syllableResults: rawSyllableResults,
 			acoustics: {
-				avgF0: Number(body.assessment.acoustics?.avgF0) || 0,
-				totalDurationMs: Number(body.assessment.acoustics?.totalDurationMs) || 0
+				avgF0: Math.max(0, Math.min(2000, Number(body.assessment.acoustics?.avgF0) || 0)),
+				totalDurationMs: Math.max(
+					0,
+					Math.min(300_000, Number(body.assessment.acoustics?.totalDurationMs) || 0)
+				)
 			},
 			overallFeedback: body.assessment.overallFeedback
+				? String(body.assessment.overallFeedback).slice(0, 500)
+				: undefined
 		}
 	};
 

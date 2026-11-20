@@ -26,14 +26,14 @@
 		const n = axes.length || 6;
 		return axes
 			.map((axis, i) => {
-				const val = axis.score !== null ? Math.min(100, Math.max(0, axis.score)) : 0;
+				const val = axis.score != null ? Math.min(100, Math.max(0, axis.score)) : 0;
 				const p = polarPoint(i, n, (val / 100) * maxR);
 				return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
 			})
 			.join(' ');
 	});
 
-	const hasAnyData = $derived(axes.some((a) => a.score !== null));
+	const hasAnyData = $derived(axes.some((a) => a.score != null));
 </script>
 
 <div class="flex flex-col items-center">
@@ -83,9 +83,9 @@
 					y={labelPt.y + 8}
 					text-anchor="middle"
 					dominant-baseline="middle"
-					class="font-mono text-[9.5px] font-extrabold {axis.score !== null ? 'fill-primary' : 'fill-muted-foreground'}"
+					class="font-mono text-[9.5px] font-extrabold {axis.score != null ? 'fill-primary' : 'fill-muted-foreground'}"
 				>
-					{axis.score !== null ? `${axis.score}%` : '-'}
+					{axis.score != null ? `${axis.score}%` : '-'}
 				</text>
 			{/each}
 
@@ -98,7 +98,7 @@
 					stroke-linejoin="round"
 				/>
 				{#each axes as axis, i (axis.key)}
-					{#if axis.score !== null}
+					{#if axis.score != null}
 						{@const pt = polarPoint(i, axes.length, (Math.min(100, Math.max(0, axis.score)) / 100) * maxR)}
 						<circle cx={pt.x} cy={pt.y} r="3.5" class="fill-primary stroke-background" stroke-width="1.5" />
 					{/if}
@@ -110,7 +110,7 @@
 	<div class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
 		<span>สมดุลรวม 6 ทักษะ:</span>
 		<span class="font-mono font-black text-foreground">
-			{overallScore !== null ? `${overallScore}%` : 'รอข้อมูลฝึกฝน'}
+			{overallScore != null ? `${overallScore}%` : 'รอข้อมูลฝึกฝน'}
 		</span>
 	</div>
 </div>

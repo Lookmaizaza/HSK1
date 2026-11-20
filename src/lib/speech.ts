@@ -132,7 +132,7 @@ export function listen(): Promise<RecognitionResult> & { stop: () => void } {
 		r.onend = () => {
 			clearTimers();
 			if (settled) return;
-			const transcript = (finalTranscript || interimTranscript).trim();
+			const transcript = `${finalTranscript}${interimTranscript}`.trim();
 			settled = true;
 			if (transcript) resolve({ transcript, confidence: bestConfidence });
 			else reject(new Error('no_speech'));
@@ -175,6 +175,7 @@ function sanitizeForTTS(text: string): string {
 // from accidental double taps and from a Svelte $effect firing twice on hydration.
 let lastSpoken = '';
 let lastSpokenAt = 0;
+let speakRequestSeq = 0;
 
 // BUG-01 FIX: getVoices() is synchronous but browser loads voices asynchronously.
 // On Android Chrome / iOS Safari, getVoices() returns [] on first call.
@@ -190,11 +191,19 @@ async function getZhVoice(): Promise<SpeechSynthesisVoice | undefined> {
 
 	// Slow path: wait for the browser to finish loading voices (Android/Safari)
 	return new Promise<SpeechSynthesisVoice | undefined>((resolve) => {
-		window.speechSynthesis.addEventListener('voiceschanged', () => resolve(tryFind()), {
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		const onVoicesChanged = () => {
+			if (timer) clearTimeout(timer);
+			resolve(tryFind());
+		};
+		window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged, {
 			once: true // auto-removes itself after firing once
 		});
 		// Safety timeout: if voiceschanged never fires (some browsers), give up after 3s
-		setTimeout(() => resolve(undefined), 3000);
+		timer = setTimeout(() => {
+			window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+			resolve(undefined);
+		}, 3000);
 	});
 }
 
@@ -208,6 +217,10 @@ export async function speak(text: string, rate = 0.9): Promise<void> {
 	if (clean === lastSpoken && now - lastSpokenAt < 300) return;
 	lastSpoken = clean;
 	lastSpokenAt = now;
+	const requestId = ++speakRequestSeq;
+
+	const zh = await getZhVoice();
+	if (requestId !== speakRequestSeq) return;
 
 	try {
 		window.speechSynthesis.cancel();
@@ -219,8 +232,6 @@ export async function speak(text: string, rate = 0.9): Promise<void> {
 	const utter = new SpeechSynthesisUtterance(clean);
 	utter.lang = 'zh-CN';
 	utter.rate = rate;
-	// BUG-01 FIX: await voice loading instead of calling getVoices() synchronously
-	const zh = await getZhVoice();
 	if (zh) utter.voice = zh;
 	window.speechSynthesis.speak(utter);
 }
@@ -441,9 +452,9 @@ export function matchChineseWord(
 		}
 	}
 
-	// 2. Substring match (candidate contains target or target contains candidate)
+	// 2. Substring match: candidate contains full target, or partial coverage when target contains candidate
 	for (const cand of cleanCandidates) {
-		if (cand.includes(cleanTarget) || cleanTarget.includes(cand)) {
+		if (cand.includes(cleanTarget)) {
 			return { isMatch: true, bestMatch: cleanTarget, similarity: 100 };
 		}
 	}

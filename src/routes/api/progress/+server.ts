@@ -3,10 +3,10 @@ import {
 	getProgress,
 	addXp,
 	completeBoss,
-	loseHeart,
 	completeLesson,
 	refillHearts
 } from '$lib/server/db';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 import type { RequestHandler } from './$types';
 import { MAX_LEARNER_LEVEL } from '$lib/gamification';
 
@@ -25,16 +25,37 @@ type Action =
 	| { action: 'refillHearts' }
 	| { action: 'completeLesson'; key: string; stars: number };
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async (event) => {
+	const { request, locals } = event;
 	if (!locals.user) throw error(401, 'Not logged in');
-	const body = (await request.json()) as Action;
+
+	const rate = consumeRateLimit(
+		`progress:u${locals.user.id}:${extractClientIp(event)}`,
+		120,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many progress requests. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
+	let body: Action;
+	try {
+		body = (await request.json()) as Action;
+	} catch {
+		throw error(400, 'Invalid JSON body');
+	}
 	const uid = locals.user.id;
 
 	switch (body.action) {
-		case 'addXp':
+		case 'addXp': {
+			const xpRate = consumeRateLimit(`progress-xp:u${uid}`, 30, 10 * 60 * 1000);
+			if (!xpRate.allowed) {
+				throw error(429, `Too many XP updates. Please retry in ${xpRate.remainingSeconds}s.`);
+			}
 			// Security: Cap XP to max 100 per action to prevent arbitrary leaderboard inflation
-			await addXp(uid, Math.min(100, Math.max(0, Math.floor(body.amount || 0))));
+			await addXp(uid, Math.min(100, Math.max(0, Math.floor(Number(body.amount) || 0))));
 			break;
+		}
 		case 'completeBoss':
 			if (!Number.isInteger(body.level) || body.level < 1 || body.level > MAX_LEARNER_LEVEL) {
 				throw error(400, 'Invalid learner level');
@@ -50,11 +71,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		case 'refillHearts':
 			await refillHearts(uid, MAX_HEARTS);
 			break;
-		case 'completeLesson':
-			if (typeof body.key === 'string' && body.key.trim().length > 0) {
-				await completeLesson(uid, body.key.slice(0, 100), Math.max(0, Math.min(3, Math.floor(body.stars || 0))));
+		case 'completeLesson': {
+			const rawKey = typeof body.key === 'string' ? body.key.trim() : '';
+			if (rawKey.length > 0 && /^[a-zA-Z0-9/_-]{1,100}$/.test(rawKey)) {
+				await completeLesson(
+					uid,
+					rawKey,
+					Math.max(0, Math.min(3, Math.floor(Number(body.stars) || 0)))
+				);
+			} else {
+				throw error(400, 'Invalid lesson key');
 			}
 			break;
+		}
 		default:
 			throw error(400, 'Unknown action');
 	}

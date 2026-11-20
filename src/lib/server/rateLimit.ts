@@ -1,4 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
+import { isIP } from 'node:net';
+import { env } from '$env/dynamic/private';
 import { recordAuditLog } from '$lib/server/db';
 
 interface AttemptRecord {
@@ -7,6 +9,8 @@ interface AttemptRecord {
 	lastAttemptAt: number;
 	blockedUntil: number | null;
 }
+
+const MAX_STORE_ENTRIES = 10_000;
 
 // In-memory rate limiting store
 const attemptStore = new Map<string, AttemptRecord>();
@@ -17,6 +21,14 @@ export const RATE_LIMIT_CONFIG = {
 	LOCKOUT_TIME_MS: 2 * 60 * 1000, // 2 minutes (120,000 ms)
 	ATTEMPT_WINDOW_MS: 10 * 60 * 1000 // 10 minutes sliding window
 };
+
+function pruneMapCapacity<V>(map: Map<string, V>, maxEntries = MAX_STORE_ENTRIES): void {
+	while (map.size >= maxEntries) {
+		const oldestKey = map.keys().next().value;
+		if (oldestKey === undefined) break;
+		map.delete(oldestKey);
+	}
+}
 
 // Periodic cleanup every 5 minutes to prevent memory leaks
 if (typeof setInterval !== 'undefined') {
@@ -37,27 +49,54 @@ if (typeof setInterval !== 'undefined') {
 	}, 5 * 60 * 1000).unref?.();
 }
 
+function normalizeValidIp(raw: string | null | undefined): string | null {
+	if (!raw) return null;
+	let candidate = raw.trim();
+	if (!candidate || candidate.length > 64) return null;
+	// Strip brackets for IPv6 like [::1]
+	if (candidate.startsWith('[') && candidate.includes(']')) {
+		candidate = candidate.slice(1, candidate.indexOf(']'));
+	}
+	if (isIP(candidate) !== 0) {
+		return candidate;
+	}
+	return null;
+}
+
 /**
- * Safely extracts client IP address from request event
+ * Safely extracts client IP address from request event.
+ * Prefers SvelteKit adapter's getClientAddress(), and only falls back to validated
+ * X-Forwarded-For / X-Real-IP headers when running behind a trusted proxy or adapter fallback.
  */
 export function extractClientIp(event: RequestEvent): string {
+	let adapterIp: string | null = null;
 	try {
-		const addr = event.getClientAddress();
-		if (addr && addr !== '::1') return addr;
+		adapterIp = normalizeValidIp(event.getClientAddress());
 	} catch {
 		// Ignore if getClientAddress is unavailable in current adapter
 	}
 
-	const forwarded = event.request.headers.get('x-forwarded-for');
-	if (forwarded) {
-		const ip = forwarded.split(',')[0].trim();
-		if (ip) return ip;
+	const trustProxy =
+		env.TRUST_PROXY === 'true' ||
+		env.TRUST_PROXY === '1' ||
+		Boolean(env.VERCEL || env.NETLIFY || env.CF_PAGES);
+
+	if (adapterIp && !trustProxy && adapterIp !== '127.0.0.1' && adapterIp !== '::1') {
+		return adapterIp;
 	}
 
-	const realIp = event.request.headers.get('x-real-ip');
-	if (realIp) return realIp.trim();
+	if (trustProxy || !adapterIp) {
+		const forwarded = event.request.headers.get('x-forwarded-for');
+		if (forwarded) {
+			const firstHop = normalizeValidIp(forwarded.split(',')[0]);
+			if (firstHop) return firstHop;
+		}
 
-	return '127.0.0.1';
+		const realIp = normalizeValidIp(event.request.headers.get('x-real-ip'));
+		if (realIp) return realIp;
+	}
+
+	return adapterIp || '127.0.0.1';
 }
 
 /**
@@ -127,6 +166,9 @@ export function recordFailedAttempt(key: string): {
 		newlyBlocked = true;
 	}
 
+	if (!attemptStore.has(key)) {
+		pruneMapCapacity(attemptStore);
+	}
 	attemptStore.set(key, record);
 
 	const isBlocked = !!record.blockedUntil && now < record.blockedUntil;
@@ -160,6 +202,9 @@ export function consumeRateLimit(
 	let record = requestWindows.get(key);
 
 	if (!record || now - record.windowStart > windowMs) {
+		if (!requestWindows.has(key)) {
+			pruneMapCapacity(requestWindows);
+		}
 		record = { count: 0, windowStart: now };
 		requestWindows.set(key, record);
 	}
@@ -192,6 +237,10 @@ export function checkLoginProtection(
 	}
 
 	if (normalizedUser) {
+		const userIpCheck = checkRateLimit(`user:${normalizedUser}:ip:${ip}`);
+		if (userIpCheck.isBlocked) {
+			return userIpCheck;
+		}
 		const userCheck = checkRateLimit(`user:${normalizedUser}`);
 		if (userCheck.isBlocked) {
 			return userCheck;
@@ -199,7 +248,11 @@ export function checkLoginProtection(
 		return {
 			isBlocked: false,
 			remainingSeconds: 0,
-			attemptsRemaining: Math.min(ipCheck.attemptsRemaining, userCheck.attemptsRemaining)
+			attemptsRemaining: Math.min(
+				ipCheck.attemptsRemaining,
+				userIpCheck.attemptsRemaining,
+				userCheck.attemptsRemaining
+			)
 		};
 	}
 
@@ -219,14 +272,23 @@ export async function handleLoginFailure(
 	const normalizedUser = username.trim().toLowerCase();
 
 	const ipResult = recordFailedAttempt(`ip:${ip}`);
+	const userIpResult = normalizedUser ? recordFailedAttempt(`user:${normalizedUser}:ip:${ip}`) : ipResult;
 	const userResult = normalizedUser ? recordFailedAttempt(`user:${normalizedUser}`) : ipResult;
 
-	const isBlocked = ipResult.isBlocked || userResult.isBlocked;
-	const remainingSeconds = Math.max(ipResult.remainingSeconds, userResult.remainingSeconds);
-	const attemptsRemaining = Math.min(ipResult.attemptsRemaining, userResult.attemptsRemaining);
+	const isBlocked = ipResult.isBlocked || userIpResult.isBlocked || userResult.isBlocked;
+	const remainingSeconds = Math.max(
+		ipResult.remainingSeconds,
+		userIpResult.remainingSeconds,
+		userResult.remainingSeconds
+	);
+	const attemptsRemaining = Math.min(
+		ipResult.attemptsRemaining,
+		userIpResult.attemptsRemaining,
+		userResult.attemptsRemaining
+	);
 
 	// If freshly locked out, log security audit event
-	if (ipResult.newlyBlocked || userResult.newlyBlocked) {
+	if (ipResult.newlyBlocked || userIpResult.newlyBlocked || userResult.newlyBlocked) {
 		try {
 			await recordAuditLog({
 				actorUsername: normalizedUser || 'anonymous',
@@ -252,14 +314,21 @@ export async function handleLoginFailure(
 }
 
 /**
- * Clears rate limit tracking upon successful authentication
+ * Clears failed login attempts for the authenticated account without clearing the shared IP key for other accounts.
  */
-export function handleLoginSuccess(event: RequestEvent, username: string): void {
+export function clearFailedLoginAttempts(event: RequestEvent, username: string): void {
 	const ip = extractClientIp(event);
 	const normalizedUser = username.trim().toLowerCase();
 
-	resetRateLimit(`ip:${ip}`);
 	if (normalizedUser) {
 		resetRateLimit(`user:${normalizedUser}`);
+		resetRateLimit(`user:${normalizedUser}:ip:${ip}`);
 	}
+}
+
+/**
+ * Clears rate limit tracking upon successful authentication (scoped to the authenticated account).
+ */
+export function handleLoginSuccess(event: RequestEvent, username: string): void {
+	clearFailedLoginAttempts(event, username);
 }

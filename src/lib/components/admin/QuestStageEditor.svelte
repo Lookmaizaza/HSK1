@@ -2,25 +2,30 @@
 	import { onMount, tick } from 'svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
-	import { speak } from '$lib/speech';
 	import { Button } from '$lib/components/ui/button';
 	import ConfirmDialog from '$lib/components/admin/ConfirmDialog.svelte';
+	import QuestWordsEditorTab from '$lib/components/admin/QuestWordsEditorTab.svelte';
+	import QuestChallengesEditorTab from '$lib/components/admin/QuestChallengesEditorTab.svelte';
 	import {
 		AlertTriangle,
-		ArrowDown,
-		ArrowUp,
 		BookOpen,
-		Copy,
 		ListChecks,
 		Plus,
 		RotateCcw,
 		Save,
-		Trash,
-		Volume2,
 		Wand2,
 		X
 	} from '@lucide/svelte';
 	import type { ChallengeType } from '$lib/data/questLevels';
+	import {
+		CATEGORY_OPTIONS,
+		makeKey,
+		parseContent,
+		type ChallengeDraft,
+		type ConfirmOptions,
+		type Issue,
+		type WordDraft
+	} from './questEditorTypes';
 
 	type Props = {
 		stage: any;
@@ -29,209 +34,6 @@
 	};
 
 	let { stage, onclose, notify }: Props = $props();
-
-	type WordDraft = {
-		key: string;
-		wordId: string;
-		hanzi: string;
-		pinyin: string;
-		thai: string;
-		english: string;
-		tone: number;
-		category: string;
-		extra: Record<string, unknown>;
-		originalHanzi: string;
-		originalPinyin: string;
-		originalTone: number;
-	};
-
-	type ChoiceDraft = { key: string; text: string };
-
-	type ChallengeDraft = {
-		key: string;
-		id: string;
-		type: ChallengeType;
-		wordKey: string;
-		choices: ChoiceDraft[];
-		correctChoiceIndex: number;
-		sentenceHanzi: string;
-		sentencePinyin: string;
-		sentenceThai: string;
-	};
-
-	type Issue = { tab: 'meta' | 'words' | 'challenges'; key?: string; message: string };
-
-	type ConfirmOptions = {
-		title: string;
-		description: string;
-		detail?: string;
-		confirmLabel?: string;
-		cancelLabel?: string;
-		tone?: 'danger' | 'warning' | 'success';
-		icon?: 'alert' | 'trash' | 'check';
-	};
-
-	const TONE_STYLES = [
-		{ bar: 'bg-sky-400', chip: 'bg-sky-500/10 text-sky-700 dark:text-sky-400' },
-		{ bar: 'bg-emerald-400', chip: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
-		{ bar: 'bg-amber-400', chip: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
-		{ bar: 'bg-rose-400', chip: 'bg-rose-500/10 text-rose-700 dark:text-rose-400' },
-		{ bar: 'bg-violet-400', chip: 'bg-violet-500/10 text-violet-700 dark:text-violet-400' }
-	];
-
-	const CATEGORY_OPTIONS = [
-		{ value: '1st', label: 'วรรณยุกต์ 1' },
-		{ value: '2nd', label: 'วรรณยุกต์ 2' },
-		{ value: '3rd', label: 'วรรณยุกต์ 3' },
-		{ value: '4th', label: 'วรรณยุกต์ 4' },
-		{ value: 'sandhi', label: 'เสียงเปลี่ยน (Sandhi)' },
-		{ value: 'pair', label: 'คำหลายพยางค์' }
-	];
-
-	const TYPE_OPTIONS: { value: ChallengeType; label: string; emoji: string }[] = [
-		{ value: 'speak', label: 'ออกเสียงคำศัพท์', emoji: '🗣️' },
-		{ value: 'listen_speak', label: 'ฟังแล้วพูดตาม', emoji: '🎧' },
-		{ value: 'translate', label: 'เลือกคำแปล', emoji: '🇹🇭' },
-		{ value: 'sentence_build', label: 'อ่านประโยค', emoji: '📝' }
-	];
-
-	const TYPE_META: Record<
-		ChallengeType,
-		{ label: string; emoji: string; hint: string; accent: string }
-	> = {
-		speak: {
-			label: 'ออกเสียงคำศัพท์',
-			emoji: '🗣️',
-			hint: 'ผู้เรียนออกเสียงคำนี้ ระบบตรวจ GOP และวรรณยุกต์',
-			accent: 'bg-emerald-400'
-		},
-		listen_speak: {
-			label: 'ฟังแล้วพูดตาม',
-			emoji: '🎧',
-			hint: 'ระบบเล่นเสียงคำนี้ก่อน แล้วให้ผู้เรียนพูดตาม',
-			accent: 'bg-sky-400'
-		},
-		translate: {
-			label: 'เลือกคำแปล',
-			emoji: '🇹🇭',
-			hint: 'ผู้เรียนเลือกคำแปลไทยที่ถูกต้องจากตัวเลือก',
-			accent: 'bg-violet-400'
-		},
-		sentence_build: {
-			label: 'อ่านประโยค',
-			emoji: '📝',
-			hint: 'ผู้เรียนอ่านประโยคภาษาจีนทั้งประโยค',
-			accent: 'bg-amber-400'
-		}
-	};
-
-	const VALID_TYPES: ChallengeType[] = ['speak', 'listen_speak', 'translate', 'sentence_build'];
-
-	let keySeq = 0;
-	function makeKey(prefix: string) {
-		keySeq += 1;
-		return `${prefix}-${keySeq}`;
-	}
-
-	function toneStyle(tone: number) {
-		return TONE_STYLES[Math.min(TONE_STYLES.length - 1, Math.max(0, (Number(tone) || 1) - 1))];
-	}
-
-	function parseContent(source: any): {
-		words: WordDraft[];
-		challenges: ChallengeDraft[];
-		error: string;
-	} {
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(source?.challengeJson ?? '[]');
-		} catch {
-			return {
-				words: [],
-				challenges: [],
-				error: 'อ่านข้อมูลโจทย์เดิมไม่สำเร็จ — กด “คืนค่าเริ่มต้น” เพื่อโหลดเนื้อหาต้นฉบับใหม่'
-			};
-		}
-
-		if (!Array.isArray(parsed) || parsed.length === 0) {
-			return {
-				words: [],
-				challenges: [],
-				error: 'ด่านนี้ยังไม่มีข้อมูลโจทย์ — กด “คืนค่าเริ่มต้น” เพื่อโหลดเนื้อหาต้นฉบับ'
-			};
-		}
-
-		const words: WordDraft[] = [];
-		const challenges: ChallengeDraft[] = [];
-		const keyByWordId = new Map<string, string>();
-
-		for (const [index, raw] of parsed.entries()) {
-			if (!raw || typeof raw !== 'object') {
-				return { words: [], challenges: [], error: 'ข้อมูลโจทย์เดิมผิดรูปแบบ — กด “คืนค่าเริ่มต้น” แล้วแก้ไขใหม่' };
-			}
-			const item = raw as Record<string, any>;
-			const rawWord = item.word;
-			if (!rawWord || typeof rawWord !== 'object') {
-				return { words: [], challenges: [], error: 'ข้อมูลโจทย์เดิมผิดรูปแบบ — กด “คืนค่าเริ่มต้น” แล้วแก้ไขใหม่' };
-			}
-			if (!VALID_TYPES.includes(item.type as ChallengeType)) {
-				return { words: [], challenges: [], error: 'พบชนิดโจทย์ที่ไม่รองรับ — กด “คืนค่าเริ่มต้น” แล้วแก้ไขใหม่' };
-			}
-
-			const rawTone = Number(rawWord.tone);
-			const tone = Number.isInteger(rawTone) && rawTone >= 1 && rawTone <= 5 ? rawTone : 1;
-			const rawCategory = String(rawWord.category ?? '1st');
-			const category = CATEGORY_OPTIONS.some((option) => option.value === rawCategory)
-				? rawCategory
-				: '1st';
-			const wordId =
-				typeof rawWord.id === 'string' && rawWord.id.trim() ? rawWord.id : `word-${index + 1}`;
-
-			let wordKey = keyByWordId.get(wordId);
-			if (!wordKey) {
-				const extra: Record<string, unknown> = {};
-				for (const [field, value] of Object.entries(rawWord)) {
-					if (!['id', 'hanzi', 'pinyin', 'english', 'thai', 'tone', 'category'].includes(field)) {
-						extra[field] = value;
-					}
-				}
-				wordKey = makeKey('w');
-				keyByWordId.set(wordId, wordKey);
-				words.push({
-					key: wordKey,
-					wordId,
-					hanzi: String(rawWord.hanzi ?? ''),
-					pinyin: String(rawWord.pinyin ?? ''),
-					thai: String(rawWord.thai ?? ''),
-					english: String(rawWord.english ?? ''),
-					tone,
-					category,
-					extra,
-					originalHanzi: String(rawWord.hanzi ?? ''),
-					originalPinyin: String(rawWord.pinyin ?? ''),
-					originalTone: tone
-				});
-			}
-
-			const choices = Array.isArray(item.choices)
-				? item.choices.map((choice: unknown) => ({ key: makeKey('ch'), text: String(choice ?? '') }))
-				: [];
-			const rawCorrect = Number(item.correctChoiceIndex);
-			challenges.push({
-				key: makeKey('c'),
-				id: typeof item.id === 'string' ? item.id : '',
-				type: item.type as ChallengeType,
-				wordKey,
-				choices,
-				correctChoiceIndex: Number.isInteger(rawCorrect) ? rawCorrect : 0,
-				sentenceHanzi: String(item.sentenceHanzi ?? ''),
-				sentencePinyin: String(item.sentencePinyin ?? ''),
-				sentenceThai: String(item.sentenceThai ?? '')
-			});
-		}
-
-		return { words, challenges, error: '' };
-	}
 
 	let title = $state('');
 	let category = $state('');
@@ -246,6 +48,35 @@
 	let submitting = $state(false);
 	let dialogEl = $state<HTMLDivElement | null>(null);
 	let resetForm = $state<HTMLFormElement | null>(null);
+	let initialSnapshot = $state('');
+
+	function editableSnapshot() {
+		return JSON.stringify({
+			title: title.trim(),
+			category: category.trim(),
+			description: description.trim(),
+			isActive,
+			words: words.map((word) => ({
+				id: word.wordId,
+				hanzi: word.hanzi.trim(),
+				pinyin: word.pinyin.trim(),
+				thai: word.thai.trim(),
+				english: word.english.trim(),
+				tone: word.tone,
+				category: word.category
+			})),
+			challenges: challenges.map((challenge) => ({
+				id: challenge.id,
+				type: challenge.type,
+				wordKey: challenge.wordKey,
+				choices: challenge.choices.map((choice) => choice.text.trim()),
+				correctChoiceIndex: challenge.correctChoiceIndex,
+				sentenceHanzi: challenge.sentenceHanzi.trim(),
+				sentencePinyin: challenge.sentencePinyin.trim(),
+				sentenceThai: challenge.sentenceThai.trim()
+			}))
+		});
+	}
 
 	$effect(() => {
 		const loaded = parseContent(stage);
@@ -256,7 +87,9 @@
 		words = loaded.words;
 		challenges = loaded.challenges;
 		parseError = loaded.error;
+		initialSnapshot = editableSnapshot();
 	});
+
 	let confirmOptions = $state<ConfirmOptions | null>(null);
 	let confirmResolver: ((confirmed: boolean) => void) | null = null;
 
@@ -301,36 +134,7 @@
 	);
 	let metaHasIssue = $derived(issues.some((issue) => issue.tab === 'meta'));
 
-	function editableSnapshot() {
-		return JSON.stringify({
-			title: title.trim(),
-			category: category.trim(),
-			description: description.trim(),
-			isActive,
-			words: words.map((word) => ({
-				id: word.wordId,
-				hanzi: word.hanzi.trim(),
-				pinyin: word.pinyin.trim(),
-				thai: word.thai.trim(),
-				english: word.english.trim(),
-				tone: word.tone,
-				category: word.category
-			})),
-			challenges: challenges.map((challenge) => ({
-				id: challenge.id,
-				type: challenge.type,
-				wordKey: challenge.wordKey,
-				choices: challenge.choices.map((choice) => choice.text.trim()),
-				correctChoiceIndex: challenge.correctChoiceIndex,
-				sentenceHanzi: challenge.sentenceHanzi.trim(),
-				sentencePinyin: challenge.sentencePinyin.trim(),
-				sentenceThai: challenge.sentenceThai.trim()
-			}))
-		});
-	}
-
-	const initialSnapshot = editableSnapshot();
-	let isDirty = $derived(editableSnapshot() !== initialSnapshot);
+	let isDirty = $derived(Boolean(initialSnapshot) && editableSnapshot() !== initialSnapshot);
 
 	function touch() {
 		if (issues.length) issues = [];
@@ -987,453 +791,32 @@
 				{/if}
 
 				{#if activeTab === 'words'}
-					<div class="mb-2 flex flex-wrap items-center justify-between gap-1">
-						<p class="text-[10px] leading-relaxed text-muted-foreground">
-							แก้คำศัพท์ที่นี่ครั้งเดียว — โจทย์ทุกข้อที่ใช้คำนี้จะอัปเดตตาม
-						</p>
-						{#if words.some((word) => !(usageByWord.get(word.key) ?? 0))}
-							<span class="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400">
-								<AlertTriangle class="size-3" />
-								{words.filter((word) => !(usageByWord.get(word.key) ?? 0)).length} คำยังไม่มีโจทย์
-							</span>
-						{/if}
-					</div>
-
-					<div class="grid gap-2 sm:grid-cols-2 min-[900px]:grid-cols-3">
-						{#each words as word, wordIndex (word.key)}
-							<div
-								data-editor-key={word.key}
-								class="relative overflow-hidden rounded-xl border border-slate-200/80 bg-card p-2 pl-3 shadow-xs transition dark:border-slate-800/80 {wordIssueKeys.has(
-									word.key
-								)
-									? 'ring-1 ring-rose-300 dark:ring-rose-800'
-									: ''}"
-							>
-								<span
-									aria-hidden="true"
-									class="absolute inset-y-0 left-0 w-1 {toneStyle(word.tone).bar}"
-								></span>
-
-								<div class="mb-1 flex items-center justify-between gap-1">
-									<div class="flex min-w-0 items-center gap-1">
-										<span
-											class="rounded-full px-1.5 py-0.5 text-[9px] font-black {toneStyle(word.tone)
-												.chip}"
-										>
-											เสียง {word.tone}
-										</span>
-										{#if (usageByWord.get(word.key) ?? 0) > 0}
-											<span
-												class="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground"
-												title="จำนวนโจทย์ที่ใช้คำนี้"
-											>
-												<ListChecks class="size-2.5" />
-												{usageByWord.get(word.key)}
-											</span>
-										{:else}
-											<span
-												class="inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-400"
-											>
-												<AlertTriangle class="size-2.5" />
-												ยังไม่มีโจทย์
-											</span>
-										{/if}
-										<span class="font-mono text-[9px] text-muted-foreground/60">
-											#{wordIndex + 1}
-										</span>
-									</div>
-									<div class="flex shrink-0 items-center gap-0.5">
-										<button
-											type="button"
-											onclick={() => {
-												void speak(word.hanzi);
-											}}
-											disabled={!word.hanzi.trim()}
-											class="grid size-6 place-items-center rounded-md text-muted-foreground transition hover:bg-primary/10 hover:text-primary disabled:opacity-30"
-											aria-label="ฟังเสียงคำศัพท์"
-											title="ฟังเสียง"
-										>
-											<Volume2 class="size-3.5" />
-										</button>
-										<button
-											type="button"
-											onclick={() => removeWord(word)}
-											disabled={words.length <= 1}
-											class="grid size-6 place-items-center rounded-md text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-600 disabled:opacity-30 dark:hover:text-rose-400"
-											aria-label="ลบคำศัพท์นี้"
-											title="ลบคำนี้"
-										>
-											<Trash class="size-3.5" />
-										</button>
-									</div>
-								</div>
-
-								<div class="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-1">
-									<label class="block min-w-0">
-										<span
-											class="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-muted-foreground"
-										>
-											ฮั่นจื้อ
-										</span>
-										<input
-											bind:value={word.hanzi}
-											class="h-8 w-full rounded-md border border-input bg-background px-1.5 text-base font-black text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/30"
-											placeholder="你好"
-											spellcheck="false"
-										/>
-									</label>
-									<label class="block min-w-0">
-										<span
-											class="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-muted-foreground"
-										>
-											พินอิน
-										</span>
-										<input
-											bind:value={word.pinyin}
-											class="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/30"
-											placeholder="nǐ hǎo"
-											spellcheck="false"
-										/>
-									</label>
-									<label class="block min-w-0">
-										<span
-											class="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-muted-foreground"
-										>
-											คำแปลไทย
-										</span>
-										<input
-											value={word.thai}
-											oninput={(event) => updateThaiTranslation(word, event.currentTarget.value)}
-											class="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/30"
-											placeholder="สวัสดี"
-										/>
-									</label>
-									<label class="block min-w-0">
-										<span
-											class="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-muted-foreground"
-										>
-											English
-										</span>
-										<input
-											bind:value={word.english}
-											class="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/30"
-											placeholder="hello"
-										/>
-									</label>
-								</div>
-
-								<div class="mt-1 flex items-center gap-1">
-									<select
-										value={word.tone}
-										onchange={(event) => setTone(word, Number(event.currentTarget.value))}
-										class="h-7 w-[74px] shrink-0 rounded-md border border-input bg-background px-1 py-0 text-[10px] font-bold text-foreground outline-none transition focus:border-primary"
-										aria-label="วรรณยุกต์ของคำ"
-									>
-										{#each [1, 2, 3, 4, 5] as tone}
-											<option value={tone}>เสียง {tone}</option>
-										{/each}
-									</select>
-									<select
-										value={word.category}
-										onchange={(event) => {
-											word.category = event.currentTarget.value;
-											touch();
-										}}
-										class="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-1 py-0 text-[10px] text-muted-foreground outline-none transition focus:border-primary"
-										aria-label="หมวดหมู่เสียงของคำ"
-									>
-										{#each CATEGORY_OPTIONS as option (option.value)}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
-								</div>
-							</div>
-						{:else}
-							<div class="col-span-full rounded-xl border border-dashed p-5 text-center">
-								<BookOpen class="mx-auto size-5 text-muted-foreground" />
-								<p class="mt-1 text-xs font-bold text-foreground">ยังไม่มีคำศัพท์ในด่านนี้</p>
-								<p class="text-[10px] text-muted-foreground">เพิ่มคำแรก แล้วสร้างโจทย์ให้ผู้เรียนฝึก</p>
-								<Button
-									type="button"
-									size="xs"
-									onclick={addWord}
-									disabled={!!parseError}
-									class="mt-2 font-bold"
-								>
-									<Plus class="size-3" /> เพิ่มคำศัพท์
-								</Button>
-							</div>
-						{/each}
-					</div>
+					<QuestWordsEditorTab
+						{words}
+						{usageByWord}
+						{wordIssueKeys}
+						{parseError}
+						onAddWord={addWord}
+						onRemoveWord={removeWord}
+						onUpdateThaiTranslation={updateThaiTranslation}
+						onSetTone={setTone}
+						onTouch={touch}
+					/>
 				{:else}
-					<div class="mb-2 flex flex-wrap items-center justify-between gap-1">
-						<p class="text-[10px] leading-relaxed text-muted-foreground">
-							เรียงจากบนลงล่างตามลำดับที่ผู้เรียนเห็น · เปลี่ยนชนิดโจทย์ได้จากเมนูในแต่ละแถว
-						</p>
-						<span class="text-[9px] font-bold text-muted-foreground">
-							ใช้คำจากแท็บ “คำศัพท์” · สูงสุด 50 ข้อ
-						</span>
-					</div>
-
-					<div class="space-y-2">
-						{#each challenges as challenge, challengeIndex (challenge.key)}
-							{@const word = wordFor(challenge)}
-							<div
-								data-editor-key={challenge.key}
-								class="relative overflow-hidden rounded-xl border border-slate-200/80 bg-card shadow-xs transition dark:border-slate-800/80 {challengeIssueKeys.has(
-									challenge.key
-								)
-									? 'ring-1 ring-rose-300 dark:ring-rose-800'
-									: ''}"
-							>
-								<span
-									aria-hidden="true"
-									class="absolute inset-y-0 left-0 w-1 {TYPE_META[challenge.type].accent}"
-								></span>
-
-								<div
-									class="flex flex-wrap items-center gap-1 border-b border-slate-200/70 bg-muted/20 px-2 py-1.5 pl-3 dark:border-slate-800/70"
-								>
-									<span
-										class="grid size-5 shrink-0 place-items-center rounded-md bg-foreground/5 font-mono text-[9px] font-black text-muted-foreground"
-									>
-										{challengeIndex + 1}
-									</span>
-									<select
-										value={challenge.type}
-										onchange={(event) => {
-											challenge.type = event.currentTarget.value as ChallengeType;
-											handleTypeChange(challenge);
-										}}
-										class="h-6 max-w-[150px] shrink-0 rounded-md border border-input bg-background px-1 py-0 text-[10px] font-bold text-foreground outline-none transition focus:border-primary"
-										aria-label="ชนิดโจทย์"
-									>
-										{#each TYPE_OPTIONS as option (option.value)}
-											<option value={option.value}>{option.emoji} {option.label}</option>
-										{/each}
-									</select>
-									<select
-										bind:value={challenge.wordKey}
-										class="h-6 min-w-[110px] flex-1 rounded-md border border-input bg-background px-1 py-0 text-[10px] text-foreground outline-none transition focus:border-primary"
-										aria-label="คำศัพท์ที่ใช้ในโจทย์"
-									>
-										{#each words as wordOption (wordOption.key)}
-											<option value={wordOption.key}>
-												{wordOption.hanzi.trim() || '(ยังไม่กรอก)'} · {wordOption.pinyin.trim() || '—'}
-											</option>
-										{/each}
-									</select>
-									{#if word}
-										<span
-											class="hidden rounded-full px-1.5 py-0.5 text-[9px] font-bold sm:inline-flex {toneStyle(
-												word.tone
-											).chip}"
-										>
-											เสียง {word.tone}
-										</span>
-									{/if}
-									<div class="ml-auto flex shrink-0 items-center gap-0.5">
-										<button
-											type="button"
-											onclick={() => moveChallenge(challengeIndex, -1)}
-											disabled={challengeIndex === 0}
-											class="grid size-6 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-											aria-label="เลื่อนโจทย์ขึ้น"
-											title="เลื่อนขึ้น"
-										>
-											<ArrowUp class="size-3.5" />
-										</button>
-										<button
-											type="button"
-											onclick={() => moveChallenge(challengeIndex, 1)}
-											disabled={challengeIndex === challenges.length - 1}
-											class="grid size-6 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-											aria-label="เลื่อนโจทย์ลง"
-											title="เลื่อนลง"
-										>
-											<ArrowDown class="size-3.5" />
-										</button>
-										<button
-											type="button"
-											onclick={() => duplicateChallenge(challengeIndex)}
-											class="grid size-6 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
-											aria-label="ทำสำเนาโจทย์"
-											title="ทำสำเนา"
-										>
-											<Copy class="size-3.5" />
-										</button>
-										<button
-											type="button"
-											onclick={() => removeChallenge(challengeIndex)}
-											class="grid size-6 place-items-center rounded-md text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
-											aria-label="ลบโจทย์ข้อนี้"
-											title="ลบโจทย์"
-										>
-											<Trash class="size-3.5" />
-										</button>
-									</div>
-								</div>
-
-								<div class="p-2 pl-3">
-									{#if challenge.type === 'translate'}
-										<div class="mb-1 flex items-center justify-between gap-2">
-											<span class="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-												ตัวเลือกคำแปล · เลือกวงกลมข้อที่ถูก
-											</span>
-											<span class="shrink-0 text-[9px] font-bold text-muted-foreground">
-												{challenge.choices.length}/8
-											</span>
-										</div>
-										<div class="grid gap-1 sm:grid-cols-2">
-											{#each challenge.choices as choice, choiceIndex (choice.key)}
-												<div
-													class="flex items-center gap-1 rounded-lg border px-1.5 py-1 transition {challenge.correctChoiceIndex ===
-													choiceIndex
-														? 'border-emerald-400 bg-emerald-500/10'
-														: 'border-slate-200/80 dark:border-slate-800/80'}"
-												>
-													<input
-														type="radio"
-														name="correct-{challenge.key}"
-														checked={challenge.correctChoiceIndex === choiceIndex}
-														onchange={() => {
-															challenge.correctChoiceIndex = choiceIndex;
-															touch();
-														}}
-														class="size-3 shrink-0 accent-emerald-600"
-														aria-label={`ทำเครื่องหมายตัวเลือกที่ ${choiceIndex + 1} เป็นคำตอบที่ถูก`}
-													/>
-													<input
-														bind:value={choice.text}
-														class="h-6 min-w-0 flex-1 bg-transparent text-[11px] text-foreground outline-none placeholder:text-muted-foreground/60"
-														placeholder={`คำแปลที่ ${choiceIndex + 1}`}
-													/>
-													<button
-														type="button"
-														onclick={() => removeChoice(challenge, choiceIndex)}
-														disabled={challenge.choices.length <= 2}
-														class="grid size-5 shrink-0 place-items-center rounded text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-600 disabled:opacity-30 dark:hover:text-rose-400"
-														aria-label="ลบตัวเลือกนี้"
-														title="ลบตัวเลือก"
-													>
-														<X class="size-3" />
-													</button>
-												</div>
-											{/each}
-										</div>
-										{#if challenge.choices.length < 8}
-											<button
-												type="button"
-												onclick={() => addChoice(challenge)}
-												class="mt-1 inline-flex h-6 items-center gap-1 rounded-md border border-dashed border-slate-300 px-2 text-[10px] font-bold text-muted-foreground transition hover:border-primary hover:text-primary dark:border-slate-700"
-											>
-												<Plus class="size-3" /> เพิ่มตัวเลือก
-											</button>
-										{/if}
-									{:else if challenge.type === 'sentence_build'}
-										<div class="grid gap-1.5 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
-											<label class="block min-w-0">
-												<span
-													class="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-muted-foreground"
-												>
-													ประโยคภาษาจีน
-												</span>
-												<input
-													bind:value={challenge.sentenceHanzi}
-													class="h-8 w-full rounded-md border border-input bg-background px-1.5 text-sm font-bold text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/30"
-													placeholder="我喜欢喝茶"
-													spellcheck="false"
-												/>
-											</label>
-											<label class="block min-w-0">
-												<span
-													class="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-muted-foreground"
-												>
-													พินอิน
-												</span>
-												<input
-													bind:value={challenge.sentencePinyin}
-													class="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/30"
-													placeholder="wǒ xǐhuān hē chá"
-													spellcheck="false"
-												/>
-											</label>
-											<label class="block min-w-0">
-												<span
-													class="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-muted-foreground"
-												>
-													คำแปลไทย
-												</span>
-												<input
-													bind:value={challenge.sentenceThai}
-													class="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/30"
-													placeholder="ฉันชอบดื่มชา"
-												/>
-											</label>
-										</div>
-										<div class="mt-1 flex flex-wrap items-center gap-1.5 text-[9px] text-muted-foreground">
-											<button
-												type="button"
-												onclick={() => {
-													void speak(challenge.sentenceHanzi);
-												}}
-												disabled={!challenge.sentenceHanzi.trim()}
-												class="inline-flex h-5 items-center gap-0.5 rounded px-1 font-bold text-primary transition hover:bg-primary/10 disabled:opacity-30"
-											>
-												<Volume2 class="size-3" /> ฟังประโยค
-											</button>
-											<span class="truncate">
-												คำในโจทย์:
-												<strong class="text-foreground">{word?.hanzi || '—'}</strong>
-												· {word?.thai || '—'}
-											</span>
-										</div>
-									{:else}
-										<div
-											class="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-slate-200 bg-muted/20 px-2 py-1.5 dark:border-slate-800"
-										>
-											<span
-												class="rounded-full bg-background px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground"
-											>
-												{TYPE_META[challenge.type].emoji} {TYPE_META[challenge.type].label}
-											</span>
-											<span class="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
-												{TYPE_META[challenge.type].hint}
-											</span>
-											<span class="text-sm font-black text-foreground">{word?.hanzi || '—'}</span>
-											<button
-												type="button"
-												onclick={() => {
-													void speak(word?.hanzi ?? '');
-												}}
-												disabled={!word?.hanzi}
-												class="grid size-6 place-items-center rounded-md text-muted-foreground transition hover:bg-primary/10 hover:text-primary disabled:opacity-30"
-												aria-label="ฟังเสียงคำศัพท์"
-												title="ฟังเสียง"
-											>
-												<Volume2 class="size-3.5" />
-											</button>
-										</div>
-									{/if}
-								</div>
-							</div>
-						{:else}
-							<div class="rounded-xl border border-dashed p-5 text-center">
-								<ListChecks class="mx-auto size-5 text-muted-foreground" />
-								<p class="mt-1 text-xs font-bold text-foreground">ยังไม่มีโจทย์ในด่านนี้</p>
-								<p class="text-[10px] text-muted-foreground">เพิ่มโจทย์ข้อแรกเพื่อให้ผู้เรียนเริ่มฝึกได้</p>
-								<Button
-									type="button"
-									size="xs"
-									onclick={addChallenge}
-									disabled={!!parseError}
-									class="mt-2 font-bold"
-								>
-									<Plus class="size-3" /> เพิ่มโจทย์
-								</Button>
-							</div>
-						{/each}
-					</div>
+					<QuestChallengesEditorTab
+						{words}
+						{challenges}
+						{challengeIssueKeys}
+						{parseError}
+						onAddChallenge={addChallenge}
+						onDuplicateChallenge={duplicateChallenge}
+						onRemoveChallenge={removeChallenge}
+						onMoveChallenge={moveChallenge}
+						onTypeChange={handleTypeChange}
+						onAddChoice={addChoice}
+						onRemoveChoice={removeChoice}
+						onTouch={touch}
+					/>
 				{/if}
 			</div>
 

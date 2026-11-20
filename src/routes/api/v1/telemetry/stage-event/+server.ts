@@ -31,16 +31,27 @@ export const POST = async (event: RequestEvent) => {
 		throw error(400, 'Invalid eventType. Allowed: ' + Array.from(ALLOWED_EVENTS).join(', '));
 	}
 
-	// Security: Only logged-in users get their real user ID recorded; unauthenticated clients cannot spoof arbitrary user IDs
-	const userId = locals.user ? locals.user.id : 'anonymous';
+	// Security: Only authenticated non-admin, non-impersonated learners with PDPA consent get stage telemetry recorded
+	if (!locals.user) {
+		throw error(401, 'Unauthorized: Authentication required.');
+	}
 
-	if (locals.user) {
-		const consented = await getUserConsent(String(locals.user.id), 'pdpa_research_telemetry').catch(
-			() => false
-		);
-		if (!consented) {
-			return json({ success: true, timestamp: Date.now(), recorded: false });
-		}
+	if (locals.user.isAdmin || locals.user.isImpersonated) {
+		return json({
+			success: true,
+			timestamp: Date.now(),
+			recorded: false,
+			skipped: true,
+			reason: 'admin_or_impersonated'
+		});
+	}
+
+	const userId = locals.user.id;
+	const consented = await getUserConsent(String(userId), 'pdpa_research_telemetry').catch(
+		() => false
+	);
+	if (!consented) {
+		return json({ success: true, timestamp: Date.now(), recorded: false });
 	}
 
 	await recordStageTelemetry({

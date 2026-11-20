@@ -21,7 +21,7 @@ function getNeonConfig() {
 	}
 }
 
-async function executeNeon(query: string): Promise<any> {
+async function executeNeon(sql: string, params: unknown[] = []): Promise<any> {
 	const cfg = getNeonConfig();
 	if (!cfg) throw new Error('Neon_DB not configured in environment');
 
@@ -31,7 +31,8 @@ async function executeNeon(query: string): Promise<any> {
 			'Content-Type': 'application/json',
 			'Neon-Connection-String': cfg.connectionString
 		},
-		body: JSON.stringify({ query })
+		body: JSON.stringify({ query: sql, params }),
+		signal: AbortSignal.timeout(10000)
 	});
 	if (!res.ok) {
 		const text = await res.text();
@@ -68,12 +69,21 @@ export async function syncTursoToNeon(): Promise<{
 		);`);
 		const usersRes = await turso.execute('SELECT * FROM users');
 		for (const c of chunk(usersRes.rows, 50)) {
-			const vals = c.map((u: any) => `(${u.id}, '${String(u.username).replace(/'/g, "''")}', '${String(u.password_hash || '')}', ${u.created_at})`).join(', ');
-			await executeNeon(`INSERT INTO users (id, username, password_hash, created_at)
-				VALUES ${vals}
+			const params: unknown[] = [];
+			const tuples: string[] = [];
+			let idx = 1;
+			for (const u of c as any[]) {
+				tuples.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+				params.push(Number(u.id), String(u.username || ''), String(u.password_hash || ''), Number(u.created_at || 0));
+			}
+			await executeNeon(
+				`INSERT INTO users (id, username, password_hash, created_at)
+				VALUES ${tuples.join(', ')}
 				ON CONFLICT (id) DO UPDATE SET
 					username = EXCLUDED.username,
-					password_hash = EXCLUDED.password_hash;`);
+					password_hash = EXCLUDED.password_hash;`,
+				params
+			);
 			stats.users += c.length;
 		}
 
@@ -87,14 +97,29 @@ export async function syncTursoToNeon(): Promise<{
 		);`);
 		const progRes = await turso.execute('SELECT * FROM progress');
 		for (const c of chunk(progRes.rows, 50)) {
-			const vals = c.map((p: any) => `(${p.user_id}, ${p.xp || 0}, ${p.hearts || 5}, ${p.streak || 0}, ${p.last_practiced ? `'${p.last_practiced}'` : 'NULL'})`).join(', ');
-			await executeNeon(`INSERT INTO progress (user_id, xp, hearts, streak, last_practiced)
-				VALUES ${vals}
+			const params: unknown[] = [];
+			const tuples: string[] = [];
+			let idx = 1;
+			for (const p of c as any[]) {
+				tuples.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+				params.push(
+					Number(p.user_id),
+					Number(p.xp ?? 0),
+					Number(p.hearts ?? 5),
+					Number(p.streak ?? 0),
+					p.last_practiced != null ? String(p.last_practiced) : null
+				);
+			}
+			await executeNeon(
+				`INSERT INTO progress (user_id, xp, hearts, streak, last_practiced)
+				VALUES ${tuples.join(', ')}
 				ON CONFLICT (user_id) DO UPDATE SET
 					xp = EXCLUDED.xp,
 					hearts = EXCLUDED.hearts,
 					streak = EXCLUDED.streak,
-					last_practiced = EXCLUDED.last_practiced;`);
+					last_practiced = EXCLUDED.last_practiced;`,
+				params
+			);
 			stats.progress += c.length;
 		}
 
@@ -115,13 +140,35 @@ export async function syncTursoToNeon(): Promise<{
 		);`);
 		const assessRes = await turso.execute('SELECT * FROM assessment_records');
 		for (const c of chunk(assessRes.rows, 50)) {
-			const vals = c.map((r: any) => `(${r.id}, '${r.user_id}', '${r.test_type}', '${r.word_id}', '${r.pinyin}', ${r.target_tone}, ${r.detected_tone}, ${r.tone_confidence || 0}, ${r.tone_score || 0}, ${r.gop_overall || 0}, ${r.per_overall || 0}, ${r.created_at})`).join(', ');
-			await executeNeon(`INSERT INTO assessment_records (id, user_id, test_type, word_id, pinyin, target_tone, detected_tone, tone_confidence, tone_score, gop_overall, per_overall, created_at)
-				VALUES ${vals}
+			const params: unknown[] = [];
+			const tuples: string[] = [];
+			let idx = 1;
+			for (const r of c as any[]) {
+				tuples.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+				params.push(
+					Number(r.id),
+					String(r.user_id || ''),
+					String(r.test_type || ''),
+					String(r.word_id || ''),
+					String(r.pinyin || ''),
+					Number(r.target_tone ?? 0),
+					Number(r.detected_tone ?? 0),
+					Number(r.tone_confidence ?? 0),
+					Number(r.tone_score ?? 0),
+					Number(r.gop_overall ?? 0),
+					Number(r.per_overall ?? 0),
+					Number(r.created_at ?? 0)
+				);
+			}
+			await executeNeon(
+				`INSERT INTO assessment_records (id, user_id, test_type, word_id, pinyin, target_tone, detected_tone, tone_confidence, tone_score, gop_overall, per_overall, created_at)
+				VALUES ${tuples.join(', ')}
 				ON CONFLICT (id) DO UPDATE SET
 					tone_score = EXCLUDED.tone_score,
 					gop_overall = EXCLUDED.gop_overall,
-					per_overall = EXCLUDED.per_overall;`);
+					per_overall = EXCLUDED.per_overall;`,
+				params
+			);
 			stats.assessments += c.length;
 		}
 
@@ -139,28 +186,107 @@ export async function syncTursoToNeon(): Promise<{
 		);`);
 		const sumRes = await turso.execute('SELECT * FROM assessment_summaries');
 		for (const c of chunk(sumRes.rows, 50)) {
-			const vals = c.map((s: any) => `(${s.id}, '${s.user_id}', '${s.test_type}', ${s.total_words || 20}, ${s.correct_tones || 0}, ${s.avg_tone_score || 0}, ${s.avg_gop || 0}, ${s.avg_per || 0}, ${s.completed_at})`).join(', ');
-			await executeNeon(`INSERT INTO assessment_summaries (id, user_id, test_type, total_words, correct_tones, avg_tone_score, avg_gop, avg_per, completed_at)
-				VALUES ${vals}
+			const params: unknown[] = [];
+			const tuples: string[] = [];
+			let idx = 1;
+			for (const s of c as any[]) {
+				tuples.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+				params.push(
+					Number(s.id),
+					String(s.user_id || ''),
+					String(s.test_type || ''),
+					Number(s.total_words ?? 20),
+					Number(s.correct_tones ?? 0),
+					Number(s.avg_tone_score ?? 0),
+					Number(s.avg_gop ?? 0),
+					Number(s.avg_per ?? 0),
+					Number(s.completed_at ?? 0)
+				);
+			}
+			await executeNeon(
+				`INSERT INTO assessment_summaries (id, user_id, test_type, total_words, correct_tones, avg_tone_score, avg_gop, avg_per, completed_at)
+				VALUES ${tuples.join(', ')}
 				ON CONFLICT (id) DO UPDATE SET
 					correct_tones = EXCLUDED.correct_tones,
-					avg_tone_score = EXCLUDED.avg_tone_score;`);
+					avg_tone_score = EXCLUDED.avg_tone_score;`,
+				params
+			);
 		}
 
 		// 5. Stage Overrides
+		await executeNeon(`CREATE TABLE IF NOT EXISTS stage_overrides (
+			id TEXT PRIMARY KEY,
+			stage_id TEXT UNIQUE,
+			title TEXT,
+			category TEXT,
+			description TEXT,
+			is_active BOOLEAN NOT NULL DEFAULT TRUE,
+			custom_words TEXT,
+			content_json TEXT,
+			stages_json TEXT,
+			updated_by TEXT,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);`);
+		await executeNeon('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS id TEXT;').catch(() => {});
+		await executeNeon('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS stages_json TEXT;').catch(() => {});
+		await executeNeon('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS custom_words TEXT;').catch(() => {});
+		await executeNeon('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS content_json TEXT;').catch(() => {});
+		await executeNeon('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS updated_by TEXT;').catch(() => {});
+
 		const ovRes = await turso.execute('SELECT * FROM stage_overrides');
-		for (const o of ovRes.rows) {
-			const isActive = o.is_active === 0 ? 'false' : 'true';
-			const title = o.title ? `'${String(o.title).replace(/'/g, "''")}'` : 'NULL';
-			const cat = o.category ? `'${String(o.category).replace(/'/g, "''")}'` : 'NULL';
-			const desc = o.description ? `'${String(o.description).replace(/'/g, "''")}'` : 'NULL';
-			const wordsJson = o.words_json ? `'${String(o.words_json).replace(/'/g, "''")}'::jsonb` : "'[]'::jsonb";
-			await executeNeon(`INSERT INTO stage_overrides (stage_id, title, category, description, is_active, custom_words_json, updated_at)
-				VALUES ('${o.stage_id}', ${title}, ${cat}, ${desc}, ${isActive}, ${wordsJson}, TO_TIMESTAMP(${o.updated_at} / 1000.0))
-				ON CONFLICT (stage_id) DO UPDATE SET
-					title = EXCLUDED.title,
-					category = EXCLUDED.category,
-					is_active = EXCLUDED.is_active;`);
+		for (const o of ovRes.rows as any[]) {
+			const stageId = String(o.stage_id || o.id || '');
+			if (!stageId) continue;
+			const isActive = o.is_active !== 0 && o.is_active !== false;
+			const customWords = o.custom_words != null ? String(o.custom_words) : null;
+			const contentJson = o.content_json != null ? String(o.content_json) : customWords;
+			const stagesJson = o.stages_json != null
+				? String(o.stages_json)
+				: (contentJson || JSON.stringify({
+					stageId,
+					title: o.title ?? null,
+					category: o.category ?? null,
+					description: o.description ?? null,
+					isActive,
+					customWords
+				}));
+			const updatedBy = o.updated_by != null ? String(o.updated_by) : null;
+			const updatedAtMs = Number(o.updated_at || Date.now());
+
+			await executeNeon(
+				`INSERT INTO stage_overrides (id, stages_json, updated_by, updated_at)
+				VALUES ($1, $2, $3, TO_TIMESTAMP($4 / 1000.0))
+				ON CONFLICT (id) DO UPDATE SET
+					stages_json = EXCLUDED.stages_json,
+					updated_by = EXCLUDED.updated_by,
+					updated_at = EXCLUDED.updated_at;`,
+				[stageId, stagesJson, updatedBy, updatedAtMs]
+			).catch(async () => {
+				await executeNeon(
+					`INSERT INTO stage_overrides (stage_id, title, category, description, is_active, custom_words, content_json, updated_by, updated_at)
+					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TO_TIMESTAMP($9 / 1000.0))
+					ON CONFLICT (stage_id) DO UPDATE SET
+						title = EXCLUDED.title,
+						category = EXCLUDED.category,
+						description = EXCLUDED.description,
+						is_active = EXCLUDED.is_active,
+						custom_words = EXCLUDED.custom_words,
+						content_json = EXCLUDED.content_json,
+						updated_by = EXCLUDED.updated_by,
+						updated_at = EXCLUDED.updated_at;`,
+					[
+						stageId,
+						o.title != null ? String(o.title) : null,
+						o.category != null ? String(o.category) : null,
+						o.description != null ? String(o.description) : null,
+						isActive,
+						customWords,
+						contentJson,
+						updatedBy,
+						updatedAtMs
+					]
+				);
+			});
 			stats.overrides++;
 		}
 
@@ -171,14 +297,44 @@ export async function syncTursoToNeon(): Promise<{
 	}
 }
 
-export async function purgeMockDataFromNeon(): Promise<void> {
+export async function deleteMockUsersFromNeon(): Promise<void> {
 	try {
-		await executeNeon(`
-			DELETE FROM users WHERE username LIKE 'mock_learner_%';
-			DELETE FROM progress WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'mock_learner_%');
-			DELETE FROM pronunciation_evaluations WHERE user_id LIKE 'mock_%' OR user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE username LIKE 'mock_learner_%');
-		`);
+		// Delete from child tables BEFORE deleting from users so subqueries resolve mock user IDs
+		await executeNeon(
+			`DELETE FROM pronunciation_evaluations WHERE user_id LIKE $1 OR user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE username LIKE $2);`,
+			['mock_%', 'mock_learner_%']
+		);
+		await executeNeon(
+			`DELETE FROM phoneme_evaluations WHERE user_id LIKE $1 OR user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE username LIKE $2);`,
+			['mock_%', 'mock_learner_%']
+		).catch(() => {});
+		await executeNeon(
+			`DELETE FROM assessment_records WHERE user_id LIKE $1 OR user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE username LIKE $2);`,
+			['mock_%', 'mock_learner_%']
+		).catch(() => {});
+		await executeNeon(
+			`DELETE FROM assessment_summaries WHERE user_id LIKE $1 OR user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE username LIKE $2);`,
+			['mock_%', 'mock_learner_%']
+		).catch(() => {});
+		await executeNeon(
+			`DELETE FROM lesson_completions WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1);`,
+			['mock_learner_%']
+		).catch(() => {});
+		await executeNeon(
+			`DELETE FROM user_mistakes WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1);`,
+			['mock_learner_%']
+		).catch(() => {});
+		await executeNeon(
+			`DELETE FROM progress WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1);`,
+			['mock_learner_%']
+		);
+		await executeNeon(
+			`DELETE FROM users WHERE username LIKE $1;`,
+			['mock_learner_%']
+		);
 	} catch (e) {
 		console.warn('⚠️ [Neon] Failed to purge mock data:', e);
 	}
 }
+
+export const purgeMockDataFromNeon = deleteMockUsersFromNeon;

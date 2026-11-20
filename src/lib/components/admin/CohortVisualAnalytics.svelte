@@ -1,42 +1,23 @@
 <script lang="ts">
 	import {
 		TrendingUp,
-		Award,
 		Zap,
 		Target,
-		BarChart3,
 		PieChart,
 		Lightbulb,
-		CheckCircle2,
-		AlertTriangle,
-		Info,
-		Layers,
-		ArrowRight,
-		Sparkles,
-		BookOpen,
 		Mic,
 		PenTool,
 		GraduationCap,
 		MessageSquare,
-		Users,
-		Compass,
-		Star
+		Compass
 	} from '@lucide/svelte';
 
 	let {
 		skillsSummary,
-		diagnostic,
-		advAnalytics,
-		totalStudents = 0,
-		onSelectUser,
-		onAssignRemedial
+		totalStudents = 0
 	}: {
 		skillsSummary: any;
-		diagnostic?: any;
-		advAnalytics?: any;
 		totalStudents?: number;
-		onSelectUser?: (user: any) => void;
-		onAssignRemedial?: (user: any, words?: string[]) => void;
 	} = $props();
 
 	// ==========================================
@@ -66,8 +47,73 @@
 		)
 	);
 	const pairedTTest = $derived(assessmentData?.pairedTTest || null);
-	const tonePairedTTest = $derived(assessmentData?.tonePairedTTest || null);
 	const avgNormalizedGainG = $derived(assessmentData?.avgNormalizedGainG ?? null);
+
+	const effectivePairedN = $derived(
+		pairedTTest && pairedTTest.n > 0 ? pairedTTest.n : pairedCount
+	);
+	const pairedMeanDelta = $derived(
+		pairedTTest && pairedTTest.n >= 1
+			? pairedTTest.meanDiff
+			: pairedCount >= 1
+				? deltaGop
+				: null
+	);
+
+	const hakeSummary = $derived.by(() => {
+		const g = avgNormalizedGainG;
+		if (g === null || g === undefined) {
+			return {
+				label: 'รอคู่สอบ Pre-Post',
+				badgeClass: 'bg-muted text-muted-foreground border-border',
+				subtext: 'ยังไม่มีข้อมูลครบคู่สำหรับคำนวณ ⟨g⟩'
+			};
+		}
+		if (g >= 0.7) {
+			return {
+				label: 'พัฒนาการระดับสูง',
+				badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+				subtext: `(⟨g⟩ = ${g.toFixed(2)})`
+			};
+		}
+		if (g >= 0.3) {
+			return {
+				label: 'พัฒนาการระดับปานกลาง',
+				badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+				subtext: `(⟨g⟩ = ${g.toFixed(2)})`
+			};
+		}
+		return {
+			label: 'พัฒนาการระดับเริ่มต้น',
+			badgeClass: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30',
+			subtext: `(⟨g⟩ = ${g.toFixed(2)})`
+		};
+	});
+
+	const confidenceSummary = $derived.by(() => {
+		const n = pairedTTest?.n ?? effectivePairedN;
+		if (!pairedTTest || n < 2 || postPhase.count === 0) {
+			return {
+				title: 'รอข้อมูลกลุ่มตัวอย่างเพิ่ม',
+				subtitle: 'ต้องการผู้สอบครบอย่างน้อย 2 คน',
+				toneClass: 'text-muted-foreground'
+			};
+		}
+		const dAbs = Math.abs(pairedTTest.cohensD ?? 0);
+		const effectLabel = dAbs >= 0.8 ? 'ผลกระทบระดับสูง' : dAbs >= 0.5 ? 'ผลกระทบระดับปานกลาง' : 'ผลกระทบระดับเล็ก';
+		if (pairedTTest.pValue < 0.05) {
+			return {
+				title: 'ยืนยันผลทางสถิติ (เชื่อถือได้)',
+				subtitle: `${effectLabel} (p < 0.05, N = ${n})`,
+				toneClass: 'text-emerald-600 dark:text-emerald-400'
+			};
+		}
+		return {
+			title: 'ยังไม่พบความแตกต่างอย่างมีนัยสำคัญ',
+			subtitle: `${effectLabel} (p = ${pairedTTest.pValue.toFixed(3)}, N = ${n})`,
+			toneClass: 'text-amber-600 dark:text-amber-400'
+		};
+	});
 
 	// Phase Categories for Grouped Bar & Trend Line (Full-width 760px viewBox)
 	const phasesList = $derived([
@@ -107,13 +153,13 @@
 			desc: 'ระดับเสียง Pitch & Tone Contour'
 		},
 		{
-			key: 'hanziWriting',
-			name: 'การคัดอักษรจีนลำดับขีด',
-			shortName: 'คัดอักษรจีน',
-			score: Math.round(Number(classRadar?.hanziWriting || 0)),
-			icon: PenTool,
+			key: 'flashcardMastery',
+			name: 'ความจำคำศัพท์ (แฟลชการ์ด)',
+			shortName: 'แฟลชการ์ด',
+			score: Math.round(Number(classRadar?.flashcardMastery || 0)),
+			icon: Target,
 			color: '#10b981',
-			desc: 'Stroke Order & Accuracy'
+			desc: 'อัตราจำคำศัพท์ Flashcards'
 		},
 		{
 			key: 'questMastery',
@@ -144,10 +190,13 @@
 		}
 	]);
 
+	const activeAxes = $derived(radarAxesList.filter((a) => a.score > 0));
 	const classOverallAvg = $derived(
 		typeof classRadar?.overallClassAvg === 'number'
 			? Math.round(classRadar.overallClassAvg)
-			: Math.round(radarAxesList.reduce((acc, a) => acc + a.score, 0) / 6)
+			: activeAxes.length > 0
+				? Math.round(activeAxes.reduce((acc, a) => acc + a.score, 0) / activeAxes.length)
+				: 0
 	);
 
 	// Radar Chart Coordinates Math (Center 200, 180, R=120)
@@ -176,7 +225,6 @@
 	);
 
 	// Strongest and Weakest Axis calculation
-	const activeAxes = $derived(radarAxesList.filter((a) => a.score > 0));
 	const strongestAxis = $derived(
 		activeAxes.length > 0 ? [...activeAxes].sort((a, b) => b.score - a.score)[0] : null
 	);
@@ -185,38 +233,45 @@
 	);
 
 	// ==========================================
-	// BLOCK C: 6-Module Cross-Feature Activity Breakdown
+	// BLOCK C: Cross-Feature Activity Breakdown (Events)
 	// ==========================================
 	const defaultUsageFeatures = [
-		{ key: 'wordPitch', label: 'ฝึกออกเสียงเดี่ยว/คู่ (Word Pitch)', icon: 'Mic', color: '#3b82f6', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
-		{ key: 'questStages', label: 'ด่านผจญภัยสะสมดาว (Quest Stages)', icon: 'Compass', color: '#10b981', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
-		{ key: 'hanziWriting', label: 'คัดอักษรจีนลำดับขีด (Hanzi Writing)', icon: 'PenTool', color: '#f59e0b', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
-		{ key: 'mockExams', label: 'แบบทดสอบจำลอง HSK (Mock Exams)', icon: 'GraduationCap', color: '#8b5cf6', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
-		{ key: 'aiRoleplay', label: 'สนทนาจำลองสถานการณ์ AI (AI Talk)', icon: 'MessageSquare', color: '#ec4899', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
-		{ key: 'assessments', label: 'แบบประเมินผลสัมฤทธิ์ (Pre/Mid/Post)', icon: 'Target', color: '#06b6d4', totalEvents: 0, uniqueUsers: 0, sharePct: 0 }
+		{ key: 'questStages', label: 'ด่านฝึกคำศัพท์ (Quest)', icon: 'Compass', color: '#2563eb', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
+		{ key: 'flashcards', label: 'แฟลชการ์ด (Flashcards)', icon: 'Target', color: '#10b981', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
+		{ key: 'wordPitch', label: 'ฝึกออกเสียง (Pitch/Word)', icon: 'Mic', color: '#16a34a', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
+		{ key: 'hanziWriting', label: 'คัดอักษรจีน (Hanzi)', icon: 'PenTool', color: '#d97706', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
+		{ key: 'mockExams', label: 'ข้อสอบ HSK (Mock Exam)', icon: 'GraduationCap', color: '#9333ea', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
+		{ key: 'aiRoleplay', label: 'สนทนา AI (Talk)', icon: 'MessageSquare', color: '#0891b2', totalEvents: 0, uniqueUsers: 0, sharePct: 0 },
+		{ key: 'assessments', label: 'แบบทดสอบ Pre/Mid/Post', icon: 'Target', color: '#e11d48', totalEvents: 0, uniqueUsers: 0, sharePct: 0 }
 	];
 
 	const crossFeatureList = $derived.by(() => {
 		const raw = skillsSummary?.crossFeatureUsage;
-		if (Array.isArray(raw) && raw.length > 0) {
-			const total = raw.reduce((sum, item) => sum + (Number(item.totalEvents) || 0), 0);
-			return raw.map((item, idx) => {
-				const fallback = defaultUsageFeatures[idx] || defaultUsageFeatures[0];
-				const events = Number(item.totalEvents) || 0;
-				return {
-					key: item.key || fallback.key,
-					label: item.label || fallback.label,
-					color: item.color || fallback.color,
-					totalEvents: events,
-					uniqueUsers: Number(item.uniqueUsers) || 0,
-					sharePct: total > 0 ? Math.round((events / total) * 1000) / 10 : 0
-				};
-			});
-		}
-		// Fallback when crossFeatureUsage is empty
-		return defaultUsageFeatures;
+		const list = Array.isArray(raw) && raw.length > 0
+			? raw.map((item, idx) => {
+					const fallback = defaultUsageFeatures[idx] || defaultUsageFeatures[0];
+					return {
+						key: item.key || fallback.key,
+						label: item.label || fallback.label,
+						color: item.color || fallback.color,
+						totalEvents: Number(item.totalEvents) || 0,
+						uniqueUsers: Number(item.uniqueUsers) || 0
+					};
+				})
+			: defaultUsageFeatures;
+
+		const totalVal = list.reduce((sum, item) => sum + item.totalEvents, 0);
+		return list.map((item) => {
+			const val = item.totalEvents;
+			return {
+				...item,
+				displayValue: val,
+				sharePct: totalVal > 0 ? Math.round((val / totalVal) * 1000) / 10 : 0
+			};
+		});
 	});
 
+	const totalCrossMetric = $derived(crossFeatureList.reduce((acc, f) => acc + f.displayValue, 0));
 	const totalCrossEvents = $derived(crossFeatureList.reduce((acc, f) => acc + f.totalEvents, 0));
 	const maxUniqueLearnersInFeature = $derived(
 		Math.max(0, ...crossFeatureList.map((f) => f.uniqueUsers))
@@ -229,7 +284,7 @@
 	const donutSlices = $derived.by(() => {
 		let accumulatedShare = 0;
 		return crossFeatureList.map((feature) => {
-			const shareFraction = totalCrossEvents > 0 ? feature.totalEvents / totalCrossEvents : 0;
+			const shareFraction = totalCrossMetric > 0 ? feature.displayValue / totalCrossMetric : 0;
 			const strokeLength = shareFraction * donutCircumference;
 			const dashOffset = -accumulatedShare * donutCircumference;
 			accumulatedShare += shareFraction;
@@ -301,11 +356,15 @@
 		</div>
 
 		<!-- Full-Width Grouped Bar Chart -->
-		<div class="pt-6">
+		<div class="pt-6 space-y-2">
+			<div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground px-1">
+				<span>📊 แท่งกราฟแสดง <strong>ค่าเฉลี่ยรวมผู้เข้าสอบแต่ละรอบ</strong> (Unpaired)</span>
+				<span>🎯 การ์ดสรุปด้านล่าง <strong>คำนวณเฉพาะผู้ที่สอบครบทั้งคู่</strong> (Paired)</span>
+			</div>
 			<div class="w-full bg-muted/10 rounded-2xl border border-border/50 p-4 overflow-hidden">
 				<svg viewBox="0 0 760 250" class="w-full h-auto max-h-[300px] select-none font-sans" preserveAspectRatio="xMidYMid meet">
 					<!-- Grid lines -->
-					{#each [0, 25, 50, 75, 100] as yVal}
+					{#each [0, 25, 50, 75, 100] as yVal (yVal)}
 						{@const y = 200 - (yVal / 100) * 165}
 						<line x1="55" y1={y} x2="725" y2={y} stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
 						<text x="46" y={y + 4} text-anchor="end" class="text-[10px] fill-muted-foreground font-mono">{yVal}%</text>
@@ -325,7 +384,7 @@
 					{/if}
 
 					<!-- Draw Grouped Bars for each phase -->
-					{#each phasesList as { label, data, cx }}
+					{#each phasesList as { label, data, cx } (label)}
 						{@const gopY = 200 - (Math.max(0, Math.min(100, data.avgGop)) / 100) * 165}
 						{@const toneY = 200 - (Math.max(0, Math.min(100, data.avgToneScore)) / 100) * 165}
 						{@const correctY = 200 - (Math.max(0, Math.min(100, data.correctTonesPct)) / 100) * 165}
@@ -406,87 +465,44 @@
 			</div>
 		</div>
 
-		<!-- Publication-Grade Inferential Statistics Ribbon (Paired Sample t-test, Cohen's d, Hake's Gain g, 95% CI) -->
-		<div class="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-			<div class="rounded-2xl border border-indigo-500/25 bg-indigo-500/5 p-3.5 text-center">
-				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hake's Gain (⟨g⟩)</div>
-				<div class="mt-1 font-mono text-xl font-black text-indigo-600 dark:text-indigo-400">
-					{avgNormalizedGainG !== null ? avgNormalizedGainG.toFixed(2) : '—'}
-				</div>
-				<div class="mt-0.5 text-[10px] text-muted-foreground">
-					{avgNormalizedGainG === null
-						? 'รอคู่สอบ Pre-Post'
-						: avgNormalizedGainG >= 0.7
-							? 'High Gain (≥0.70)'
-							: avgNormalizedGainG >= 0.3
-								? 'Medium Gain (0.30–0.69)'
-								: 'Low Gain (<0.30)'}
-				</div>
-			</div>
-
-			<div class="rounded-2xl border border-border/70 bg-muted/20 p-3.5 text-center">
-				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Paired t-Statistic</div>
-				<div class="mt-1 font-mono text-xl font-black text-foreground">
-					{pairedTTest && pairedTTest.n >= 2 ? `t = ${pairedTTest.tStat.toFixed(2)}` : '—'}
-				</div>
-				<div class="mt-0.5 text-[10px] font-mono text-muted-foreground">
-					df = {pairedTTest?.df ?? 0} (N = {pairedTTest?.n ?? pairedCount})
-				</div>
-			</div>
-
-			<div class="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-3.5 text-center">
-				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Two-Tailed p-Value</div>
-				<div class="mt-1 font-mono text-xl font-black {pairedTTest?.isSignificant05 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}">
-					{#if pairedTTest && pairedTTest.n >= 2}
-						{pairedTTest.pValue < 0.001 ? 'p < .001***' : `p = ${pairedTTest.pValue.toFixed(3)}`}
+		<!-- 3 Human-Readable Summary Cards (Default View for Non-Technical Admins) -->
+		<div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+			<!-- Card 1: Paired Mean Δ -->
+			<div class="rounded-2xl border border-indigo-500/25 bg-indigo-500/5 p-4 flex flex-col justify-between space-y-2">
+				<div class="text-xs font-bold text-muted-foreground">คะแนนเฉลี่ยเปลี่ยนแปลง (Paired Mean Δ)</div>
+				<div class="font-mono text-2xl font-black {pairedMeanDelta === null ? 'text-muted-foreground' : pairedMeanDelta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
+					{#if pairedMeanDelta !== null}
+						{pairedMeanDelta >= 0 ? `+${pairedMeanDelta.toFixed(1)}%` : `${pairedMeanDelta.toFixed(1)}%`} GOP
 					{:else}
-						—
+						รอคู่สอบ Pre-Post
 					{/if}
 				</div>
-				<div class="mt-0.5 text-[10px] text-muted-foreground">
-					{pairedTTest?.isSignificant01
-						? 'นัยสำคัญ α = .01'
-						: pairedTTest?.isSignificant05
-							? 'นัยสำคัญ α = .05'
-							: 'รอเพิ่มกลุ่มตัวอย่าง'}
+				<div class="text-[11px] text-muted-foreground">
+					จากผู้เรียนที่สอบครบทั้ง 2 รอบ <strong class="font-mono text-foreground">N = {effectivePairedN} คน</strong>
 				</div>
 			</div>
 
-			<div class="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3.5 text-center">
-				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Effect Size (Cohen's d)</div>
-				<div class="mt-1 font-mono text-xl font-black text-amber-600 dark:text-amber-400">
-					{pairedTTest && pairedTTest.n >= 2 ? `d = ${pairedTTest.cohensD.toFixed(2)}` : '—'}
+			<!-- Card 2: Hake's Gain Plain Language -->
+			<div class="rounded-2xl border border-border/70 bg-muted/20 p-4 flex flex-col justify-between space-y-2">
+				<div class="text-xs font-bold text-muted-foreground">ระดับพัฒนาการเรียนรู้ (Hake's Gain)</div>
+				<div class="flex items-center gap-2 flex-wrap">
+					<span class="inline-flex items-center rounded-xl border px-3 py-1 text-sm font-black {hakeSummary.badgeClass}">
+						{hakeSummary.label}
+					</span>
 				</div>
-				<div class="mt-0.5 text-[10px] text-muted-foreground">
-					{pairedTTest?.effectSizeLabel || 'รอข้อมูลคู่ขนาน'}
-				</div>
-			</div>
-
-			<div class="rounded-2xl border border-border/70 bg-muted/20 p-3.5 text-center">
-				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">95% CI of ΔGOP</div>
-				<div class="mt-1 font-mono text-sm font-black text-foreground pt-1">
-					{#if pairedTTest && pairedTTest.n >= 2}
-						[{pairedTTest.ci95Lower > 0 ? '+' : ''}{pairedTTest.ci95Lower}, {pairedTTest.ci95Upper > 0 ? '+' : ''}{pairedTTest.ci95Upper}]
-					{:else}
-						—
-					{/if}
-				</div>
-				<div class="mt-1 text-[10px] font-mono text-muted-foreground">
-					Mean Δ = {pairedTTest ? `${pairedTTest.meanDiff > 0 ? '+' : ''}${pairedTTest.meanDiff}%` : '—'}
+				<div class="text-[11px] font-mono text-muted-foreground">
+					{hakeSummary.subtext}
 				</div>
 			</div>
 
-			<div class="rounded-2xl border border-border/70 bg-muted/20 p-3.5 text-center">
-				<div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pre / Post SD</div>
-				<div class="mt-1 font-mono text-sm font-black text-foreground pt-1">
-					{#if pairedTTest && pairedTTest.n >= 2}
-						±{pairedTTest.preSd}% ➔ ±{pairedTTest.postSd}%
-					{:else}
-						—
-					{/if}
+			<!-- Card 3: Statistical Confidence -->
+			<div class="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex flex-col justify-between space-y-2">
+				<div class="text-xs font-bold text-muted-foreground">ความน่าเชื่อถือของผลลัพธ์ (Statistical Confidence)</div>
+				<div class="text-base font-black leading-snug {confidenceSummary.toneClass}">
+					{confidenceSummary.title}
 				</div>
-				<div class="mt-1 text-[10px] font-mono text-muted-foreground">
-					Tone d = {tonePairedTTest && tonePairedTTest.n >= 2 ? tonePairedTTest.cohensD.toFixed(2) : '—'}
+				<div class="text-[11px] text-muted-foreground">
+					{confidenceSummary.subtitle}
 				</div>
 			</div>
 		</div>
@@ -500,26 +516,30 @@
 				<div class="space-y-1.5 text-xs">
 					<div class="font-bold text-foreground text-sm flex items-center gap-2">
 						<span>💡 สรุปผลการประเมินและการพัฒนาการของผู้เรียนทั้งรุ่น</span>
-						{#if deltaGop !== null}
-							<span class="rounded-full px-2.5 py-0.5 text-xs font-mono font-bold {deltaGop >= 0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600'}">
-								{deltaGop >= 0 ? `+${deltaGop}%` : `${deltaGop}%`} GOP
+						{#if pairedMeanDelta !== null}
+							<span class="rounded-full px-2.5 py-0.5 text-xs font-mono font-bold {pairedMeanDelta >= 0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600'}">
+								{pairedMeanDelta >= 0 ? `+${pairedMeanDelta.toFixed(1)}%` : `${pairedMeanDelta.toFixed(1)}%`} GOP
 							</span>
 						{/if}
 					</div>
 					<div class="text-muted-foreground leading-relaxed">
 						{#if postPhase.count > 0 && prePhase.count > 0}
+							{@const postDiff = Number(postPhase.avgGop) - Number(prePhase.avgGop)}
 							<span>
-								ผู้เรียนทำคะแนนความชัดเจนการออกเสียง (GOP) จากระยะก่อนเรียน ({(Number(prePhase.avgGop) || 0).toFixed(1)}%) พัฒนาขึ้นเป็น <strong>{(Number(postPhase.avgGop) || 0).toFixed(1)}%</strong> ในระยะหลังเรียน
-								({deltaGop !== null && deltaGop >= 0 ? `พัฒนาการคนเดิม +${Number(deltaGop).toFixed(1)}% GOP` : `เปลี่ยนแปลง ${deltaGop}%`}) 
-								ความแม่นยำวรรณยุกต์อยู่ที่ {(Number(postPhase.avgToneScore) || 0).toFixed(1)}% 
-								{postPhase.avgToneScore < 70 ? '• แนะนำเสริมการฝึกแยกเสียงวรรณยุกต์ 2 และ 3 เพิ่มเติม' : '• ภาพรวมความแม่นยำวรรณยุกต์อยู่ในเกณฑ์ดี'}
+								ค่าเฉลี่ยรวมทุกผู้เข้าสอบ (Unpaired) จากก่อนเรียน ({(Number(prePhase.avgGop) || 0).toFixed(1)}%) {postDiff >= 0 ? 'เพิ่มขึ้นเป็น' : 'อยู่ที่'} <strong>{(Number(postPhase.avgGop) || 0).toFixed(1)}%</strong> ในระยะหลังเรียน
+								{#if pairedMeanDelta !== null}
+									· ขณะที่พัฒนาการเฉพาะผู้ที่สอบครบทั้งคู่ (Paired Mean Δ, N = {effectivePairedN} คน) อยู่ที่ <strong>{pairedMeanDelta >= 0 ? `+${pairedMeanDelta.toFixed(1)}%` : `${pairedMeanDelta.toFixed(1)}%`} GOP</strong>
+								{/if}
+								· ความแม่นยำวรรณยุกต์หลังเรียน {(Number(postPhase.avgToneScore) || 0).toFixed(1)}%
 							</span>
 						{:else if midPhase.count > 0 && prePhase.count > 0}
+							{@const midDiff = Number(midPhase.avgGop) - Number(prePhase.avgGop)}
 							<span>
-								ผู้เรียนมีคะแนนความชัดเจนการออกเสียง (GOP) เฉลี่ยจากก่อนเรียน ({(Number(prePhase.avgGop) || 0).toFixed(1)}%) ขยับขึ้นเป็น <strong>{(Number(midPhase.avgGop) || 0).toFixed(1)}%</strong> ในระยะกลางภาค 
-								({deltaGop !== null && deltaGop >= 0 ? `พัฒนาการคนเดิมที่สอบครบ +${Number(deltaGop).toFixed(1)}% GOP` : `เปลี่ยนแปลง ${deltaGop}%`}) 
-								โดยคะแนนวรรณยุกต์ขยับจาก {(Number(prePhase.avgToneScore) || 0).toFixed(1)}% เป็น {(Number(midPhase.avgToneScore) || 0).toFixed(1)}%
-								• แนะนำให้ผู้เรียนฝึกด่านเสียงวรรณยุกต์ที่ 2 และ 3 อย่างต่อเนื่องก่อนเข้าสู่การประเมินหลังเรียน (Post-test)
+								ค่าเฉลี่ยรวมทุกผู้เข้าสอบ (Unpaired) จากก่อนเรียน ({(Number(prePhase.avgGop) || 0).toFixed(1)}%) {midDiff >= 0 ? 'เพิ่มขึ้นเป็น' : 'ลดลงเป็น'} <strong>{(Number(midPhase.avgGop) || 0).toFixed(1)}%</strong> ในระยะกลางภาค
+								{#if pairedMeanDelta !== null}
+									· ขณะที่พัฒนาการเฉพาะผู้ที่สอบครบทั้งคู่ (Paired Mean Δ, N = {effectivePairedN} คน) อยู่ที่ <strong>{pairedMeanDelta >= 0 ? `+${pairedMeanDelta.toFixed(1)}%` : `${pairedMeanDelta.toFixed(1)}%`} GOP</strong>
+								{/if}
+								· แนะนำให้ผู้เรียนฝึกต่อเนื่องก่อนเข้าสู่การประเมินหลังเรียน (Post-test)
 							</span>
 						{:else if prePhase.count > 0}
 							<span>
@@ -568,7 +588,7 @@
 				<div class="w-full max-w-[400px]">
 					<svg viewBox="0 0 400 360" class="w-full h-auto overflow-visible select-none font-sans">
 						<!-- Concentric regular hexagonal grid rings (20%, 40%, 60%, 80%, 100%) -->
-						{#each [0.2, 0.4, 0.6, 0.8, 1.0] as ringFrac}
+						{#each [0.2, 0.4, 0.6, 0.8, 1.0] as ringFrac (ringFrac)}
 							{@const ringPts = [0, 1, 2, 3, 4, 5]
 								.map((i) => {
 									const angle = -90 + i * 60;
@@ -596,7 +616,7 @@
 						{/each}
 
 						<!-- 6 Radial Axis Lines -->
-						{#each [0, 1, 2, 3, 4, 5] as i}
+						{#each [0, 1, 2, 3, 4, 5] as i (i)}
 							{@const angle = -90 + i * 60}
 							{@const rad = (angle * Math.PI) / 180}
 							{@const endX = radarCx + radarMaxR * Math.cos(rad)}
@@ -624,7 +644,7 @@
 							/>
 
 							<!-- Vertex Dots & glowing circles -->
-							{#each radarAxesList as axis, i}
+							{#each radarAxesList as axis, i (axis.key)}
 								{@const pt = getRadarCoords(i, axis.score)}
 								<circle
 									cx={pt.x}
@@ -639,7 +659,7 @@
 						{/if}
 
 						<!-- Outer Axis Labels with Score Badges -->
-						{#each radarAxesList as axis, i}
+						{#each radarAxesList as axis, i (axis.key)}
 							{@const angle = -90 + i * 60}
 							{@const rad = (angle * Math.PI) / 180}
 							{@const labelR = radarMaxR + 28}
@@ -674,7 +694,7 @@
 
 			<!-- 6 Mini KPI Cards -->
 			<div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
-				{#each radarAxesList as axis}
+				{#each radarAxesList as axis (axis.key)}
 					<div class="rounded-2xl border border-border/60 bg-muted/20 p-2.5 flex items-center justify-between">
 						<div class="flex items-center gap-2">
 							<div class="p-1.5 rounded-lg bg-card border border-border/50 text-muted-foreground">
@@ -692,40 +712,7 @@
 				{/each}
 			</div>
 
-			<!-- Plain-Thai Insight Box (Block B) -->
-			<div class="mt-6 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 p-4">
-				<div class="flex items-start gap-3">
-					<div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-						<Lightbulb class="size-5" />
-					</div>
-					<div class="space-y-1 text-xs">
-						<div class="font-bold text-foreground text-sm">💡 สรุปผล: สมดุลทักษะทั้ง 6 มิติของชั้นเรียน</div>
-						<div class="text-muted-foreground leading-relaxed">
-							{#if strongestAxis && weakestAxis && strongestAxis.score > 0}
-								<div class="flex flex-wrap items-center gap-2">
-									<span class="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-bold">เด่นสุด: {strongestAxis.name} ({strongestAxis.score}%)</span>
-									<span class="rounded-md bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-bold">ควรเสริม: {weakestAxis.name} ({weakestAxis.score}%)</span>
-								</div>
-								<div class="pt-1">
-									{#if weakestAxis.key === 'toneMastery'}
-										แนะนำจัดกิจกรรมเปรียบเทียบเสียงคู่เทียบ (Minimal Pairs เช่น mā vs má) ในช่วง 10 นาทีแรกของคาบ
-									{:else if weakestAxis.key === 'hanziWriting'}
-										แนะนำให้นักเรียนฝึกในโหมด Stroke Writing โดยย้ำหลักการลากเส้นบนลงล่างและซ้ายไปขวา
-									{:else if weakestAxis.key === 'examReadiness'}
-										แนะนำให้นักเรียนฝึกทำแบบทดสอบวัดระดับ HSK แบบจับเวลาเพื่อสร้างความคุ้นเคย
-									{:else if weakestAxis.key === 'conversationalFluency'}
-										แนะนำให้นักเรียนฝึกสนทนาโต้ตอบสถานการณ์จริงในโหมด /talk วันละ 1 สถานการณ์
-									{:else}
-										แนะนำบูรณาการแบบฝึกหัดทักษะนี้ควบคู่ไปกับด่านผจญภัยประจำวัน
-									{/if}
-								</div>
-							{:else}
-								ระบบกำลังรวบรวมสถิติจากผู้เรียนทุกคน เมื่อเริ่มมีผลการประเมินในแต่ละทักษะ แดชบอร์ดจะสรุปจุดเด่นและด้านที่ควรพัฒนาของห้องเรียนตามข้อมูลจริง
-							{/if}
-						</div>
-					</div>
-				</div>
-			</div>
+			<!-- Plain-Thai Insight Box (Block B) Removed for Clean UI -->
 		</section>
 
 		<!-- ===================================================================== -->
@@ -733,7 +720,7 @@
 		<!-- ===================================================================== -->
 		<section class="xl:col-span-5 rounded-2xl border border-border bg-card p-6 flex flex-col justify-between">
 			<!-- Header -->
-			<div class="flex items-center justify-between pb-5 border-b border-border">
+			<div class="flex flex-wrap items-center justify-between gap-2 pb-5 border-b border-border">
 				<div class="flex items-center gap-3">
 					<div class="flex size-10 items-center justify-center rounded-xl border border-border bg-background text-primary">
 						<PieChart class="size-5" />
@@ -741,7 +728,7 @@
 					<div>
 						<h3 class="text-base sm:text-lg font-bold text-foreground">สัดส่วนการใช้งานรายโหมด</h3>
 						<p class="text-xs text-muted-foreground mt-0.5">
-							กิจกรรมรวมของผู้เรียน {totalStudents} คน
+							กิจกรรมรวมของผู้เรียน {totalStudents} คน (นับตามจำนวนครั้ง)
 						</p>
 					</div>
 				</div>
@@ -766,9 +753,9 @@
 						/>
 
 						<!-- Donut Segments (Rotated by -90 deg to start from 12 o'clock) -->
-						{#if totalCrossEvents > 0}
+						{#if totalCrossMetric > 0}
 							<g transform="rotate(-90 120 120)">
-								{#each donutSlices as slice}
+								{#each donutSlices as slice (slice.key)}
 									{#if slice.strokeLength > 0}
 										<circle
 											cx="120"
@@ -802,7 +789,7 @@
 
 			<!-- Breakdown List with Horizontal Bars -->
 			<div class="space-y-2.5 pt-2">
-				{#each crossFeatureList as feat}
+				{#each crossFeatureList as feat (feat.key)}
 					<div class="rounded-xl border border-border/50 bg-muted/20 p-2 text-xs space-y-1">
 						<div class="flex items-center justify-between font-bold">
 							<div class="flex items-center gap-2 truncate">
@@ -810,8 +797,12 @@
 								<span class="text-foreground truncate">{feat.label}</span>
 							</div>
 							<div class="flex items-center gap-2 font-mono shrink-0">
-								<span class="text-foreground">{feat.totalEvents.toLocaleString()} ครั้ง</span>
-								<span class="text-muted-foreground text-[10px]">({feat.sharePct}%)</span>
+								<span class="text-foreground">
+									{feat.totalEvents.toLocaleString()} ครั้ง
+								</span>
+								<span class="text-muted-foreground text-[10px]">
+									({feat.sharePct}%)
+								</span>
 							</div>
 						</div>
 						<!-- Progress bar -->
@@ -823,36 +814,6 @@
 						</div>
 					</div>
 				{/each}
-			</div>
-
-			<!-- Plain-Thai Insight Box (Block C) -->
-			<div class="mt-6 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 p-4">
-				<div class="flex items-start gap-3">
-					<div class="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
-						<Lightbulb class="size-5" />
-					</div>
-					<div class="space-y-1 text-xs">
-						<div class="font-bold text-foreground text-sm">💡 สรุปผล: พฤติกรรมการเข้าใช้งาน 6 ฟีเจอร์หลัก</div>
-						<div class="text-muted-foreground leading-relaxed">
-							{#if topFeature && topFeature.totalEvents > 0}
-								<div class="flex flex-wrap items-center gap-2">
-									<span class="rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 font-bold">ยอดนิยม: {topFeature.label} ({topFeature.sharePct}%)</span>
-									{#if underutilizedFeature && underutilizedFeature.sharePct < 15}
-										<span class="rounded-md bg-muted px-2 py-0.5 font-semibold text-muted-foreground">ใช้น้อย: {underutilizedFeature.label} ({underutilizedFeature.sharePct}%)</span>
-									{/if}
-								</div>
-								<div class="pt-0.5">
-									{topFeature.label} มีการเข้าใช้งานสูงสุด {topFeature.totalEvents.toLocaleString()} ครั้ง 
-									{#if underutilizedFeature && underutilizedFeature.sharePct < 10}
-										— แนะนำกระตุ้นให้ฝึก {underutilizedFeature.label} เพิ่มเติมเพื่อความสมดุล
-									{/if}
-								</div>
-							{:else}
-								ยังไม่มีการบันทึกกิจกรรมการใช้งานใน 6 โมดูลหลัก เมื่อนักเรียนเริ่มฝึกฝน แดชบอร์ดจะสรุปสัดส่วนความสนใจของห้องเรียนให้ทันที
-							{/if}
-						</div>
-					</div>
-				</div>
 			</div>
 		</section>
 	</div>

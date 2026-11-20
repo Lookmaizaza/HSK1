@@ -97,6 +97,11 @@ export function buildStudentRadarAxes(
 			? Math.min(100, Math.round((crossSkill.progress.totalStars / 30) * 100))
 			: null;
 
+	const flashcardScore =
+		crossSkill.flashcard.totalWords > 0
+			? Math.min(100, Math.round((crossSkill.flashcard.totalMastered / crossSkill.flashcard.totalWords) * 100))
+			: null;
+
 	return [
 		{
 			key: 'phoneme',
@@ -113,11 +118,11 @@ export function buildStudentRadarAxes(
 			attempts: practicedTones.reduce((sum, t) => sum + t.count, 0)
 		},
 		{
-			key: 'writing',
-			label: 'คัดอักษรจีน',
-			shortLabel: 'คัดจีน',
-			score: crossSkill.writing.avgScore,
-			attempts: crossSkill.writing.attempts
+			key: 'flashcard',
+			label: 'แฟลชการ์ด (ความจำคำศัพท์)',
+			shortLabel: 'แฟลชการ์ด',
+			score: flashcardScore,
+			attempts: crossSkill.flashcard.setsCompleted
 		},
 		{
 			key: 'quest',

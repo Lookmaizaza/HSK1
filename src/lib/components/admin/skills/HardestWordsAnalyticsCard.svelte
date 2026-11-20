@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { AlertTriangle, Volume2, Mic } from '@lucide/svelte';
+	import { AlertTriangle, Volume2 } from '@lucide/svelte';
 	import { speak } from '$lib/speech';
 
 	let {
 		words = []
 	}: {
-		words: Array<{ word: string; count: number; avgScore: number }>;
+		words: Array<{ word: string; count: number; uniqueUsers?: number; avgScore: number }>;
 	} = $props();
 
 	const sortedHardest = $derived(
@@ -77,7 +77,9 @@
 						{#each sortedHardest as item (item.word)}
 							<tr class="hover:bg-muted/10 transition">
 								<td class="py-2 px-3 font-black text-sm text-foreground">{item.word}</td>
-								<td class="py-2 px-3 text-right font-mono text-muted-foreground">{item.count} ครั้ง</td>
+								<td class="py-2 px-3 text-right font-mono text-muted-foreground">
+									{item.count} ครั้ง{#if item.uniqueUsers} · <span class="text-foreground font-semibold">{item.uniqueUsers} คน</span>{/if}
+								</td>
 								<td class="py-2 px-3 text-right">
 									<span class="rounded-md px-2 py-0.5 font-mono font-bold text-[11px] {item.avgScore < 60 ? 'bg-rose-500/15 text-rose-600' : item.avgScore < 75 ? 'bg-amber-500/15 text-amber-600' : 'bg-emerald-500/15 text-emerald-600'}">
 										{item.avgScore}%

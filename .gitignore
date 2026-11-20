@@ -20,6 +20,16 @@ Thumbs.db
 
 # Local DB
 /data
+local.db
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Working / local artifacts (note: tracked PDFs/pptx remain tracked until git rm --cached)
+/filr
+*.pptx
+*.pdf
 
 # Vite
 vite.config.js.timestamp-*

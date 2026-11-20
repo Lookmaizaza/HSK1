@@ -4,7 +4,7 @@ import { computePairedTTest, type PairedTTestResult } from '$lib/analytics/stati
 // and against a remote Turso database (libsql://...) in production.
 
 import { createClient, type Client } from '@libsql/client';
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { env } from '$env/dynamic/private';
@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS users (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	username TEXT NOT NULL UNIQUE COLLATE NOCASE,
 	password_hash TEXT NOT NULL,
-	created_at INTEGER NOT NULL
+	created_at INTEGER NOT NULL,
+	last_login_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -127,7 +128,20 @@ CREATE TABLE IF NOT EXISTS learning_events (
 	word_id TEXT NOT NULL,
 	statement_id TEXT NOT NULL UNIQUE,
 	xapi_statement TEXT NOT NULL,
-	practice_mode TEXT NOT NULL DEFAULT 'unknown',
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
+	stage_id TEXT,
+	created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS app_learning_events (
+	statement_id TEXT PRIMARY KEY,
+	user_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	xapi_statement TEXT NOT NULL,
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
 	stage_id TEXT,
 	created_at INTEGER NOT NULL
 );
@@ -143,7 +157,20 @@ CREATE TABLE IF NOT EXISTS phoneme_evaluations (
 	status TEXT NOT NULL,
 	target TEXT NOT NULL,
 	recognized TEXT NOT NULL,
-	practice_mode TEXT NOT NULL DEFAULT 'unknown',
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
+	stage_id TEXT,
+	created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS app_learning_events (
+	statement_id TEXT PRIMARY KEY,
+	user_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	xapi_statement TEXT NOT NULL,
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
 	stage_id TEXT,
 	created_at INTEGER NOT NULL
 );
@@ -318,6 +345,19 @@ function init(): Promise<void> {
 	if (!initPromise) {
 		initPromise = (async () => {
 			await client.executeMultiple(SCHEMA);
+			const userColumns = await client.execute('PRAGMA table_info(users)');
+			const userColumnNames = new Set(userColumns.rows.map((row) => String(row.name)));
+			if (!userColumnNames.has('last_login_at')) {
+				await client.execute('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
+				await client.execute(`
+					UPDATE users
+					SET last_login_at = COALESCE(
+						(SELECT MAX(expires_at) - ${SESSION_TTL_MS} FROM sessions WHERE sessions.user_id = users.id),
+						created_at
+					)
+					WHERE last_login_at IS NULL
+				`).catch(() => {});
+			}
 			const progressColumns = await client.execute('PRAGMA table_info(progress)');
 			const progressColumnNames = new Set(progressColumns.rows.map((row) => String(row.name)));
 			if (!progressColumnNames.has('learner_level')) {
@@ -433,17 +473,18 @@ export async function createUser(username: string, password: string): Promise<Us
 	const client = getDb();
 	if (!client) throw new Error('Database not available (Please check TURSO_DATABASE_URL)');
 	await init();
+	const now = Date.now();
 	let id: number | undefined;
 	try {
 		const result = await client.execute({
-			sql: 'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?) RETURNING id',
-			args: [username, hashPassword(password), Date.now()]
+			sql: 'INSERT INTO users (username, password_hash, created_at, last_login_at) VALUES (?, ?, ?, ?) RETURNING id',
+			args: [username, hashPassword(password), now, now]
 		});
 		id = Number(result.rows[0]?.id ?? result.lastInsertRowid);
 	} catch {
 		const result = await client.execute({
-			sql: 'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
-			args: [username, hashPassword(password), Date.now()]
+			sql: 'INSERT INTO users (username, password_hash, created_at, last_login_at) VALUES (?, ?, ?, ?)',
+			args: [username, hashPassword(password), now, now]
 		});
 		id = Number(result.lastInsertRowid);
 	}
@@ -508,12 +549,17 @@ export async function createSession(userId: number): Promise<{ token: string; ex
 	const client = getDb();
 	if (!client) throw new Error('Database not available');
 	await init();
+	const now = Date.now();
 	const token = randomBytes(32).toString('hex');
-	const expiresAt = Date.now() + SESSION_TTL_MS;
+	const expiresAt = now + SESSION_TTL_MS;
 	await client.execute({
 		sql: 'INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
 		args: [token, userId, expiresAt]
 	});
+	await client.execute({
+		sql: 'UPDATE users SET last_login_at = ? WHERE id = ?',
+		args: [now, userId]
+	}).catch(() => {});
 	return { token, expiresAt };
 }
 
@@ -629,7 +675,13 @@ export async function addXp(userId: number, amount: number): Promise<void> {
 }
 
 export async function loseHeart(userId: number): Promise<void> {
-	void userId;
+	const client = getDb();
+	if (!client) return;
+	await init();
+	await client.execute({
+		sql: 'UPDATE progress SET hearts = MAX(0, hearts - 1) WHERE user_id = ?',
+		args: [userId]
+	});
 }
 
 export async function refillHearts(userId: number, max: number): Promise<void> {
@@ -695,6 +747,7 @@ export type AdminUserRow = {
 	id: number;
 	username: string;
 	createdAt: number;
+	lastLoginAt: number | null;
 	xp: number;
 	hearts: number;
 	streak: number;
@@ -711,7 +764,7 @@ export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
 	if (!client) return [];
 	await init();
 	const result = await client.execute(`
-		SELECT u.id, u.username, u.created_at,
+		SELECT u.id, u.username, u.created_at, u.last_login_at,
 		       COALESCE(p.xp, 0) AS xp,
 		       COALESCE(p.hearts, 5) AS hearts,
 		       COALESCE(p.streak, 0) AS streak,
@@ -744,6 +797,7 @@ export async function listAllUsersWithProgress(): Promise<AdminUserRow[]> {
 			id: Number(r.id),
 			username,
 			createdAt: Number(r.created_at),
+			lastLoginAt: r.last_login_at == null ? Number(r.created_at) : Number(r.last_login_at),
 			xp: Number(r.xp),
 			hearts: Number(r.hearts),
 			streak: Number(r.streak),
@@ -933,6 +987,23 @@ export async function clearUserMistakes(userId: number): Promise<void> {
 	});
 }
 
+export function normalizePerPercentage(rawPer: unknown, phonemeDetails?: any[], fallbackPer = 0): number {
+	if (Array.isArray(phonemeDetails) && phonemeDetails.length > 0) {
+		const explicitStatuses = phonemeDetails.filter((d) => d && typeof d.status === 'string');
+		if (explicitStatuses.length > 0) {
+			const totalPhonemes = explicitStatuses.length;
+			const totalErrors = explicitStatuses.filter((d) => d.status !== 'correct').length;
+			return Number(((totalErrors / Math.max(1, totalPhonemes)) * 100).toFixed(2));
+		}
+	}
+	const num = Number(rawPer);
+	if (!Number.isFinite(num) || num < 0) return fallbackPer;
+	if (num > 0 && num <= 1) {
+		return Number((num * 100).toFixed(2));
+	}
+	return Number(Math.min(100, num).toFixed(2));
+}
+
 // Pronunciation Evaluation Queries & Logs
 export async function recordPronunciationEvaluation(payload: {
 	user_id: string;
@@ -975,7 +1046,7 @@ export async function recordPronunciationEvaluation(payload: {
 		attemptNumber: Number(payload.attempt_number ?? 1),
 		audioDurationSec: Number(payload.audio_duration_sec ?? 0),
 		gopOverall: Number(payload.scores.gop_overall ?? 0),
-		perOverall: Number(payload.scores.per_overall ?? 0),
+		perOverall: normalizePerPercentage(payload.scores.per_overall, payload.scores.phoneme_details),
 		toneScore: Number(payload.scores.tone_score ?? 0),
 		phonemeDetails: payload.scores.phoneme_details ?? [],
 		practiceMode,
@@ -989,10 +1060,13 @@ export async function recordPronunciationEvaluation(payload: {
 	};
 
 	if (client) {
-		// Dedup guard: check if identical record already exists
+		// Dedup guard: check if identical record already exists (including recent assessment window)
 		const existingCheck = await client.execute({
-			sql: `SELECT id FROM pronunciation_evaluations WHERE user_id = ? AND word_id = ? AND created_at = ? LIMIT 1`,
-			args: [evaluation.userId, evaluation.wordId, createdAt]
+			sql: `SELECT id FROM pronunciation_evaluations
+			      WHERE user_id = ? AND word_id = ?
+			        AND (created_at = ? OR idempotency_key = ? OR (? = 'assessment' AND practice_mode = 'assessment' AND ABS(created_at - ?) <= 5000))
+			      LIMIT 1`,
+			args: [evaluation.userId, evaluation.wordId, createdAt, idempotencyKey, practiceMode, createdAt]
 		}).catch(() => ({ rows: [] }));
 		if (existingCheck.rows && existingCheck.rows.length > 0) {
 			return; // Skip duplicate insertion
@@ -1124,7 +1198,7 @@ export async function getPronunciationEvaluations(
 			slope_type: r.slope_type == null ? null : String(r.slope_type),
 			scores: {
 				gop_overall: Number(r.gop_overall),
-				per_overall: Number(r.per_overall),
+				per_overall: normalizePerPercentage(r.per_overall, phonemeDetails),
 				tone_score: Number(r.tone_score),
 				phoneme_details: phonemeDetails
 			},
@@ -1163,14 +1237,27 @@ export async function getPronunciationPhonemeErrorStats(userId?: string | string
 	let totalGop = 0;
 	let totalPer = 0;
 	let totalTone = 0;
+	let totalErrors = 0;
+	let totalPhonemes = 0;
 	const substitutionMap: Record<string, { target: string; recognized: string; count: number }> = {};
 
 	for (const item of list) {
 		totalGop += item.scores.gop_overall;
-		totalPer += item.scores.per_overall;
 		totalTone += item.scores.tone_score;
 
-		for (const p of item.scores.phoneme_details) {
+		const details = item.scores.phoneme_details || [];
+		const explicitStatuses = details.filter((p: any) => p && typeof p.status === 'string');
+		if (explicitStatuses.length > 0) {
+			const pCnt = explicitStatuses.length;
+			const errCnt = explicitStatuses.filter((p: any) => p.status !== 'correct').length;
+			totalPhonemes += pCnt;
+			totalErrors += errCnt;
+			totalPer += (errCnt / Math.max(1, pCnt)) * 100;
+		} else {
+			totalPer += normalizePerPercentage(item.scores.per_overall, details);
+		}
+
+		for (const p of details) {
 			if (p.status === 'substitution' && p.target && p.recognized && p.target !== p.recognized) {
 				const key = `${p.target}->${p.recognized}`;
 				if (!substitutionMap[key]) {
@@ -1217,15 +1304,20 @@ export async function getPronunciationPhonemeErrorStats(userId?: string | string
 	}
 
 	const frequentSubstitutions = Object.values(substitutionMap).sort((a, b) => b.count - a.count).slice(0, 10);
+	const computedAvgPer = totalPhonemes > 0
+		? Number(((totalErrors / Math.max(1, totalPhonemes)) * 100).toFixed(2))
+		: Number((totalPer / list.length).toFixed(2));
 
 	return {
 		totalAttempts: list.length,
 		avgGop: Number((totalGop / list.length).toFixed(1)),
-		avgPer: Number((totalPer / list.length).toFixed(2)),
+		avgPer: computedAvgPer,
 		avgToneScore: Number((totalTone / list.length).toFixed(1)),
 		frequentSubstitutions
 	};
 }
+
+export const getCohortPronunciationDiagnostics = getPronunciationPhonemeErrorStats;
 
 // -------------------------------------------------------------
 // Learning Events (xAPI Statements Storage - Zero Audio Storage at Rest)
@@ -1391,6 +1483,30 @@ export async function getUserConsent(
 	return Number(result.rows[0].granted) === 1;
 }
 
+export async function getUserConsentsSummary(userId: string): Promise<{ audio: boolean; research: boolean }> {
+	const client = getDb();
+	if (!client) return { audio: true, research: true };
+	await init();
+	const result = await client.execute({
+		sql: `SELECT consent_type, granted FROM user_consents
+		      WHERE user_id = ? AND consent_type IN ('audio_processing', 'pdpa_research_telemetry')
+		      ORDER BY updated_at DESC`,
+		args: [String(userId)]
+	});
+	let audio: boolean | null = null;
+	let research: boolean | null = null;
+	for (const r of result.rows) {
+		const ct = String(r.consent_type);
+		if (ct === 'audio_processing' && audio === null) {
+			audio = Number(r.granted) === 1;
+		} else if (ct === 'pdpa_research_telemetry' && research === null) {
+			research = Number(r.granted) === 1;
+		}
+		if (audio !== null && research !== null) break;
+	}
+	return { audio: Boolean(audio), research: Boolean(research) };
+}
+
 export async function hasUserConsent(
 	userId: string,
 	consentType = 'pdpa_research_telemetry'
@@ -1491,13 +1607,26 @@ export async function getDiagnosticAnalytics(
 	let totalGop = 0;
 	let totalPer = 0;
 	let totalTone = 0;
+	let totalErrors = 0;
+	let totalPhonemes = 0;
 
 	for (const ev of evalList) {
 		totalGop += ev.scores.gop_overall;
-		totalPer += ev.scores.per_overall;
 		totalTone += ev.scores.tone_score;
 
-		for (const p of ev.scores.phoneme_details) {
+		const details = ev.scores.phoneme_details || [];
+		const explicitStatuses = details.filter((p: any) => p && typeof p.status === 'string');
+		if (explicitStatuses.length > 0) {
+			const pCnt = explicitStatuses.length;
+			const errCnt = explicitStatuses.filter((p: any) => p.status !== 'correct').length;
+			totalPhonemes += pCnt;
+			totalErrors += errCnt;
+			totalPer += (errCnt / Math.max(1, pCnt)) * 100;
+		} else {
+			totalPer += normalizePerPercentage(ev.scores.per_overall, details);
+		}
+
+		for (const p of details) {
 			const pName = p.phoneme || p.target;
 			if (!pName) continue;
 
@@ -1682,11 +1811,18 @@ export async function getDiagnosticAnalytics(
 		.filter((t) => toneStats[t].total > 0 && toneStats[t].sumScore / toneStats[t].total < 75)
 		.map((t) => t);
 
+	const computedAvgPer =
+		totalAttempts > 0
+			? totalPhonemes > 0
+				? Number(((totalErrors / Math.max(1, totalPhonemes)) * 100).toFixed(2))
+				: Number((totalPer / totalAttempts).toFixed(2))
+			: null;
+
 	return {
 		hasData: totalAttempts > 0,
 		totalAttempts,
 		overallAccuracy: totalAttempts > 0 ? Number((totalGop / totalAttempts).toFixed(1)) : null,
-		avgPer: totalAttempts > 0 ? Number((totalPer / totalAttempts).toFixed(2)) : null,
+		avgPer: computedAvgPer,
 		avgToneScore: totalAttempts > 0 ? Number((totalTone / totalAttempts).toFixed(1)) : null,
 		toneAccuracy,
 		listeningImpact: {
@@ -1703,6 +1839,8 @@ export async function getDiagnosticAnalytics(
 		weakTones
 	};
 }
+
+export const getLearner360Diagnostics = getDiagnosticAnalytics;
 
 // -------------------------------------------------------------
 // Research Data Export (IEEE 9274.1.1 xAPI Telemetry & Acoustic Metrics)
@@ -2338,7 +2476,7 @@ export async function recordPhonemeEvaluations(
 	if (items.length === 0) return;
 	if (client) await init();
 
-	for (const item of items) {
+	const preparedRecords = items.map((item) => {
 		const id = item.id || randomBytes(16).toString('hex');
 		const now = item.createdAt || Date.now();
 		const practiceMode = item.practiceMode ?? 'unknown';
@@ -2346,7 +2484,7 @@ export async function recordPhonemeEvaluations(
 		if (practiceMode === 'stage' && (!stageId || !/^[a-zA-Z0-9_-]{2,64}$/.test(stageId))) {
 			throw new Error('Quest phoneme evaluation requires a valid stage ID.');
 		}
-		const record = {
+		return {
 			id,
 			userId: String(item.userId),
 			wordId: String(item.wordId),
@@ -2361,9 +2499,12 @@ export async function recordPhonemeEvaluations(
 			stageId,
 			createdAt: now
 		};
-		if (client) {
-			await client.execute({
-				sql: `INSERT INTO phoneme_evaluations
+	});
+
+	if (client && preparedRecords.length > 0) {
+		await client.batch(
+			preparedRecords.map((record) => ({
+				sql: `INSERT OR IGNORE INTO phoneme_evaluations
 				      (id, user_id, word_id, pinyin, phoneme, phoneme_type, gop, status, target, recognized, practice_mode, stage_id, created_at)
 				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				args: [
@@ -2371,17 +2512,20 @@ export async function recordPhonemeEvaluations(
 					record.phonemeType, record.gop, record.status, record.target, record.recognized,
 					record.practiceMode, record.stageId, record.createdAt
 				]
-			});
-		}
-		try {
-			await recordNeonPhonemeEvaluation({
+			}))
+		);
+	}
+
+	await Promise.all(
+		preparedRecords.map((record) =>
+			recordNeonPhonemeEvaluation({
 				...record,
 				practiceMode: record.practiceMode === 'stage' || record.practiceMode === 'word' || record.practiceMode === 'assessment' ? record.practiceMode : 'word'
-			});
-		} catch (e) {
-			console.error('⚠️ [Neon] Failed to mirror phoneme evaluation:', e);
-		}
-	}
+			}).catch((e) => {
+				console.error('⚠️ [Neon] Failed to mirror phoneme evaluation:', e);
+			})
+		)
+	);
 }
 
 export async function getPhonemeEvaluations(
@@ -2524,19 +2668,27 @@ export async function getStageTelemetryStats(): Promise<Record<string, {
 	if (client) {
 		try {
 			await init();
-			const res = await client.execute(`
-				SELECT 
-					stage_id,
-					COUNT(CASE WHEN event_type = 'view' THEN 1 END) as total_views,
-					COUNT(DISTINCT user_id) as unique_users,
-					COUNT(DISTINCT CASE WHEN event_type = 'pass' THEN user_id END) as total_passed,
-					COUNT(DISTINCT CASE WHEN event_type = 'fail' THEN user_id END) as total_failed,
-					COUNT(DISTINCT CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN user_id END) as total_attempts,
-					COALESCE(AVG(CASE WHEN score > 0 THEN score END), 0) as avg_score,
-					COALESCE(AVG(time_spent_ms) / 1000.0, 0) as avg_time_sec
-				FROM stage_telemetry
-				GROUP BY stage_id
-			`);
+			const adminIds = await getAdminUserIds();
+			const adminWhere = adminIds.length > 0
+				? `WHERE user_id != 'anonymous' AND user_id NOT IN (${adminIds.map(() => '?').join(',')})`
+				: `WHERE user_id != 'anonymous'`;
+			const res = await client.execute({
+				sql: `
+					SELECT 
+						stage_id,
+						COUNT(CASE WHEN event_type = 'view' THEN 1 END) as total_views,
+						COUNT(DISTINCT user_id) as unique_users,
+						COUNT(DISTINCT CASE WHEN event_type = 'pass' THEN user_id END) as total_passed,
+						COUNT(DISTINCT CASE WHEN event_type = 'fail' THEN user_id END) as total_failed,
+						COUNT(DISTINCT CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN user_id END) as total_attempts,
+						COALESCE(AVG(CASE WHEN score > 0 THEN score END), 0) as avg_score,
+						COALESCE(AVG(time_spent_ms) / 1000.0, 0) as avg_time_sec
+					FROM stage_telemetry
+					${adminWhere}
+					GROUP BY stage_id
+				`,
+				args: adminIds
+			});
 
 			for (const row of res.rows) {
 				const sid = String(row.stage_id);
@@ -2729,6 +2881,7 @@ export async function recordAuditLog(params: {
 	userAgent?: string | null;
 }): Promise<void> {
 	const client = getDb();
+	const id = randomUUID();
 	const now = Date.now();
 	const detailsStr = typeof params.details === 'object' && params.details !== null
 		? JSON.stringify(params.details)
@@ -2738,9 +2891,10 @@ export async function recordAuditLog(params: {
 		try {
 			await init();
 			await client.execute({
-				sql: `INSERT INTO audit_logs (actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO audit_logs (id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				args: [
+					id,
 					params.actorUsername,
 					params.action,
 					params.resourceType,
@@ -2774,11 +2928,11 @@ export async function getAuditLogs(limit = 100): Promise<AuditLogEntry[]> {
 	try {
 		await init();
 		const res = await client.execute({
-			sql: 'SELECT id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at FROM audit_logs ORDER BY created_at DESC LIMIT ?',
+			sql: 'SELECT rowid AS _rowid, id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at FROM audit_logs ORDER BY created_at DESC LIMIT ?',
 			args: [limit]
 		});
-		return res.rows.map((r) => ({
-			id: String(r.id),
+		return res.rows.map((r, idx) => ({
+			id: r.id != null && String(r.id) !== 'null' && String(r.id) !== '' ? String(r.id) : `audit_${r._rowid ?? idx}_${r.created_at ?? 0}`,
 			actorUsername: String(r.actor_username),
 			action: String(r.action),
 			resourceType: String(r.resource_type),
@@ -2841,6 +2995,7 @@ export function computeHakeGain(preScore: number, postScore: number): number {
 export type ClassRadar6Axis = {
 	phonemeClarity: number;
 	toneMastery: number;
+	flashcardMastery: number;
 	hanziWriting: number;
 	questMastery: number;
 	examReadiness: number;
@@ -2997,6 +3152,7 @@ export async function getClassRadarBenchmark(): Promise<ClassRadar6Axis> {
 	const defaultBenchmark: ClassRadar6Axis = {
 		phonemeClarity: 0,
 		toneMastery: 0,
+		flashcardMastery: 0,
 		hanziWriting: 0,
 		questMastery: 0,
 		examReadiness: 0,
@@ -3010,7 +3166,7 @@ export async function getClassRadarBenchmark(): Promise<ClassRadar6Axis> {
 	const whereNotAdmin = adminIds.length ? `WHERE user_id NOT IN (${adminIds.map(() => '?').join(',')})` : '';
 
 	try {
-		const [evalRes, writingRes, questRes, examRes, chatRes] = await Promise.all([
+		const [evalRes, writingRes, flashcardRes, questRes, examRes, chatRes] = await Promise.all([
 			client.execute({
 				sql: `SELECT ROUND(AVG(gop_overall)) as avg_gop, ROUND(AVG(tone_score)) as avg_tone
 				      FROM pronunciation_evaluations ${whereNotAdmin}`,
@@ -3019,6 +3175,11 @@ export async function getClassRadarBenchmark(): Promise<ClassRadar6Axis> {
 			client.execute({
 				sql: `SELECT ROUND(AVG(CAST(score AS REAL) / CASE WHEN max_score > 0 THEN max_score ELSE 100 END * 100)) as avg_writing
 				      FROM hanzi_writing_attempts ${whereNotAdmin}`,
+				args: adminIds
+			}).catch(() => ({ rows: [] })),
+			client.execute({
+				sql: `SELECT ROUND(AVG(CAST(mastered_count AS REAL) / CASE WHEN total_words > 0 THEN total_words ELSE 1 END * 100)) as avg_fc
+				      FROM flashcard_set_completions ${whereNotAdmin}`,
 				args: adminIds
 			}).catch(() => ({ rows: [] })),
 			client.execute({
@@ -3045,12 +3206,13 @@ export async function getClassRadarBenchmark(): Promise<ClassRadar6Axis> {
 
 		const phonemeClarity = Math.max(0, Math.min(100, Math.round(Number(evalRes.rows[0]?.avg_gop || 0))));
 		const toneMastery = Math.max(0, Math.min(100, Math.round(Number(evalRes.rows[0]?.avg_tone || 0))));
+		const flashcardMastery = Math.max(0, Math.min(100, Math.round(Number(flashcardRes.rows[0]?.avg_fc || 0))));
 		const hanziWriting = Math.max(0, Math.min(100, Math.round(Number(writingRes.rows[0]?.avg_writing || 0))));
 		const questMastery = Math.max(0, Math.min(100, Math.round(Number(questRes.rows[0]?.avg_quest || 0))));
 		const examReadiness = Math.max(0, Math.min(100, Math.round(Number(examRes.rows[0]?.avg_exam || 0))));
 		const conversationalFluency = Math.max(0, Math.min(100, Math.round(Number(chatRes.rows[0]?.avg_chat || 0))));
 
-		const nonZeroAxes = [phonemeClarity, toneMastery, hanziWriting, questMastery, examReadiness, conversationalFluency].filter((v) => v > 0);
+		const nonZeroAxes = [phonemeClarity, toneMastery, flashcardMastery, questMastery, examReadiness, conversationalFluency].filter((v) => v > 0);
 		const overallClassAvg = nonZeroAxes.length > 0
 			? Math.round(nonZeroAxes.reduce((s, v) => s + v, 0) / nonZeroAxes.length)
 			: 0;
@@ -3058,6 +3220,7 @@ export async function getClassRadarBenchmark(): Promise<ClassRadar6Axis> {
 		const result: ClassRadar6Axis = {
 			phonemeClarity,
 			toneMastery,
+			flashcardMastery,
 			hanziWriting,
 			questMastery,
 			examReadiness,
@@ -3202,10 +3365,11 @@ export async function getUserFullDetail(userId: number) {
 		writingRes,
 		examRes,
 		chatbotRes,
+		flashcardRes,
 		interventions,
 		classRadarBenchmark
 	] = await Promise.all([
-		client.execute({ sql: 'SELECT id, username, created_at FROM users WHERE id = ?', args: [userId] }),
+		client.execute({ sql: 'SELECT id, username, created_at, last_login_at FROM users WHERE id = ?', args: [userId] }),
 		client.execute({ sql: 'SELECT xp, hearts, streak, last_practiced FROM progress WHERE user_id = ?', args: [userId] }),
 		client.execute({ sql: 'SELECT lesson_key, stars FROM lesson_completions WHERE user_id = ?', args: [userId] }),
 		getTopMistakes(userId, 20),
@@ -3244,6 +3408,12 @@ export async function getUserFullDetail(userId: number) {
 			sql: `SELECT id, scenario_id, scenario_title, turns_count, avg_score, total_xp, created_at
 			      FROM chatbot_sessions WHERE user_id = ?
 			      ORDER BY created_at DESC`,
+			args: [String(userId)]
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT id, hsk_level, set_index, mastered_count, review_count, total_words, completed_at
+			      FROM flashcard_set_completions WHERE user_id = ?
+			      ORDER BY completed_at DESC LIMIT 30`,
 			args: [String(userId)]
 		}).catch(() => ({ rows: [] })),
 		getTeacherInterventions(String(userId)).catch(() => []),
@@ -3789,10 +3959,95 @@ export async function getUserFullDetail(userId: number) {
 		recommendedRemedialWords
 	};
 
+	const unifiedTimeline: Array<{
+		id: string;
+		mode: 'quest' | 'flashcard' | 'pronunciation' | 'writing' | 'exam' | 'chatbot' | 'assessment';
+		modeLabel: string;
+		title: string;
+		result: string;
+		createdAt: number;
+	}> = [];
+
+	for (const st of stageTelemetryList) {
+		unifiedTimeline.push({
+			id: `st_${st.stageId}_${st.createdAt}`,
+			mode: 'quest',
+			modeLabel: 'ด่านฝึกคำศัพท์',
+			title: st.stageId,
+			result: st.eventType === 'pass' ? `ผ่าน (${st.score}%)` : st.eventType === 'fail' ? `ไม่ผ่าน (${st.score}%)` : 'เข้าดูด่าน',
+			createdAt: st.createdAt
+		});
+	}
+	for (const r of flashcardRes.rows) {
+		const mastered = Number(r.mastered_count || 0);
+		const total = Number(r.total_words || 0);
+		const pct = total > 0 ? Math.round((mastered / total) * 100) : 0;
+		unifiedTimeline.push({
+			id: `fc_${r.id}`,
+			mode: 'flashcard',
+			modeLabel: 'แฟลชการ์ด',
+			title: `HSK ${r.hsk_level} ชุดที่ ${r.set_index}`,
+			result: `จำได้ ${mastered}/${total} คำ (${pct}%)`,
+			createdAt: Number(r.completed_at || 0)
+		});
+	}
+	for (const ev of recentEvaluations) {
+		unifiedTimeline.push({
+			id: `ev_${ev.id}`,
+			mode: 'pronunciation',
+			modeLabel: ev.practice_mode === 'stage' ? 'ออกเสียง (ด่าน)' : 'ออกเสียง (คำ)',
+			title: `${ev.word_id} (${ev.pinyin})`,
+			result: `GOP ${Math.round(ev.scores.gop_overall)}% · Tone ${Math.round(ev.scores.tone_score)}%`,
+			createdAt: Number(ev.created_at || 0)
+		});
+	}
+	for (const r of writingRows) {
+		unifiedTimeline.push({
+			id: `wr_${r.attempt_id}`,
+			mode: 'writing',
+			modeLabel: 'คัดอักษรจีน',
+			title: `${r.character} (${r.pinyin || ''})`,
+			result: `คะแนน ${r.score}% · ผิด ${r.mistake_count} ครั้ง`,
+			createdAt: Number(r.created_at || 0)
+		});
+	}
+	for (const r of examRes.rows) {
+		unifiedTimeline.push({
+			id: `ex_${r.id}`,
+			mode: 'exam',
+			modeLabel: 'ข้อสอบ HSK',
+			title: `HSK ${r.hsk_level} (${r.exam_code})`,
+			result: `${r.total_score}/${r.max_score} · ${Number(r.is_passed) === 1 ? 'ผ่าน' : 'ไม่ผ่าน'}`,
+			createdAt: Number(r.completed_at || 0)
+		});
+	}
+	for (const r of chatbotRes.rows) {
+		unifiedTimeline.push({
+			id: `ch_${r.id}`,
+			mode: 'chatbot',
+			modeLabel: 'สนทนา AI',
+			title: String(r.scenario_title || r.scenario_id),
+			result: `${r.turns_count} เทิร์น · ${Math.round(Number(r.avg_score || 0))}%`,
+			createdAt: Number(r.created_at || 0)
+		});
+	}
+	for (const r of assessmentRes.rows) {
+		unifiedTimeline.push({
+			id: `as_${r.id}`,
+			mode: 'assessment',
+			modeLabel: 'แบบทดสอบวัดผล',
+			title: String(r.test_type).toUpperCase(),
+			result: `GOP ${Math.round(Number(r.avg_gop || 0))}% · Tone ${Math.round(Number(r.avg_tone_score || 0))}%`,
+			createdAt: Number(r.completed_at || 0)
+		});
+	}
+	unifiedTimeline.sort((a, b) => b.createdAt - a.createdAt);
+
 	return {
 		id: Number(uRow.id),
 		username: String(uRow.username),
 		createdAt: Number(uRow.created_at),
+		lastLoginAt: uRow.last_login_at == null ? Number(uRow.created_at) : Number(uRow.last_login_at),
 		xp: pRow ? Number(pRow.xp || 0) : 0,
 		hearts: pRow ? Number(pRow.hearts ?? 5) : 5,
 		streak: pRow ? Number(pRow.streak || 0) : 0,
@@ -3807,6 +4062,7 @@ export async function getUserFullDetail(userId: number) {
 		phonemes,
 		learningEvents,
 		stageTelemetry: stageTelemetryList,
+		unifiedTimeline: unifiedTimeline.slice(0, 60),
 		// Aliases for compatibility
 		user: { id: Number(uRow.id), username: String(uRow.username), createdAt: Number(uRow.created_at) },
 		progress: {
@@ -3841,6 +4097,8 @@ export type ParticipationTrendPoint = {
 	totalActions: number;
 	activeLearners: number;
 	weeklyUniqueLearners: number;
+	uniqueLearners7d: number;
+	uniqueLearners30d: number;
 	breakdown: {
 		quest: number;
 		pitch: number;
@@ -3856,74 +4114,131 @@ export type ParticipationTrendPoint = {
 	wordAvgScore: number | null;
 };
 
-export async function getParticipationTrend(): Promise<ParticipationTrendPoint[]> {
+export async function getParticipationTrend(days = 30): Promise<ParticipationTrendPoint[]> {
 	const client = getDb();
 	if (!client) return [];
 	await init();
 	try {
+		const THAI_OFFSET_MS = 7 * 60 * 60 * 1000;
+		const nowThai = new Date(Date.now() + THAI_OFFSET_MS);
+		nowThai.setUTCHours(0, 0, 0, 0);
+		const sinceMs = nowThai.getTime() - (days - 1) * 86400_000 - THAI_OFFSET_MS;
+
+		const adminIds = await getAdminUserIds();
+		const adminNotIn = adminIds.length > 0 ? `AND CAST(user_id AS TEXT) NOT IN (${adminIds.map(() => '?').join(',')})` : '';
+		const adminUserNotIn = adminIds.length > 0 ? `AND CAST(id AS TEXT) NOT IN (${adminIds.map(() => '?').join(',')})` : '';
+
 		const cteSql = `
 			WITH all_events AS (
 				SELECT
-					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					strftime('%Y-%m-%d', datetime((created_at + 25200000)/1000, 'unixepoch')) AS day,
 					CAST(user_id AS TEXT) AS user_id,
 					CASE WHEN practice_mode = 'stage' THEN 'quest' ELSE 'pitch' END AS activity_type,
 					gop_overall AS gop
 				FROM pronunciation_evaluations
-				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				WHERE created_at >= ? AND user_id != 'anonymous' ${adminNotIn}
 				UNION ALL
 				SELECT
-					strftime('%Y-%m-%d', datetime(completed_at/1000, 'unixepoch')) AS day,
+					strftime('%Y-%m-%d', datetime((created_at + 25200000)/1000, 'unixepoch')) AS day,
+					CAST(user_id AS TEXT) AS user_id,
+					'quest' AS activity_type,
+					NULL AS gop
+				FROM stage_telemetry
+				WHERE created_at >= ? AND user_id != 'anonymous' ${adminNotIn}
+				UNION ALL
+				SELECT
+					strftime('%Y-%m-%d', datetime((completed_at + 25200000)/1000, 'unixepoch')) AS day,
 					CAST(user_id AS TEXT) AS user_id,
 					'flashcard' AS activity_type,
 					NULL AS gop
 				FROM flashcard_set_completions
-				WHERE completed_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				WHERE completed_at >= ? AND user_id != 'anonymous' ${adminNotIn}
 				UNION ALL
 				SELECT
-					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					strftime('%Y-%m-%d', datetime((created_at + 25200000)/1000, 'unixepoch')) AS day,
 					CAST(user_id AS TEXT) AS user_id,
 					'hanzi' AS activity_type,
 					NULL AS gop
 				FROM hanzi_writing_attempts
-				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				WHERE created_at >= ? AND user_id != 'anonymous' ${adminNotIn}
 				UNION ALL
 				SELECT
-					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					strftime('%Y-%m-%d', datetime((completed_at + 25200000)/1000, 'unixepoch')) AS day,
 					CAST(user_id AS TEXT) AS user_id,
 					'exam' AS activity_type,
 					NULL AS gop
 				FROM exam_attempts
-				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				WHERE completed_at >= ? AND user_id != 'anonymous' ${adminNotIn}
 				UNION ALL
 				SELECT
-					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					strftime('%Y-%m-%d', datetime((created_at + 25200000)/1000, 'unixepoch')) AS day,
 					CAST(user_id AS TEXT) AS user_id,
 					'dialogue' AS activity_type,
 					NULL AS gop
 				FROM chatbot_sessions
-				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				WHERE created_at >= ? AND user_id != 'anonymous' ${adminNotIn}
+				UNION ALL
+				SELECT
+					strftime('%Y-%m-%d', datetime((completed_at + 25200000)/1000, 'unixepoch')) AS day,
+					CAST(user_id AS TEXT) AS user_id,
+					'pitch' AS activity_type,
+					avg_gop AS gop
+				FROM assessment_summaries
+				WHERE completed_at >= ? AND user_id != 'anonymous' ${adminNotIn}
+			),
+			all_active_users AS (
+				SELECT day, user_id FROM all_events
+				UNION
+				SELECT
+					strftime('%Y-%m-%d', datetime((COALESCE(last_login_at, created_at) + 25200000)/1000, 'unixepoch')) AS day,
+					CAST(id AS TEXT) AS user_id
+				FROM users
+				WHERE COALESCE(last_login_at, created_at) >= ? ${adminUserNotIn}
 			)
 		`;
 
-		const [typeRes, dauRes, weeklyRes] = await Promise.all([
-			client.execute(`
-				${cteSql}
-				SELECT day, activity_type, COUNT(*) AS total_actions, ROUND(AVG(gop), 1) AS avg_gop
-				FROM all_events
-				GROUP BY day, activity_type
-				ORDER BY day ASC
-			`),
-			client.execute(`
-				${cteSql}
-				SELECT day, COUNT(DISTINCT user_id) AS active_learners
-				FROM all_events
-				GROUP BY day
-			`),
-			client.execute(`
-				${cteSql}
-				SELECT COUNT(DISTINCT user_id) AS weekly_learners
-				FROM all_events
-			`)
+		const eventArgs = Array.from({ length: 7 }, () => [sinceMs, ...adminIds]).flat();
+		const dauArgs = [...eventArgs, sinceMs, ...adminIds];
+
+		const sevenDaysAgoThaiDay = new Date(nowThai.getTime() - 6 * 86400_000).toISOString().slice(0, 10);
+
+		const [typeRes, dauRes, periodRes, period7dRes] = await Promise.all([
+			client.execute({
+				sql: `
+					${cteSql}
+					SELECT day, activity_type, COUNT(*) AS total_actions, ROUND(AVG(gop), 1) AS avg_gop
+					FROM all_events
+					GROUP BY day, activity_type
+					ORDER BY day ASC
+				`,
+				args: dauArgs
+			}),
+			client.execute({
+				sql: `
+					${cteSql}
+					SELECT day, COUNT(DISTINCT user_id) AS active_learners
+					FROM all_active_users
+					GROUP BY day
+				`,
+				args: dauArgs
+			}),
+			client.execute({
+				sql: `
+					${cteSql}
+					SELECT COUNT(DISTINCT user_id) AS weekly_learners
+					FROM all_active_users
+				`,
+				args: dauArgs
+			}),
+			client.execute({
+				sql: `
+					${cteSql}
+					SELECT COUNT(DISTINCT user_id) AS learners_7d
+					FROM all_active_users
+					WHERE day >= ?
+				`,
+				args: [...dauArgs, sevenDaysAgoThaiDay]
+			})
 		]);
 
 		const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -3940,12 +4255,12 @@ export async function getParticipationTrend(): Promise<ParticipationTrendPoint[]
 			dauByDay.set(String(row.day), Number(row.active_learners || 0));
 		}
 
-		const weeklyUniqueLearners = Number(weeklyRes.rows[0]?.weekly_learners || 0);
+		const uniqueLearners30d = Number(periodRes.rows[0]?.weekly_learners || 0);
+		const uniqueLearners7d = Number(period7dRes.rows[0]?.learners_7d || 0);
+		const weeklyUniqueLearners = uniqueLearners7d;
 
-		return Array.from({ length: 7 }, (_, index) => {
-			const date = new Date();
-			date.setUTCHours(0, 0, 0, 0);
-			date.setUTCDate(date.getUTCDate() - (6 - index));
+		return Array.from({ length: days }, (_, index) => {
+			const date = new Date(nowThai.getTime() - (days - 1 - index) * 86400_000);
 			const day = date.toISOString().slice(0, 10);
 			const rows = byDay.get(day) ?? [];
 
@@ -3978,6 +4293,8 @@ export async function getParticipationTrend(): Promise<ParticipationTrendPoint[]
 				totalActions,
 				activeLearners: dauByDay.get(day) ?? 0,
 				weeklyUniqueLearners,
+				uniqueLearners7d,
+				uniqueLearners30d,
 				breakdown,
 				stagePracticeCount: breakdown.quest,
 				wordPracticeCount: breakdown.pitch,
@@ -4009,47 +4326,67 @@ export async function getPracticeBreakdown() {
 
 	try {
 		await init();
+		const adminIds = await getAdminUserIds();
+		const adminFilter = adminIds.length > 0
+			? `user_id != 'anonymous' AND user_id NOT IN (${adminIds.map(() => '?').join(',')})`
+			: `user_id != 'anonymous'`;
+
 		const [summaryResult, stageResult, wordResult, hardestWordsResult] = await Promise.all([
-			client.execute(`
-				SELECT practice_mode,
-				       COUNT(*) AS attempts,
-				       ROUND(AVG(gop_overall), 1) AS avg_gop,
-				       COUNT(DISTINCT user_id) AS learners,
-				       COUNT(DISTINCT CASE WHEN practice_mode = 'stage' THEN stage_id END) AS stages,
-				       COUNT(DISTINCT CASE WHEN practice_mode = 'word' THEN word_id END) AS words
-				FROM pronunciation_evaluations
-				GROUP BY practice_mode
-			`),
-			client.execute(`
-				SELECT stage_id,
-				       COUNT(*) AS attempts,
-				       ROUND(AVG(gop_overall), 1) AS avg_gop
-				FROM pronunciation_evaluations
-				WHERE practice_mode = 'stage' AND stage_id IS NOT NULL
-				GROUP BY stage_id
-				ORDER BY attempts DESC
-				LIMIT 20
-			`),
-			client.execute(`
-				SELECT word_id,
-				       COUNT(*) AS attempts,
-				       ROUND(AVG(gop_overall), 1) AS avg_gop
-				FROM pronunciation_evaluations
-				WHERE practice_mode = 'word'
-				GROUP BY word_id
-				ORDER BY attempts DESC
-				LIMIT 20
-			`),
-			client.execute(`
-				SELECT word_id,
-				       COUNT(*) AS attempts,
-				       ROUND(AVG(gop_overall), 1) AS avg_gop
-				FROM pronunciation_evaluations
-				WHERE word_id IS NOT NULL AND TRIM(word_id) != ''
-				GROUP BY word_id
-				ORDER BY avg_gop ASC, attempts DESC
-				LIMIT 30
-			`)
+			client.execute({
+				sql: `
+					SELECT practice_mode,
+					       COUNT(*) AS attempts,
+					       ROUND(AVG(gop_overall), 1) AS avg_gop,
+					       COUNT(DISTINCT user_id) AS learners,
+					       COUNT(DISTINCT CASE WHEN practice_mode = 'stage' THEN stage_id END) AS stages,
+					       COUNT(DISTINCT CASE WHEN practice_mode = 'word' THEN word_id END) AS words
+					FROM pronunciation_evaluations
+					WHERE ${adminFilter}
+					GROUP BY practice_mode
+				`,
+				args: adminIds
+			}),
+			client.execute({
+				sql: `
+					SELECT stage_id,
+					       COUNT(*) AS attempts,
+					       ROUND(AVG(gop_overall), 1) AS avg_gop
+					FROM pronunciation_evaluations
+					WHERE practice_mode = 'stage' AND stage_id IS NOT NULL AND ${adminFilter}
+					GROUP BY stage_id
+					ORDER BY attempts DESC
+					LIMIT 20
+				`,
+				args: adminIds
+			}),
+			client.execute({
+				sql: `
+					SELECT word_id,
+					       COUNT(*) AS attempts,
+					       COUNT(DISTINCT user_id) AS unique_users,
+					       ROUND(AVG(gop_overall), 1) AS avg_gop
+					FROM pronunciation_evaluations
+					WHERE practice_mode = 'word' AND ${adminFilter}
+					GROUP BY word_id
+					ORDER BY attempts DESC
+					LIMIT 20
+				`,
+				args: adminIds
+			}),
+			client.execute({
+				sql: `
+					SELECT word_id,
+					       COUNT(*) AS attempts,
+					       COUNT(DISTINCT user_id) AS unique_users,
+					       ROUND(AVG(gop_overall), 1) AS avg_gop
+					FROM pronunciation_evaluations
+					WHERE word_id IS NOT NULL AND TRIM(word_id) != '' AND ${adminFilter}
+					GROUP BY word_id
+					ORDER BY avg_gop ASC, attempts DESC
+					LIMIT 30
+				`,
+				args: adminIds
+			})
 		]);
 
 		const stageSummary = summaryResult.rows.find((row) => row.practice_mode === 'stage');
@@ -4088,11 +4425,13 @@ export async function getPracticeBreakdown() {
 			words: wordResult.rows.map((row) => ({
 				word: String(row.word_id),
 				count: Number(row.attempts || 0),
+				uniqueUsers: Number(row.unique_users || 0),
 				avgScore: Number(row.avg_gop || 0)
 			})),
 			hardestWords: hardestWordsResult.rows.map((row) => ({
 				word: String(row.word_id),
 				count: Number(row.attempts || 0),
+				uniqueUsers: Number(row.unique_users || 0),
 				avgScore: Number(row.avg_gop || 0)
 			}))
 		};
@@ -4117,6 +4456,7 @@ export type AssessmentWordInput = {
 	toneScore: number;
 	gopOverall: number;
 	perOverall: number;
+	createdAt?: number;
 };
 
 export type AssessmentSummaryInput = {
@@ -4134,6 +4474,13 @@ export async function recordAssessmentWord(input: AssessmentWordInput): Promise<
 	if (!client) return;
 	await init();
 
+	const safePerOverall = normalizePerPercentage(
+		input.perOverall,
+		undefined,
+		Number(input.targetTone) === Number(input.detectedTone) ? 0 : 25
+	);
+	const createdAt = input.createdAt ?? Date.now();
+
 	await client.execute({
 		sql: `INSERT INTO assessment_records (
 			user_id, test_type, word_id, pinyin, target_tone, detected_tone,
@@ -4149,8 +4496,8 @@ export async function recordAssessmentWord(input: AssessmentWordInput): Promise<
 			input.toneConfidence,
 			input.toneScore,
 			input.gopOverall,
-			input.perOverall,
-			Date.now()
+			safePerOverall,
+			createdAt
 		]
 	});
 }
@@ -4194,13 +4541,20 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 
 	// Fetch existing user_id + word_id + created_at to avoid duplicating the same attempt
 	const existingQuery = userId
-		? { sql: "SELECT user_id, word_id, created_at FROM pronunciation_evaluations WHERE user_id = ?", args: [userId] }
-		: { sql: "SELECT user_id, word_id, created_at FROM pronunciation_evaluations", args: [] };
+		? { sql: "SELECT user_id, word_id, created_at, practice_mode FROM pronunciation_evaluations WHERE user_id = ?", args: [userId] }
+		: { sql: "SELECT user_id, word_id, created_at, practice_mode FROM pronunciation_evaluations", args: [] };
 
 	const existingRes = await client.execute(existingQuery).catch(() => ({ rows: [] }));
 	const existingKeys = new Set(
 		existingRes.rows.map((r) => `${r.user_id}_${r.word_id}_${r.created_at}`)
 	);
+	const existingTimestampsByUserWord = new Map<string, number[]>();
+	for (const r of existingRes.rows) {
+		const uw = `${r.user_id}_${r.word_id}`;
+		const list = existingTimestampsByUserWord.get(uw) ?? [];
+		list.push(Number(r.created_at || 0));
+		existingTimestampsByUserWord.set(uw, list);
+	}
 
 	for (const row of recordsRes.rows) {
 		const uId = String(row.user_id);
@@ -4209,14 +4563,18 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 		const wordId = String(row.word_id);
 		const createdAt = Number(row.created_at || Date.now());
 		const key = `${uId}_${wordId}_${createdAt}`;
-		if (existingKeys.has(key)) continue;
+		const uw = `${uId}_${wordId}`;
+		const nearTimestamps = existingTimestampsByUserWord.get(uw) ?? [];
+		if (existingKeys.has(key) || nearTimestamps.some((ts) => Math.abs(ts - createdAt) <= 5000)) {
+			continue;
+		}
 
 		const targetTone = Number(row.target_tone);
 		const detectedTone = Number(row.detected_tone);
 		const isToneMatch = targetTone === detectedTone;
 		const toneScore = Number(row.tone_score || 0);
 		const gopOverall = Number(row.gop_overall || toneScore);
-		const perOverall = Number(row.per_overall || (isToneMatch ? 0 : 25));
+		const perOverall = normalizePerPercentage(row.per_overall, undefined, isToneMatch ? 0 : 25);
 		const pinyin = String(row.pinyin || '');
 		const testType = String(row.test_type || 'pre').toLowerCase();
 
@@ -4240,6 +4598,7 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 					gop: gopOverall,
 					toneScore: toneScore,
 					type: 'final_tone',
+					status: isToneMatch ? 'correct' : 'substitution',
 					isMatch: isToneMatch,
 					targetTone,
 					detectedTone
@@ -4248,6 +4607,8 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 		});
 
 		existingKeys.add(key);
+		nearTimestamps.push(createdAt);
+		existingTimestampsByUserWord.set(uw, nearTimestamps);
 
 		const targetPhonemes = extractTargetPhonemes(pinyin);
 		if (targetPhonemes.length > 0) {
@@ -4321,7 +4682,7 @@ export async function getUserAssessmentStatus(userId: string): Promise<{
 // Advanced Learning Analytics (5 Core Pedagogical Modules)
 // -------------------------------------------------------------
 
-export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word' = 'stage') {
+export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word' | 'all' = 'stage') {
 	const client = getDb();
 	await init();
 
@@ -4370,12 +4731,16 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 		};
 	}
 
-	// 1. Drop-off Funnel Analysis (Real Data from DB)
+	// 1. Drop-off Funnel Analysis (User-Centric + Event Mode from DB)
 	let totalViews = 0;
 	let totalAttempts = 0;
 	let totalPassed = 0;
 	let totalFailed = 0;
+	let userFlow = { totalViews: 0, totalAttempts: 0, totalPassed: 0, totalFailed: 0, overallDropOffRate: 0 };
+	let eventFlow = { totalViews: 0, totalAttempts: 0, totalPassed: 0, totalFailed: 0, overallDropOffRate: 0 };
 	let bottleneckStages: any[] = [];
+	let recentStageSessions: any[] = [];
+	let recentPronunciationSessions: any[] = [];
 
 	try {
 		const adminIds = await getAdminUserIds();
@@ -4384,67 +4749,171 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			: `WHERE user_id != 'anonymous'`;
 		const adminArgs = adminIds.length > 0 ? adminIds : [];
 
-		// Stage-level breakdown from real stage_telemetry (excluding admins and anonymous)
-		const telRes = await client.execute({
-			sql: `
-				SELECT 
-					stage_id,
-					COUNT(CASE WHEN event_type = 'view' THEN 1 END) as views,
-					COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as attempts,
-					COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as passed,
-					COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as failed
-				FROM stage_telemetry
-				${adminClause}
-				GROUP BY stage_id
-				HAVING views > 0 OR attempts > 0
-			`,
-			args: adminArgs
-		});
+		const [telEventRes, telUserRes, compUserRes, recentStageRes, recentPronRes] = await Promise.all([
+			client.execute({
+				sql: `
+					SELECT
+						stage_id,
+						COUNT(CASE WHEN event_type = 'view' THEN 1 END) as views,
+						COUNT(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 END) as attempts,
+						COUNT(CASE WHEN event_type = 'pass' THEN 1 END) as passed,
+						COUNT(CASE WHEN event_type = 'fail' THEN 1 END) as failed
+					FROM stage_telemetry
+					${adminClause}
+					GROUP BY stage_id
+				`,
+				args: adminArgs
+			}),
+			client.execute({
+				sql: `
+					SELECT stage_id, CAST(user_id AS TEXT) as user_id,
+					       MAX(CASE WHEN event_type = 'pass' THEN 1 ELSE 0 END) as is_passed,
+					       MAX(CASE WHEN event_type IN ('attempt', 'pass', 'fail') THEN 1 ELSE 0 END) as is_attempted
+					FROM stage_telemetry
+					${adminClause}
+					GROUP BY stage_id, CAST(user_id AS TEXT)
+				`,
+				args: adminArgs
+			}),
+			client.execute({
+				sql: `
+					SELECT lesson_key as stage_id, CAST(user_id AS TEXT) as user_id
+					FROM lesson_completions
+					${adminClause} AND stars > 0
+				`,
+				args: adminArgs
+			}),
+			client.execute({
+				sql: `
+					SELECT st.id, st.stage_id, st.user_id, COALESCE(u.username, st.user_id) as username,
+					       st.event_type, st.score, st.time_spent_ms, st.created_at
+					FROM stage_telemetry st
+					LEFT JOIN users u ON CAST(u.id AS TEXT) = st.user_id
+					WHERE st.user_id != 'anonymous' ${adminIds.length > 0 ? `AND st.user_id NOT IN (${adminIds.map(() => '?').join(',')})` : ''}
+					ORDER BY st.created_at DESC
+					LIMIT 50
+				`,
+				args: adminArgs
+			}).catch(() => ({ rows: [] })),
+			client.execute({
+				sql: `
+					SELECT pe.id, pe.user_id, COALESCE(u.username, pe.user_id) as username,
+					       pe.word_id, pe.pinyin, pe.gop_overall, pe.tone_score, pe.practice_mode, pe.stage_id, pe.created_at
+					FROM pronunciation_evaluations pe
+					LEFT JOIN users u ON CAST(u.id AS TEXT) = pe.user_id
+					WHERE pe.user_id != 'anonymous'
+					  AND ${practiceMode === 'stage' ? "pe.practice_mode IN ('stage', 'lesson')" : practiceMode === 'word' ? "pe.practice_mode IN ('word', 'flashcard', 'assessment', 'unknown')" : "1=1"}
+					  ${adminIds.length > 0 ? `AND pe.user_id NOT IN (${adminIds.map(() => '?').join(',')})` : ''}
+					ORDER BY pe.created_at DESC
+					LIMIT 50
+				`,
+				args: adminArgs
+			}).catch(() => ({ rows: [] }))
+		]);
 
-		const stageMap = new Map<string, { views: number; attempts: number; passed: number; failed: number }>();
-		for (const r of telRes.rows) {
-			stageMap.set(String(r.stage_id), {
-				views: Number(r.views || 0),
-				attempts: Number(r.attempts || 0),
-				passed: Number(r.passed || 0),
-				failed: Number(r.failed || 0)
-			});
+		recentStageSessions = recentStageRes.rows.map((r) => ({
+			id: String(r.id),
+			stageId: String(r.stage_id),
+			userId: String(r.user_id),
+			username: String(r.username || r.user_id),
+			eventType: String(r.event_type),
+			score: Number(r.score || 0),
+			timeSpentSec: Math.round(Number(r.time_spent_ms || 0) / 1000),
+			createdAt: Number(r.created_at || 0)
+		}));
+
+		recentPronunciationSessions = recentPronRes.rows.map((r) => ({
+			id: Number(r.id),
+			userId: String(r.user_id),
+			username: String(r.username || r.user_id),
+			wordId: String(r.word_id),
+			pinyin: String(r.pinyin || ''),
+			gopScore: Math.round(Number(r.gop_overall || 0)),
+			toneScore: Math.round(Number(r.tone_score || 0)),
+			practiceMode: String(r.practice_mode || 'word'),
+			stageId: r.stage_id ? String(r.stage_id) : null,
+			createdAt: Number(r.created_at || 0)
+		}));
+
+		// Event totals
+		for (const r of telEventRes.rows) {
+			eventFlow.totalViews += Number(r.views || 0);
+			eventFlow.totalAttempts += Number(r.attempts || 0);
+			eventFlow.totalPassed += Number(r.passed || 0);
+			eventFlow.totalFailed += Number(r.failed || 0);
+		}
+		eventFlow.totalViews = Math.max(eventFlow.totalViews, eventFlow.totalAttempts);
+		eventFlow.overallDropOffRate = eventFlow.totalViews > 0
+			? Math.round(((eventFlow.totalViews - eventFlow.totalPassed) / eventFlow.totalViews) * 100)
+			: 0;
+
+		// User-centric per-stage & global sets
+		const stageUsers = new Map<string, { viewed: Set<string>; attempted: Set<string>; passed: Set<string> }>();
+		const globalViewed = new Set<string>();
+		const globalAttempted = new Set<string>();
+		const globalPassed = new Set<string>();
+
+		const ensureStage = (stId: string) => {
+			let entry = stageUsers.get(stId);
+			if (!entry) {
+				entry = { viewed: new Set(), attempted: new Set(), passed: new Set() };
+				stageUsers.set(stId, entry);
+			}
+			return entry;
+		};
+
+		for (const r of telUserRes.rows) {
+			const stId = String(r.stage_id);
+			const uid = String(r.user_id);
+			const s = ensureStage(stId);
+			s.viewed.add(uid);
+			globalViewed.add(uid);
+			if (Number(r.is_attempted) === 1 || Number(r.is_passed) === 1) {
+				s.attempted.add(uid);
+				globalAttempted.add(uid);
+			}
+			if (Number(r.is_passed) === 1) {
+				s.passed.add(uid);
+				globalPassed.add(uid);
+			}
 		}
 
-		// Incorporate real completions from lesson_completions table (excluding admins & anonymous)
-		const compRes = await client.execute({
-			sql: `
-				SELECT lesson_key, COUNT(*) as passed_count
-				FROM lesson_completions
-				${adminClause}
-				GROUP BY lesson_key
-			`,
-			args: adminArgs
-		});
-		for (const r of compRes.rows) {
-			const stId = String(r.lesson_key);
-			const cnt = Number(r.passed_count || 0);
-			const cur = stageMap.get(stId) || { views: cnt, attempts: cnt, passed: cnt, failed: 0 };
-			cur.passed = Math.max(cur.passed, cnt);
-			cur.attempts = Math.max(cur.attempts, cur.passed);
-			cur.views = Math.max(cur.views, cur.attempts);
-			stageMap.set(stId, cur);
+		for (const r of compUserRes.rows) {
+			const stId = String(r.stage_id);
+			const uid = String(r.user_id);
+			const s = ensureStage(stId);
+			s.viewed.add(uid);
+			s.attempted.add(uid);
+			s.passed.add(uid);
+			globalViewed.add(uid);
+			globalAttempted.add(uid);
+			globalPassed.add(uid);
 		}
 
-		// Aggregate total views, attempts, passed, failed across real quest stages
-		for (const [stageId, data] of stageMap.entries()) {
-			totalViews += data.views;
-			totalAttempts += data.attempts;
-			totalPassed += data.passed;
-			totalFailed += data.failed;
+		userFlow.totalViews = globalViewed.size;
+		userFlow.totalAttempts = globalAttempted.size;
+		userFlow.totalPassed = globalPassed.size;
+		userFlow.totalFailed = Math.max(0, userFlow.totalViews - userFlow.totalPassed);
+		userFlow.overallDropOffRate = userFlow.totalViews > 0
+			? Math.round((userFlow.totalFailed / userFlow.totalViews) * 100)
+			: 0;
 
-			const dropRate = data.attempts > 0 ? Math.round((data.failed / data.attempts) * 100) : 0;
+		totalViews = userFlow.totalViews;
+		totalAttempts = userFlow.totalAttempts;
+		totalPassed = userFlow.totalPassed;
+		totalFailed = userFlow.totalFailed;
+
+		for (const [stageId, s] of stageUsers.entries()) {
+			const views = s.viewed.size;
+			const passed = s.passed.size;
+			const failed = Math.max(0, views - passed);
+			const dropRate = views > 0 ? Math.round((failed / views) * 100) : 0;
 			bottleneckStages.push({
 				stageId,
-				views: data.views,
-				attempts: data.attempts,
-				passed: data.passed,
-				failed: data.failed,
+				views,
+				attempts: s.attempted.size,
+				passed,
+				failed,
 				dropRate,
 				advice: dropRate >= 40
 					? 'อัตราหลุดสูง: มีผู้เรียนติดขัดในด่านนี้ แนะนำปรับลดคำศัพท์หรือเพิ่มแบบฝึกหัดเทียบเสียง'
@@ -4454,20 +4923,22 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			});
 		}
 
-		bottleneckStages.sort((a, b) => b.dropRate - a.dropRate || b.attempts - a.attempts);
+		bottleneckStages.sort((a, b) => b.dropRate - a.dropRate || b.views - a.views);
 		bottleneckStages = bottleneckStages.slice(0, 5);
 	} catch (e) {
 		console.warn('Failed to calculate drop-off funnel from DB:', e);
 	}
 
-	const overallDropOffRate = totalAttempts > 0 ? Math.round((totalFailed / totalAttempts) * 100) : 0;
+	const overallDropOffRate = userFlow.overallDropOffRate;
 
 	const modeSqlFilter =
-		practiceMode === 'stage'
+		practiceMode === 'all'
+			? "practice_mode IN ('stage', 'lesson', 'word', 'flashcard', 'assessment', 'unknown')"
+			: practiceMode === 'stage'
 			? "practice_mode IN ('stage', 'lesson')"
 			: "practice_mode IN ('word', 'flashcard', 'assessment', 'unknown')";
 
-	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB, filtered by practiceMode with fallback)
+	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB, filtered by practiceMode)
 	const phonemeTargets = ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x'];
 	const matrixData: Record<string, Record<string, number>> = {};
 	for (const t of phonemeTargets) {
@@ -4481,20 +4952,12 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 
 	try {
 		// 1) From phoneme_evaluations table
-		let peRes = await client.execute(`
+		const peRes = await client.execute(`
 			SELECT target, recognized, COUNT(*) as cnt 
 			FROM phoneme_evaluations 
 			WHERE target IS NOT NULL AND recognized IS NOT NULL AND ${modeSqlFilter}
 			GROUP BY target, recognized
 		`);
-		if (peRes.rows.length === 0) {
-			peRes = await client.execute(`
-				SELECT target, recognized, COUNT(*) as cnt 
-				FROM phoneme_evaluations 
-				WHERE target IS NOT NULL AND recognized IS NOT NULL 
-				GROUP BY target, recognized
-			`);
-		}
 		for (const r of peRes.rows) {
 			const t = String(r.target);
 			const rec = String(r.recognized);
@@ -4508,10 +4971,7 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 		}
 
 		// 2) From pronunciation_evaluations phoneme_details
-		let proRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter}`);
-		if (proRes.rows.length === 0) {
-			proRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
-		}
+		const proRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter} ORDER BY created_at DESC LIMIT 2000`);
 		for (const r of proRes.rows) {
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
@@ -4527,15 +4987,16 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			}
 		}
 
-		// Calculate accuracy percentage on diagonal
+		// Convert every cell in each target row to a consistent 0-100 percentage scale
 		for (const t of phonemeTargets) {
-			const correct = matrixData[t][t] || 0;
 			let totalForTarget = 0;
 			for (const r of phonemeTargets) {
 				totalForTarget += matrixData[t][r];
 			}
 			if (totalForTarget > 0) {
-				matrixData[t][t] = Math.round((correct / totalForTarget) * 100);
+				for (const r of phonemeTargets) {
+					matrixData[t][r] = Math.round((matrixData[t][r] / totalForTarget) * 100);
+				}
 			}
 		}
 	} catch (e) {
@@ -4575,10 +5036,7 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 	};
 
 	try {
-		let toneRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter}`);
-		if (toneRes.rows.length === 0) {
-			toneRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
-		}
+		const toneRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter} ORDER BY created_at DESC LIMIT 2000`);
 		for (const r of toneRes.rows) {
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
@@ -4657,29 +5115,25 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			listenEventsByUserWord.set(key, arr);
 		}
 
-		let proRes = await client.execute(`
+		const proRes = await client.execute(`
 			SELECT user_id, word_id, gop_overall, per_overall, tone_score, listen_count, hesitation_ms, phoneme_details, created_at
 			FROM pronunciation_evaluations
 			WHERE ${modeSqlFilter}
+			ORDER BY created_at DESC
+			LIMIT 2000
 		`);
-		if (proRes.rows.length === 0) {
-			proRes = await client.execute(`
-				SELECT user_id, word_id, gop_overall, per_overall, tone_score, listen_count, hesitation_ms, phoneme_details, created_at
-				FROM pronunciation_evaluations
-			`);
-		}
 
 		for (const r of proRes.rows) {
 			const uid = String(r.user_id);
 			const wid = String(r.word_id);
 			const gop = Number(r.gop_overall || 0);
 			const tone = Number(r.tone_score || 0);
-			const per = Number(r.per_overall || 0);
 			const createdAt = Number(r.created_at || 0);
 			const isPassed = gop >= 70 ? 1 : 0;
 
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
+			const per = normalizePerPercentage(r.per_overall, details);
 
 			const listenCntCol = Number(r.listen_count || 0);
 			const detailsListened = details.some((d: any) => Boolean(d.listenedToExample) || Number(d.exampleListenCount || 0) > 0);
@@ -4890,8 +5344,12 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			totalPassed,
 			totalFailed,
 			overallDropOffRate,
+			userFlow,
+			eventFlow,
 			bottleneckStages
 		},
+		recentStageSessions,
+		recentPronunciationSessions,
 		phonemeSubstitutionMatrix: {
 			targets: phonemeTargets,
 			matrix: matrixData,
@@ -5161,7 +5619,7 @@ export async function getTeacherInterventions(userId: string): Promise<any[]> {
 	});
 }
 
-/** Marks pending interventions as 'improved' when all assigned remedial words are passed (GOP >= 70) after assignment OR overall average GOP reaches >= 75%. Returns rows updated. */
+/** Marks pending interventions as 'improved' when all assigned remedial words are passed (GOP >= 70) after assignment OR post-intervention average GOP reaches >= 75%. Returns rows updated. */
 export async function checkAndUpdateInterventionStatus(): Promise<number> {
 	const client = getDb();
 	if (!client) return 0;
@@ -5184,10 +5642,14 @@ export async function checkAndUpdateInterventionStatus(): Promise<number> {
 			if (rawWords.length > 0) {
 				const evalRes = await client.execute({
 					sql: 'SELECT word_id, MAX(gop_overall) as max_gop FROM pronunciation_evaluations WHERE user_id = ? AND created_at >= ? GROUP BY word_id',
-					args: [uid, createdAt - 60000]
+					args: [uid, createdAt]
 				});
 				const passedSet = new Set(
-					evalRes.rows.filter((r) => Number(r.max_gop || 0) >= 70).map((r) => String(r.word_id))
+					evalRes.rows.filter((r) => {
+						const rawGop = Number(r.max_gop || 0);
+						const normGop = rawGop > 0 && rawGop <= 1 ? rawGop * 100 : rawGop;
+						return normGop >= 70;
+					}).map((r) => String(r.word_id))
 				);
 				if (rawWords.every((w) => passedSet.has(w))) {
 					await client.execute({
@@ -5195,30 +5657,38 @@ export async function checkAndUpdateInterventionStatus(): Promise<number> {
 						args: [id]
 					});
 					updatedCount++;
+					continue;
 				}
+			}
+
+			// Check post-intervention average GOP (normalized to 0-100 scale, requiring practice after assignment)
+			const postAvgRes = await client.execute({
+				sql: `
+					SELECT COUNT(*) as cnt,
+					       AVG(CASE WHEN gop_score > 0 AND gop_score <= 1 THEN gop_score * 100.0 ELSE gop_score END) as avg_gop
+					FROM (
+						SELECT gop_overall AS gop_score FROM pronunciation_evaluations WHERE user_id = ? AND created_at >= ?
+						UNION ALL
+						SELECT gop_overall AS gop_score FROM assessment_records WHERE user_id = ? AND created_at >= ?
+					)
+				`,
+				args: [uid, createdAt, uid, createdAt]
+			});
+			const postCnt = Number(postAvgRes.rows[0]?.cnt || 0);
+			const postAvgGop = Number(postAvgRes.rows[0]?.avg_gop || 0);
+			if (postCnt > 0 && postAvgGop >= 75) {
+				await client.execute({
+					sql: "UPDATE teacher_interventions SET status = 'improved' WHERE id = ?",
+					args: [id]
+				});
+				updatedCount++;
 			}
 		}
 	} catch (e) {
 		console.warn('Failed per-word intervention status check:', e);
 	}
 
-	const res = await client.execute(`
-		UPDATE teacher_interventions
-		SET status = 'improved'
-		WHERE status = 'pending'
-		  AND user_id IN (
-			SELECT user_id FROM (
-				SELECT user_id, AVG(gop_score) AS avg_gop
-				FROM (
-					SELECT user_id, gop_overall AS gop_score FROM pronunciation_evaluations
-					UNION ALL
-					SELECT user_id, gop_overall AS gop_score FROM assessment_records
-				)
-				GROUP BY user_id
-			) WHERE avg_gop >= 75
-		)
-	`);
-	return updatedCount + (res.rowsAffected ?? 0);
+	return updatedCount;
 }
 
 export async function getAllTeacherInterventions(): Promise<any[]> {
@@ -5371,7 +5841,7 @@ export async function getSkillsAnalyticsSummary() {
 	const adminAndClause = adminIds.length ? `AND user_id NOT IN (${adminIds.map(() => '?').join(',')})` : '';
 
 	// 1. Exam Analytics
-	const [examTotalRes, examByLevelRes] = await Promise.all([
+	const [examTotalRes, examByLevelRes, examRecentRes] = await Promise.all([
 		client.execute({
 			sql: `SELECT
 			        COUNT(*) as total_attempts,
@@ -5404,6 +5874,17 @@ export async function getSkillsAnalyticsSummary() {
 			      GROUP BY hsk_level
 			      ORDER BY hsk_level ASC`,
 			args: adminIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT ea.id, ea.user_id, COALESCE(u.username, ea.user_id) as username,
+			        ea.hsk_level, ea.exam_code, ea.total_score, ea.max_score, ea.pass_score, ea.is_passed,
+			        ea.listening_score, ea.reading_score, ea.writing_score, ea.time_spent_sec, ea.completed_at
+			      FROM exam_attempts ea
+			      LEFT JOIN users u ON CAST(u.id AS TEXT) = ea.user_id
+			      ${adminIds.length ? `WHERE ea.user_id NOT IN (${adminIds.map(() => '?').join(',')})` : ''}
+			      ORDER BY ea.completed_at DESC
+			      LIMIT 50`,
+			args: adminIds
 		}).catch(() => ({ rows: [] }))
 	]);
 
@@ -5414,8 +5895,8 @@ export async function getSkillsAnalyticsSummary() {
 	const examAvgScore = Math.round(Number(examTotalRow?.avg_score || 0));
 
 	const byLevel: Record<number, any> = {
-		1: { level: 1, attempts: 0, passed: 0, passRate: 0, avgScore: 0, maxScore: 300, passScore: 180, avgListening: 0, avgReading: 0, avgWriting: 0, avgTimeSec: 0 },
-		2: { level: 2, attempts: 0, passed: 0, passRate: 0, avgScore: 0, maxScore: 300, passScore: 180, avgListening: 0, avgReading: 0, avgWriting: 0, avgTimeSec: 0 },
+		1: { level: 1, attempts: 0, passed: 0, passRate: 0, avgScore: 0, maxScore: 200, passScore: 120, avgListening: 0, avgReading: 0, avgWriting: 0, avgTimeSec: 0 },
+		2: { level: 2, attempts: 0, passed: 0, passRate: 0, avgScore: 0, maxScore: 200, passScore: 120, avgListening: 0, avgReading: 0, avgWriting: 0, avgTimeSec: 0 },
 		3: { level: 3, attempts: 0, passed: 0, passRate: 0, avgScore: 0, maxScore: 300, passScore: 180, avgListening: 0, avgReading: 0, avgWriting: 0, avgTimeSec: 0 }
 	};
 
@@ -5424,24 +5905,41 @@ export async function getSkillsAnalyticsSummary() {
 		const cnt = Number(row.count);
 		const passed = Number(row.passed_count);
 		const avgScore = Math.round(Number(row.avg_score || 0));
+		const defaultMax = lvl === 3 ? 300 : 200;
+		const defaultPass = lvl === 3 ? 180 : 120;
 		byLevel[lvl] = {
 			level: lvl,
 			attempts: cnt,
 			passed,
 			passRate: cnt > 0 ? Math.round((passed / cnt) * 100) : 0,
 			avgScore,
-			maxScore: Number(row.max_score || 300),
-			passScore: Math.round(Number(row.pass_score || 180)),
+			maxScore: Number(row.max_score || defaultMax),
+			passScore: Math.round(Number(row.pass_score || defaultPass)),
 			avgListening: Math.round(Number(row.avg_listening || 0)),
 			avgReading: Math.round(Number(row.avg_reading || 0)),
-			avgWriting: Math.round(Number(row.avg_writing || 0)),
+			avgWriting: lvl === 3 ? Math.round(Number(row.avg_writing || 0)) : 0,
 			avgTimeSec: Math.round(Number(row.avg_time_sec || 0))
 		};
 	}
 	const byLevelDetailed = [1, 2, 3].map((lvl) => byLevel[lvl]);
+	const recentExamAttempts = examRecentRes.rows.map((r) => ({
+		id: Number(r.id),
+		userId: String(r.user_id),
+		username: String(r.username || r.user_id),
+		hskLevel: Number(r.hsk_level),
+		examCode: String(r.exam_code || ''),
+		totalScore: Number(r.total_score || 0),
+		maxScore: Number(r.max_score || (Number(r.hsk_level) === 3 ? 300 : 200)),
+		isPassed: Number(r.is_passed) === 1,
+		listeningScore: Number(r.listening_score || 0),
+		readingScore: Number(r.reading_score || 0),
+		writingScore: Number(r.writing_score || 0),
+		timeSpentSec: Number(r.time_spent_sec || 0),
+		completedAt: Number(r.completed_at || 0)
+	}));
 
 	// 2. Writing Analytics
-	const [writingTotalRes, writingCharsRes, writingDetailsRes] = await Promise.all([
+	const [writingTotalRes, writingCharsRes, writingDetailsRes, writingRecentRes] = await Promise.all([
 		client.execute({
 			sql: `SELECT
 			        COUNT(*) as total_attempts,
@@ -5469,6 +5967,7 @@ export async function getSkillsAnalyticsSummary() {
 			      FROM hanzi_writing_attempts
 			      ${adminClause}
 			      GROUP BY character
+			      HAVING SUM(mistake_count) > 0
 			      ORDER BY total_mistakes DESC, attempts DESC
 			      LIMIT 25`,
 			args: adminIds
@@ -5479,6 +5978,16 @@ export async function getSkillsAnalyticsSummary() {
 			      ${adminClause}
 			      ORDER BY created_at DESC
 			      LIMIT 500`,
+			args: adminIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT h.attempt_id, h.user_id, COALESCE(u.username, h.user_id) as username,
+			        h.character, h.pinyin, h.stroke_count, h.mistake_count, h.sequence_correct, h.score, h.created_at
+			      FROM hanzi_writing_attempts h
+			      LEFT JOIN users u ON CAST(u.id AS TEXT) = h.user_id
+			      ${adminIds.length ? `WHERE h.user_id NOT IN (${adminIds.map(() => '?').join(',')})` : ''}
+			      ORDER BY h.created_at DESC
+			      LIMIT 50`,
 			args: adminIds
 		}).catch(() => ({ rows: [] }))
 	]);
@@ -5575,7 +6084,7 @@ export async function getSkillsAnalyticsSummary() {
 	const writingAvgMistakes = totalWritingAttempts > 0 ? Number((totalMistakesAll / totalWritingAttempts).toFixed(1)) : 0;
 
 	// 3. Chatbot Analytics
-	const [chatTotalRes, chatByScenarioRes] = await Promise.all([
+	const [chatTotalRes, chatByScenarioRes, chatRecentRes] = await Promise.all([
 		client.execute({
 			sql: `SELECT
 			        COUNT(*) as total_sessions,
@@ -5602,8 +6111,43 @@ export async function getSkillsAnalyticsSummary() {
 			      GROUP BY scenario_id, scenario_title
 			      ORDER BY sessions_count DESC`,
 			args: adminIds
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT cs.id, cs.user_id, COALESCE(u.username, cs.user_id) as username,
+			        cs.scenario_id, cs.scenario_title, cs.turns_count, cs.avg_score, cs.total_xp, cs.created_at
+			      FROM chatbot_sessions cs
+			      LEFT JOIN users u ON CAST(u.id AS TEXT) = cs.user_id
+			      ${adminIds.length ? `WHERE cs.user_id NOT IN (${adminIds.map(() => '?').join(',')})` : ''}
+			      ORDER BY cs.created_at DESC
+			      LIMIT 50`,
+			args: adminIds
 		}).catch(() => ({ rows: [] }))
 	]);
+
+	const recentWritingAttempts = writingRecentRes.rows.map((r) => ({
+		id: String(r.attempt_id),
+		userId: String(r.user_id),
+		username: String(r.username || r.user_id),
+		character: String(r.character),
+		pinyin: String(r.pinyin || ''),
+		strokeCount: Number(r.stroke_count || 0),
+		mistakeCount: Number(r.mistake_count || 0),
+		sequenceCorrect: Number(r.sequence_correct || 0) === 1,
+		score: Number(r.score || 0),
+		createdAt: Number(r.created_at || 0)
+	}));
+
+	const recentChatSessions = chatRecentRes.rows.map((r) => ({
+		id: Number(r.id),
+		userId: String(r.user_id),
+		username: String(r.username || r.user_id),
+		scenarioId: String(r.scenario_id),
+		scenarioTitle: String(r.scenario_title || r.scenario_id),
+		turnsCount: Number(r.turns_count || 0),
+		avgScore: Math.round(Number(r.avg_score || 0)),
+		totalXp: Number(r.total_xp || 0),
+		createdAt: Number(r.created_at || 0)
+	}));
 
 	const chatRow = chatTotalRes.rows[0];
 	const byScenario = chatByScenarioRes.rows.map((r) => ({
@@ -5737,25 +6281,29 @@ export async function getSkillsAnalyticsSummary() {
 		else gainCategory = 'low';
 	}
 
-	// 5. Cross-Feature Usage across 6 modules
-	const [wordPitchRes, questStagesRes, writingUsageRes, examUsageRes, chatUsageRes, assessUsageRes] = await Promise.all([
+	// 5. Cross-Feature Usage across modules (User-Centric + Events)
+	const [wordPitchRes, questStagesRes, flashcardUsageRes, writingUsageRes, examUsageRes, chatUsageRes, assessUsageRes] = await Promise.all([
 		client.execute({
 			sql: `SELECT COUNT(*) as events, COUNT(DISTINCT user_id) as users
 			      FROM pronunciation_evaluations
 			      WHERE (practice_mode = 'word' OR practice_mode = 'unknown' OR practice_mode IS NULL)
-			      ${adminAndClause}`,
+			      AND user_id != 'anonymous' ${adminAndClause}`,
 			args: adminIds
 		}).catch(() => ({ rows: [] })),
 		client.execute({
 			sql: `SELECT COUNT(*) as events, COUNT(DISTINCT user_id) as users
 			      FROM (
-			        SELECT CAST(user_id AS TEXT) as user_id FROM lesson_completions ${adminClause}
+			        SELECT CAST(user_id AS TEXT) as user_id FROM lesson_completions WHERE stars > 0 ${adminAndClause}
 			        UNION ALL
 			        SELECT user_id FROM stage_telemetry WHERE user_id != 'anonymous' ${adminAndClause}
-			        UNION ALL
-			        SELECT user_id FROM pronunciation_evaluations WHERE practice_mode = 'stage' AND user_id != 'anonymous' ${adminAndClause}
 			      )`,
-			args: [...adminIds, ...adminIds, ...adminIds]
+			args: [...adminIds, ...adminIds]
+		}).catch(() => ({ rows: [] })),
+		client.execute({
+			sql: `SELECT COUNT(*) as events, COUNT(DISTINCT user_id) as users
+			      FROM flashcard_set_completions
+			      ${adminClause}`,
+			args: adminIds
 		}).catch(() => ({ rows: [] })),
 		client.execute({
 			sql: `SELECT COUNT(*) as events, COUNT(DISTINCT user_id) as users
@@ -5784,12 +6332,13 @@ export async function getSkillsAnalyticsSummary() {
 	]);
 
 	const rawCrossFeatures = [
-		{ key: 'wordPitch', label: 'ฝึกออกเสียงคำเดี่ยว (Pitch/Word)', icon: '🎙️', color: '#16a34a', totalEvents: Number(wordPitchRes.rows[0]?.events || 0), uniqueUsers: Number(wordPitchRes.rows[0]?.users || 0) },
-		{ key: 'questStages', label: 'ตะลุยด่านผจญภัย (Quest Stages)', icon: '🗺️', color: '#2563eb', totalEvents: Number(questStagesRes.rows[0]?.events || 0), uniqueUsers: Number(questStagesRes.rows[0]?.users || 0) },
-		{ key: 'hanziWriting', label: 'คัดลายมือลำดับขีด (Hanzi Writing)', icon: '✍️', color: '#d97706', totalEvents: Number(writingUsageRes.rows[0]?.events || 0), uniqueUsers: Number(writingUsageRes.rows[0]?.users || 0) },
-		{ key: 'mockExams', label: 'จำลองสอบวัดระดับ (Mock HSK)', icon: '📝', color: '#9333ea', totalEvents: Number(examUsageRes.rows[0]?.events || 0), uniqueUsers: Number(examUsageRes.rows[0]?.users || 0) },
-		{ key: 'aiRoleplay', label: 'สนทนาจำลอง AI (AI Role-Play)', icon: '🤖', color: '#0891b2', totalEvents: Number(chatUsageRes.rows[0]?.events || 0), uniqueUsers: Number(chatUsageRes.rows[0]?.users || 0) },
-		{ key: 'assessments', label: 'สอบมาตรฐาน Pre/Mid/Post', icon: '📊', color: '#e11d48', totalEvents: Number(assessUsageRes.rows[0]?.events || 0), uniqueUsers: Number(assessUsageRes.rows[0]?.users || 0) }
+		{ key: 'questStages', label: 'ด่านฝึกคำศัพท์ (Quest)', icon: '🗺️', color: '#2563eb', totalEvents: Number(questStagesRes.rows[0]?.events || 0), uniqueUsers: Number(questStagesRes.rows[0]?.users || 0) },
+		{ key: 'flashcards', label: 'แฟลชการ์ด (Flashcards)', icon: '🗂️', color: '#10b981', totalEvents: Number(flashcardUsageRes.rows[0]?.events || 0), uniqueUsers: Number(flashcardUsageRes.rows[0]?.users || 0) },
+		{ key: 'wordPitch', label: 'ฝึกออกเสียง (Pitch/Word)', icon: '🎙️', color: '#16a34a', totalEvents: Number(wordPitchRes.rows[0]?.events || 0), uniqueUsers: Number(wordPitchRes.rows[0]?.users || 0) },
+		{ key: 'hanziWriting', label: 'คัดอักษรจีน (Hanzi)', icon: '✍️', color: '#d97706', totalEvents: Number(writingUsageRes.rows[0]?.events || 0), uniqueUsers: Number(writingUsageRes.rows[0]?.users || 0) },
+		{ key: 'mockExams', label: 'ข้อสอบ HSK (Mock Exam)', icon: '📝', color: '#9333ea', totalEvents: Number(examUsageRes.rows[0]?.events || 0), uniqueUsers: Number(examUsageRes.rows[0]?.users || 0) },
+		{ key: 'aiRoleplay', label: 'สนทนา AI (Talk)', icon: '🤖', color: '#0891b2', totalEvents: Number(chatUsageRes.rows[0]?.events || 0), uniqueUsers: Number(chatUsageRes.rows[0]?.users || 0) },
+		{ key: 'assessments', label: 'แบบทดสอบ Pre/Mid/Post', icon: '📊', color: '#e11d48', totalEvents: Number(assessUsageRes.rows[0]?.events || 0), uniqueUsers: Number(assessUsageRes.rows[0]?.users || 0) }
 	];
 
 	const totalCrossEvents = rawCrossFeatures.reduce((s, f) => s + f.totalEvents, 0);
@@ -5815,7 +6364,8 @@ export async function getSkillsAnalyticsSummary() {
 			avgTimeSec: Math.round(Number(examTotalRow?.avg_time_sec || 0)),
 			byLevel,
 			byLevelMap: byLevel,
-			byLevelDetailed
+			byLevelDetailed,
+			recentAttempts: recentExamAttempts
 		},
 		writing: {
 			totalAttempts: totalWritingAttempts,
@@ -5830,7 +6380,8 @@ export async function getSkillsAnalyticsSummary() {
 			strokeAccuracyPct,
 			avgDurationSec,
 			topCharacters,
-			weakCharacters: topCharacters
+			weakCharacters: topCharacters,
+			recentAttempts: recentWritingAttempts
 		},
 		chatbot: {
 			totalSessions: Number(chatRow?.total_sessions || 0),
@@ -5839,7 +6390,8 @@ export async function getSkillsAnalyticsSummary() {
 			avgTurns: Number(Number(chatRow?.avg_turns || 0).toFixed(1)),
 			avgScore: Math.round(Number(chatRow?.avg_score || 0)),
 			totalXp: Number(chatRow?.total_xp || 0),
-			byScenario
+			byScenario,
+			recentSessions: recentChatSessions
 		},
 		assessment: {
 			phases,

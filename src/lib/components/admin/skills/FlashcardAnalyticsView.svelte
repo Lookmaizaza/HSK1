@@ -5,8 +5,6 @@
 		Target,
 		Users,
 		Sparkles,
-		CheckCircle2,
-		RotateCcw,
 		Clock,
 		Search,
 		TrendingUp,
@@ -117,12 +115,9 @@
 				<BookOpen class="size-6" />
 			</div>
 			<div>
-				<div class="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-					Flashcard Analytics & Vocabulary Retention
-				</div>
 				<h2 class="text-xl font-black text-foreground">การฝึกชุดคำศัพท์ (Flashcards)</h2>
 				<p class="text-xs text-muted-foreground mt-0.5">
-					ติดตามความก้าวหน้าการท่องบัตรคำศัพท์ HSK 1–3 อัตราความจำแม่นยำ และประวัติการฝึกจบชุดของผู้เรียน
+					ความก้าวหน้าการท่องบัตรคำศัพท์ HSK 1–3 และประวัติการฝึกจบชุด
 				</p>
 			</div>
 		</div>
@@ -424,23 +419,6 @@
 					{/each}
 				</tbody>
 			</table>
-		</div>
-
-		<!-- Pedagogical Takeaway Box -->
-		<div class="mt-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 p-4">
-			<div class="flex items-start gap-3">
-				<div class="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-					<Lightbulb class="size-5" />
-				</div>
-				<div class="space-y-1.5 text-xs">
-					<div class="font-bold text-foreground text-sm">💡 สรุปผลการฝึกชุดคำศัพท์ (Flashcard Pedagogical Insights)</div>
-					<div class="text-muted-foreground leading-relaxed">
-						<p>
-							ระบบจัดเก็บข้อมูลแบบ Real-time จากหน้า <code>/flashcard</code> เมื่อผู้เรียนฝึกจบแต่ละชุด ช่วยให้ครูผู้สอนติดตามอัตราความจำแม่นยำรายชุดคำศัพท์ และทราบว่าผู้เรียนคนใดต้องการความช่วยเหลือเป็นพิเศษ
-						</p>
-					</div>
-				</div>
-			</div>
 		</div>
 	</section>
 </div>

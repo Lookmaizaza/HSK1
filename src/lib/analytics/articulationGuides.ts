@@ -112,32 +112,158 @@ const ARTICULATORY_DEFINITIONS: Record<
 	}
 };
 
+const INITIALS = [
+	'zh', 'ch', 'sh',
+	'b', 'p', 'm', 'f',
+	'd', 't', 'n', 'l',
+	'g', 'k', 'h',
+	'j', 'q', 'x',
+	'r', 'z', 'c', 's'
+];
+
+const FINALS = [
+	'iang', 'iong', 'uang', 'ueng',
+	'ang', 'eng', 'ian', 'iao', 'ing', 'iu', 'ong', 'uai', 'uan', 'un', 'uo', 'üe', 'üan', 'ün',
+	'ai', 'an', 'ao', 'ei', 'en', 'er', 'ia', 'ie', 'in', 'ou', 'ua', 'ui', 've', 'van', 'vn',
+	'a', 'e', 'i', 'o', 'u', 'ü', 'v'
+];
+
+const ZERO_INITIAL_SYLLABLES = [
+	'yáng', 'yāng', 'yǎng', 'yàng', 'yang',
+	'yóng', 'yōng', 'yǒng', 'yòng', 'yong',
+	'wáng', 'wāng', 'wǎng', 'wàng', 'wang',
+	'wēng', 'wéng', 'wěng', 'wèng', 'weng',
+	'yuān', 'yuán', 'yuǎn', 'yuàn', 'yuan',
+	'yīng', 'yíng', 'yǐng', 'yìng', 'ying',
+	'yān', 'yán', 'yǎn', 'yàn', 'yan',
+	'yāo', 'yáo', 'yǎo', 'yào', 'yao',
+	'yōu', 'yóu', 'yǒu', 'yòu', 'you',
+	'wāi', 'wái', 'wǎi', 'wài', 'wai',
+	'wān', 'wán', 'wǎn', 'wàn', 'wan',
+	'wēn', 'wén', 'wěn', 'wèn', 'wen',
+	'wēi', 'wéi', 'wěi', 'wèi', 'wei',
+	'yuē', 'yué', 'yuě', 'yuè', 'yue',
+	'yūn', 'yún', 'yǔn', 'yùn', 'yun',
+	'yīn', 'yín', 'yǐn', 'yìn', 'yin',
+	'yā', 'yá', 'yǎ', 'yà', 'ya',
+	'yē', 'yé', 'yě', 'yè', 'ye',
+	'yī', 'yí', 'yǐ', 'yì', 'yi',
+	'yū', 'yú', 'yǔ', 'yù', 'yu',
+	'wā', 'wá', 'wǎ', 'wà', 'wa',
+	'wō', 'wó', 'wǒ', 'wò', 'wo',
+	'wū', 'wú', 'wǔ', 'wù', 'wu',
+	'āng', 'áng', 'ǎng', 'àng', 'ang',
+	'ēng', 'éng', 'ěng', 'èng', 'eng',
+	'āi', 'ái', 'ǎi', 'ài', 'ai',
+	'ān', 'án', 'ǎn', 'àn', 'an',
+	'āo', 'áo', 'ǎo', 'ào', 'ao',
+	'ēi', 'éi', 'ěi', 'èi', 'ei',
+	'ēn', 'én', 'ěn', 'èn', 'en',
+	'ēr', 'ér', 'ěr', 'èr', 'er',
+	'ōu', 'óu', 'ǒu', 'òu', 'ou',
+	'ā', 'á', 'ǎ', 'à', 'a',
+	'ē', 'é', 'ě', 'è', 'e',
+	'ō', 'ó', 'ǒ', 'ò', 'o'
+];
+
+function stripPinyinDiacritics(input: string): string {
+	return input
+		.toLowerCase()
+		.replace(/ǖ|ǘ|ǚ|ǜ/g, 'ü')
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
+ * Segments a potentially concatenated multi-syllable Pinyin string into individual syllables.
+ * e.g. "lǎoshī" -> ["lao", "shi"], "diànhuà" -> ["dian", "hua"], "ānjìng" -> ["an", "jing"]
+ */
+export function segmentPinyinSyllables(pinyin: string): string[] {
+	if (!pinyin) return [];
+	const rawTokens = pinyin
+		.toLowerCase()
+		.replace(/[0-9]/g, ' ')
+		.split(/[\s'’_-]+/)
+		.filter(Boolean);
+
+	const syllables: string[] = [];
+
+	for (const rawToken of rawTokens) {
+		const clean = stripPinyinDiacritics(rawToken).replace(/[^a-zü]/g, '');
+		if (!clean) continue;
+
+		let pos = 0;
+		while (pos < clean.length) {
+			const rest = clean.slice(pos);
+			let matchedSyllable = '';
+
+			// 1. Try matching initial + final (respecting valid onset boundaries ahead)
+			for (const init of INITIALS) {
+				if (!rest.startsWith(init)) continue;
+				const afterInit = rest.slice(init.length);
+				for (const fin of FINALS) {
+					if (!afterInit.startsWith(fin)) continue;
+					const candidate = init + fin;
+					const remaining = rest.slice(candidate.length);
+					// Prevent greedy final (e.g. 'an' or 'ang') from swallowing the next syllable's initial 'g', 'n', or 'r'
+					if (
+						remaining.length > 0 &&
+						(fin.endsWith('n') || fin.endsWith('ng')) &&
+						/^[aeiouüv]/.test(remaining)
+					) {
+						continue;
+					}
+					if (candidate.length > matchedSyllable.length) {
+						matchedSyllable = candidate;
+					}
+				}
+				if (matchedSyllable) break;
+			}
+
+			// 2. Try zero-initial syllables (y-, w-, a-, e-, o-)
+			if (!matchedSyllable) {
+				for (const zeroSyl of ZERO_INITIAL_SYLLABLES) {
+					const normZero = stripPinyinDiacritics(zeroSyl);
+					if (!rest.startsWith(normZero)) continue;
+					const remaining = rest.slice(normZero.length);
+					if (
+						remaining.length > 0 &&
+						(normZero.endsWith('n') || normZero.endsWith('ng')) &&
+						/^[aeiouüv]/.test(remaining)
+					) {
+						continue;
+					}
+					if (normZero.length > matchedSyllable.length) {
+						matchedSyllable = normZero;
+					}
+				}
+			}
+
+			if (matchedSyllable) {
+				syllables.push(matchedSyllable);
+				pos += matchedSyllable.length;
+			} else {
+				// Advance by 1 character if malformed pinyin encountered to avoid infinite loop
+				pos += 1;
+			}
+		}
+	}
+
+	return syllables;
+}
+
 /**
  * Extracts initial consonants from Pinyin string with compound syllable support.
  * e.g. "lǎoshī" -> ['l', 'sh'], "ānjìng" -> ['j'], "diànhuà" -> ['d', 'h']
  */
 export function extractInitialsFromPinyin(pinyin: string): string[] {
 	if (!pinyin) return [];
-	const INITIALS = [
-		'zh', 'ch', 'sh',
-		'b', 'p', 'm', 'f',
-		'd', 't', 'n', 'l',
-		'g', 'k', 'h',
-		'j', 'q', 'x',
-		'r', 'z', 'c', 's'
-	];
-
-	const tokens = pinyin
-		.toLowerCase()
-		.replace(/[0-9]/g, '')
-		.split(/[\s'_-]+/);
-
+	const syllables = segmentPinyinSyllables(pinyin);
 	const detected = new Set<string>();
 
-	for (const token of tokens) {
-		const clean = token.replace(/[^a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, '');
+	for (const syl of syllables) {
 		for (const init of INITIALS) {
-			if (clean.startsWith(init)) {
+			if (syl.startsWith(init)) {
 				detected.add(init);
 				break;
 			}

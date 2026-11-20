@@ -19,6 +19,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		const diag = await getDiagnosticAnalytics(String(user.id));
 		if (!diag || !diag.hasData) {
 			return {
+				stageOverrides,
 				remedialCards: [] as RemedialCard[],
 				diagnosticSummary: null as DiagnosticSummary
 			};

@@ -5,7 +5,6 @@ import {
 	findUserByUsername,
 	verifyPassword,
 	createSession,
-	deleteSession,
 	getResearchExportStats,
 	getUserFullDetail,
 	getStageTelemetryStats,
@@ -37,7 +36,7 @@ import { checkLoginProtection, handleLoginFailure, handleLoginSuccess } from '$l
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
-	const { locals, url, cookies } = event;
+	const { locals, url } = event;
 	const currentUser = locals.realAdmin || locals.user;
 
 	// Show login form inline when anonymous
@@ -50,13 +49,7 @@ export const load: PageServerLoad = async (event) => {
 		};
 	}
 	if (!currentUser.isAdmin) {
-		const token = cookies.get('session');
-		if (token) {
-			await deleteSession(token).catch(() => {});
-		}
-		cookies.delete('session', { path: '/' });
-		cookies.delete('impersonate_user_id', { path: '/' });
-		throw redirect(303, '/admin');
+		throw redirect(302, '/');
 	}
 
 	const selectedUserId = url.searchParams.get('userId')
@@ -78,8 +71,8 @@ export const load: PageServerLoad = async (event) => {
 		participationTrend,
 		practiceBreakdown,
 		selectedUserDetail,
-		questAnalytics,
-		pitchAnalytics,
+		advancedAnalytics,
+		pitchAnalyticsData,
 		flashcardAnalytics
 	] = await Promise.all([
 		getSkillsAnalyticsSummary(),
@@ -91,13 +84,15 @@ export const load: PageServerLoad = async (event) => {
 		getStageOverrides(),
 		getAuditLogs(200),
 		getPronunciationPhonemeErrorStats(),
-		getParticipationTrend(),
+		getParticipationTrend(30),
 		getPracticeBreakdown(),
 		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
 		getAdvancedLearningAnalytics('stage'),
 		getAdvancedLearningAnalytics('word'),
 		getFlashcardAnalytics()
 	]);
+	const questAnalytics = advancedAnalytics;
+	const pitchAnalytics = pitchAnalyticsData;
 
 	const learnerUsers = users.filter((u) => !u.isAdmin);
 	const adminUsers = users.filter((u) => u.isAdmin);
@@ -118,12 +113,13 @@ export const load: PageServerLoad = async (event) => {
 		const cur = completionsByUser.get(c.userId) ?? {};
 		cur[c.lessonKey] = c.stars;
 		completionsByUser.set(c.userId, cur);
-		if (c.stars > 0) {
+		if (c.stars > 0 && !adminUserIdSet.has(c.userId)) {
 			completionsCountByStage[c.lessonKey] = (completionsCountByStage[c.lessonKey] || 0) + 1;
 		}
 	}
 
-	const today = new Date().toISOString().slice(0, 10);
+	const THAI_OFFSET_MS = 7 * 60 * 60 * 1000;
+	const today = new Date(Date.now() + THAI_OFFSET_MS).toISOString().slice(0, 10);
 
 	const usersWithDetail = users.map((u) => {
 		const comp = completionsByUser.get(u.id) ?? {};
@@ -140,12 +136,15 @@ export const load: PageServerLoad = async (event) => {
 			}
 			perTrack[t.id] = { done, total: trackTotals[t.id], stars: starsSum };
 		}
+		const lastLoginDay = u.lastLoginAt
+			? new Date(u.lastLoginAt + THAI_OFFSET_MS).toISOString().slice(0, 10)
+			: null;
 		return {
 			...u,
 			completions: comp,
 			perTrack,
 			totalCompleted: Object.values(comp).filter((s) => s > 0).length,
-			activeToday: u.lastPracticed === today
+			activeToday: u.lastPracticed === today || lastLoginDay === today
 		};
 	});
 
@@ -242,13 +241,24 @@ export const load: PageServerLoad = async (event) => {
 		} catch {}
 	}
 
+	const stagesWithActivity = enrichedStages.filter((st) => st.stats.totalViews > 0);
+	const avgStagePassRate = stagesWithActivity.length > 0
+		? Math.round(stagesWithActivity.reduce((sum, st) => sum + st.stats.passRate, 0) / stagesWithActivity.length)
+		: 0;
+
+	const dauTodayFromTrend = participationTrend.length > 0
+		? participationTrend[participationTrend.length - 1].activeLearners
+		: 0;
+	const activeTodayUsersCount = usersWithDetail.filter((u) => !u.isAdmin && u.activeToday).length;
+
 	const stats = {
 		totalUsers: users.length,
 		totalLearners: learnerUsers.length,
 		totalAdmins: adminUsers.length,
 		totalXp: learnerUsers.reduce((s, u) => s + u.xp, 0),
 		totalCompletions: completions.filter((c) => c.stars > 0 && !adminUserIdSet.has(c.userId)).length,
-		activeToday: usersWithDetail.filter((u) => !u.isAdmin && u.activeToday).length,
+		activeToday: Math.max(dauTodayFromTrend, activeTodayUsersCount),
+		avgStagePassRate,
 		topStreak: learnerUsers.reduce((m, u) => Math.max(m, u.streak), 0),
 		avgGopScore: classPhonemeStats.avgGop,
 		avgPerRate: classPhonemeStats.avgPer,

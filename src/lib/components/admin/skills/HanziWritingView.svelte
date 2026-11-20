@@ -1,11 +1,21 @@
 <script lang="ts">
-	import { Edit3, Lightbulb } from '@lucide/svelte';
+	import { Edit3, Lightbulb, Clock } from '@lucide/svelte';
 
 	interface Props {
 		skillsAnalytics: any;
 	}
 
 	let { skillsAnalytics }: Props = $props();
+
+	function formatDate(ms: number) {
+		if (!ms) return '—';
+		return new Date(ms).toLocaleString('th-TH', {
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
 </script>
 
 <div class="space-y-6">
@@ -16,9 +26,8 @@
 				<Edit3 class="size-6" />
 			</div>
 			<div>
-				<div class="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Stroke Order Analytics</div>
-				<h2 class="text-xl font-black text-foreground">ลำดับขีดและการคัดอักษรจีน (Hanzi Writing & Stroke Dynamics)</h2>
-				<p class="text-xs text-muted-foreground mt-0.5">สถิติการฝึกเขียนตัวอักษรจีน วิเคราะห์จุดที่เขียนผิดบ่อย และตัวอักษรที่ต้องฝึกฝนเพิ่มเติม</p>
+				<h2 class="text-xl font-black text-foreground">การคัดอักษรจีน</h2>
+				<p class="text-xs text-muted-foreground mt-0.5">สถิติความแม่นยำลำดับขีดและตัวอักษรที่เขียนผิดบ่อย</p>
 			</div>
 		</div>
 	</div>
@@ -28,7 +37,7 @@
 		<div class="rounded-2xl border bg-card p-5 space-y-1">
 			<div class="text-xs text-muted-foreground font-semibold">จำนวนครั้งที่ฝึกเขียนสะสม</div>
 			<div class="text-2xl font-black font-mono text-foreground">{skillsAnalytics?.writing?.totalAttempts ?? 0} ครั้ง</div>
-			<div class="text-[11px] text-muted-foreground">ครอบคลุมทุกอักษรในคลัง</div>
+			<div class="text-[11px] text-muted-foreground">จากผู้เรียน {skillsAnalytics?.writing?.uniqueLearners ?? 0} คน · {skillsAnalytics?.writing?.uniqueCharacters ?? 0} ตัวอักษร</div>
 		</div>
 		<div class="rounded-2xl border bg-card p-5 space-y-1">
 			<div class="text-xs text-muted-foreground font-semibold">ความแม่นยำลำดับขีดรวม</div>
@@ -104,35 +113,63 @@
 					{:else}
 						<tr>
 							<td colspan="7" class="py-8 text-center text-muted-foreground">
-								ยังไม่มีข้อมูลการเขียนอักษรจีนที่ผิดพลาด
+								ผู้เรียนเขียนถูกครบทุกตัว ยังไม่พบตัวอักษรที่ผิดพลาด
 							</td>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+	</section>
 
-		<!-- Plain-Thai Insight Box (Hanzi Writing) -->
-		<div class="mt-4 rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 p-4">
-			<div class="flex items-start gap-3">
-				<div class="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0">
-					<Lightbulb class="size-5" />
-				</div>
-				<div class="space-y-1.5 text-xs">
-					<div class="font-bold text-foreground text-sm">💡 สรุปผล: วินิจฉัยทักษะการคัดลายมือและลำดับขีดอักษรจีน</div>
-					<div class="text-muted-foreground leading-relaxed">
-						<div class="flex flex-wrap items-center gap-2">
-							<span class="rounded-md bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 font-bold">ความแม่นยำลำดับขีด: {skillsAnalytics?.writing?.strokeAccuracyPct ?? 0}%</span>
-							<span class="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-bold">เขียนถูกรวดเดียว: {skillsAnalytics?.writing?.perfectSequenceRatePct ?? skillsAnalytics?.writing?.perfectRate ?? 0}%</span>
-						</div>
-						{#if (skillsAnalytics?.writing?.totalAttempts ?? 0) > 0}
-							<p class="pt-0.5">การวิเคราะห์ความแม่นยำจากประวัติการคัดอักษรจีนจริง {skillsAnalytics?.writing?.totalAttempts} ครั้ง แนะนำเน้นย้ำหลักการลากเส้นพื้นฐาน (บนลงล่าง ซ้ายไปขวา) สำหรับอักษรที่มีข้อผิดพลาดสะสม</p>
-						{:else}
-							<p class="pt-0.5">ยังไม่มีประวัติการฝึกคัดอักษรจีนในระบบ เมื่อผู้เรียนเริ่มฝึกเขียนอักษรจีน แดชบอร์ดจะประมวลผลความแม่นยำลำดับขีดและจุดที่เขียนผิดบ่อยให้โดยอัตโนมัติ</p>
-						{/if}
-					</div>
-				</div>
+	<!-- Recent Writing Attempts Log -->
+	<section class="rounded-3xl border bg-card p-6 shadow-xs space-y-4">
+		<div class="flex items-center justify-between border-b pb-3">
+			<div class="flex items-center gap-2">
+				<Clock class="size-4 text-rose-500" />
+				<h3 class="font-bold text-sm text-foreground uppercase tracking-wider">
+					ประวัติการคัดอักษรจีนล่าสุด (Recent Completed Sessions)
+				</h3>
 			</div>
+			<span class="text-xs text-muted-foreground">แสดงประวัติล่าสุด 50 รายการ</span>
+		</div>
+
+		<div class="overflow-x-auto rounded-2xl border">
+			<table class="w-full text-left text-xs">
+				<thead class="border-b bg-muted/30 font-bold uppercase tracking-wider text-muted-foreground">
+					<tr>
+						<th class="py-2.5 px-3">เวลา</th>
+						<th class="py-2.5 px-3">ผู้เรียน</th>
+						<th class="py-2.5 px-3">ตัวอักษร</th>
+						<th class="py-2.5 px-3 text-center">ผิดพลาด</th>
+						<th class="py-2.5 px-3 text-right">คะแนน</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y">
+					{#each (skillsAnalytics?.writing?.recentAttempts ?? []) as r (r.id)}
+						<tr class="hover:bg-muted/10 transition">
+							<td class="py-2.5 px-3 font-mono text-muted-foreground text-[11px]">{formatDate(r.createdAt)}</td>
+							<td class="py-2.5 px-3 font-bold text-foreground">@{r.username}</td>
+							<td class="py-2.5 px-3">
+								<span class="text-base font-bold font-serif text-foreground">{r.character}</span>
+								{#if r.pinyin}
+									<span class="text-[11px] font-mono text-muted-foreground ml-1.5">({r.pinyin})</span>
+								{/if}
+							</td>
+							<td class="py-2.5 px-3 text-center font-mono {r.mistakeCount > 0 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'}">
+								{r.mistakeCount > 0 ? `ผิด ${r.mistakeCount} ครั้ง` : 'ไม่ผิดเลย'}
+							</td>
+							<td class="py-2.5 px-3 text-right font-mono font-bold {r.score >= 80 ? 'text-emerald-600' : 'text-amber-600'}">
+								{r.score}%
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td colspan="5" class="py-8 text-center text-muted-foreground">ยังไม่มีประวัติการคัดอักษรจีน</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 	</section>
 </div>

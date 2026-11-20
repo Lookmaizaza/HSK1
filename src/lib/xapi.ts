@@ -40,7 +40,7 @@ export type PronunciationAssessmentTelemetry = {
 	timestamp: string;
 	userId?: string | number;
 	username?: string;
-	practiceMode?: 'stage' | 'word';
+	practiceMode?: 'stage' | 'word' | 'assessment' | 'unknown';
 	stageId?: string;
 	word: WordTargetInfo;
 	behavior: ListeningBehavior;

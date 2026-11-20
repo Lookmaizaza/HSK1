@@ -61,6 +61,7 @@
 	async function handleAccept(requestMic = true) {
 		if (isSubmitting) return;
 		isSubmitting = true;
+		micError = null;
 
 		if (requestMic) {
 			await requestMicrophonePermission();
@@ -81,36 +82,40 @@
 					consent_version: 'v1.0'
 				})
 			});
-			if (res.ok) {
-				const data = await res.json();
-				if (data?.userId) {
-					resolvedUserId = String(data.userId);
-				}
+			if (!res.ok) {
+				throw new Error(`บันทึกความยินยอมไม่สำเร็จ (HTTP ${res.status})`);
 			}
-		} catch {}
+			const data = await res.json();
+			if (data?.userId) {
+				resolvedUserId = String(data.userId);
+			}
 
-		// Save consent record locally per user
-		const userStorageKey = `yupakjeen_pdpa_consent_user_${resolvedUserId}`;
-		const consentData = {
-			userId: resolvedUserId,
-			termsAccepted,
-			audioConsent,
-			researchConsent,
-			micGranted,
-			version: 'v1.0',
-			consentedAt: new Date().toISOString()
-		};
-		try {
-			localStorage.setItem(userStorageKey, JSON.stringify(consentData));
-		} catch {}
+			// Save consent record locally per user only after server persistence succeeds
+			const userStorageKey = `yupakjeen_pdpa_consent_user_${resolvedUserId}`;
+			const consentData = {
+				userId: resolvedUserId,
+				termsAccepted,
+				audioConsent,
+				researchConsent,
+				micGranted,
+				version: 'v1.0',
+				consentedAt: new Date().toISOString()
+			};
+			try {
+				localStorage.setItem(userStorageKey, JSON.stringify(consentData));
+			} catch {}
 
-		isOpen = false;
-		isSubmitting = false;
+			isOpen = false;
 
-		// Reload layout data so newly provisioned guest_xxxxxx session is active immediately across the app
-		try {
-			await invalidateAll();
-		} catch {}
+			// Reload layout data so newly provisioned guest_xxxxxx session is active immediately across the app
+			try {
+				await invalidateAll();
+			} catch {}
+		} catch (err: any) {
+			micError = err?.message || 'ไม่สามารถบันทึกความยินยอมได้ กรุณาลองใหม่อีกครั้ง';
+		} finally {
+			isSubmitting = false;
+		}
 	}
 </script>
 

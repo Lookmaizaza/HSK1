@@ -1,11 +1,21 @@
 <script lang="ts">
-	import { MessageSquare, Volume2, Lightbulb } from '@lucide/svelte';
+	import { MessageSquare, Volume2, Lightbulb, Clock } from '@lucide/svelte';
 
 	interface Props {
 		skillsAnalytics: any;
 	}
 
 	let { skillsAnalytics }: Props = $props();
+
+	function formatDate(ms: number) {
+		if (!ms) return '—';
+		return new Date(ms).toLocaleString('th-TH', {
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
 </script>
 
 <div class="space-y-6">
@@ -16,9 +26,8 @@
 				<Volume2 class="size-6" />
 			</div>
 			<div>
-				<div class="text-[11px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">Situational Dialogue Practice</div>
-				<h2 class="text-xl font-black text-foreground">ทักษะการสนทนาโต้ตอบตามสถานการณ์ (Situational Dialogue Fluency)</h2>
-				<p class="text-xs text-muted-foreground mt-0.5">ประเมินความคล่องแคล่วในการสื่อสาร จำนวนเทิร์นการโต้ตอบ และการใช้คำศัพท์ในสถานการณ์จริง</p>
+				<h2 class="text-xl font-black text-foreground">การสนทนาตามสถานการณ์ (AI Talk)</h2>
+				<p class="text-xs text-muted-foreground mt-0.5">จำนวนรอบ เทิร์นการโต้ตอบ และคะแนนเฉลี่ยแยกตามสถานการณ์</p>
 			</div>
 		</div>
 	</div>
@@ -63,7 +72,7 @@
 
 		{#if Array.isArray(skillsAnalytics?.chatbot?.byScenario) && skillsAnalytics.chatbot.byScenario.length > 0}
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-				{#each skillsAnalytics.chatbot.byScenario as sc}
+				{#each skillsAnalytics.chatbot.byScenario as sc (sc.scenarioId ?? sc.scenarioTitle)}
 					<div class="rounded-2xl border p-4 space-y-3 bg-muted/10 hover:bg-muted/20 transition">
 						<div class="flex items-start justify-between gap-2">
 							<div class="font-bold text-sm text-foreground leading-tight">{sc.scenarioTitle}</div>
@@ -97,32 +106,50 @@
 				</p>
 			</div>
 		{/if}
+	</section>
 
-		<!-- Plain-Thai Insight Box (Situational Dialogue) -->
-		<div class="mt-4 rounded-2xl bg-violet-500/5 dark:bg-violet-500/10 border border-violet-500/20 p-4">
-			<div class="flex items-start gap-3">
-				<div class="p-2 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 shrink-0">
-					<Lightbulb class="size-5" />
-				</div>
-				<div class="space-y-1.5 text-xs">
-					<div class="font-bold text-foreground text-sm">💡 สรุปผล: ทักษะการสนทนาโต้ตอบตามสถานการณ์</div>
-					<div class="text-muted-foreground leading-relaxed">
-						{#if (skillsAnalytics?.chatbot?.totalSessions ?? 0) > 0}
-							<div class="flex flex-wrap items-center gap-2">
-								<span class="rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 px-2 py-0.5 font-bold">เทิร์นเฉลี่ย: {Math.round((skillsAnalytics?.chatbot?.totalTurns || 0) / skillsAnalytics.chatbot.totalSessions)} ครั้ง/รอบ</span>
-								<span class="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-bold">คะแนนเฉลี่ย: {skillsAnalytics?.chatbot?.avgScore ?? 0}%</span>
-							</div>
-							<p class="pt-0.5">การประเมินทักษะการโต้ตอบตามบริบทจริงของผู้เรียนในแต่ละสถานการณ์จำลอง</p>
-						{:else}
-							<div class="flex flex-wrap items-center gap-2">
-								<span class="rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 px-2 py-0.5 font-bold">สถานะ: รอการบันทึกบทสนทนาจริง</span>
-								<span class="rounded-md bg-muted px-2 py-0.5 font-semibold text-muted-foreground">การสนทนาจำลองชีวิตประจำวัน</span>
-							</div>
-							<p class="pt-0.5">ปัจจุบันยังไม่มีประวัติการฝึกสนทนาในระบบ เมื่อผู้เรียนเริ่มฝึกสนทนาในแต่ละสถานการณ์ แดชบอร์ดจะบันทึกจำนวนเทิร์น ความคล่องแคล่ว และการใช้คำศัพท์ตามบริบทจริงให้อัตโนมัติ</p>
-						{/if}
-					</div>
-				</div>
+	<!-- Recent Dialogue Sessions Log -->
+	<section class="rounded-3xl border bg-card p-6 shadow-xs space-y-4">
+		<div class="flex items-center justify-between border-b pb-3">
+			<div class="flex items-center gap-2">
+				<Clock class="size-4 text-violet-500" />
+				<h3 class="font-bold text-sm text-foreground uppercase tracking-wider">
+					ประวัติการสนทนาล่าสุด (Recent Completed Sessions)
+				</h3>
 			</div>
+			<span class="text-xs text-muted-foreground">แสดงประวัติล่าสุด 50 รายการ</span>
+		</div>
+
+		<div class="overflow-x-auto rounded-2xl border">
+			<table class="w-full text-left text-xs">
+				<thead class="border-b bg-muted/30 font-bold uppercase tracking-wider text-muted-foreground">
+					<tr>
+						<th class="py-2.5 px-3">เวลา</th>
+						<th class="py-2.5 px-3">ผู้เรียน</th>
+						<th class="py-2.5 px-3">สถานการณ์</th>
+						<th class="py-2.5 px-3 text-center">จำนวนเทิร์น</th>
+						<th class="py-2.5 px-3 text-right">คะแนนเฉลี่ย / XP</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y">
+					{#each (skillsAnalytics?.chatbot?.recentSessions ?? []) as r (r.id)}
+						<tr class="hover:bg-muted/10 transition">
+							<td class="py-2.5 px-3 font-mono text-muted-foreground text-[11px]">{formatDate(r.createdAt)}</td>
+							<td class="py-2.5 px-3 font-bold text-foreground">@{r.username}</td>
+							<td class="py-2.5 px-3 font-semibold text-foreground">{r.scenarioTitle}</td>
+							<td class="py-2.5 px-3 text-center font-mono">{r.turnsCount} เทิร์น</td>
+							<td class="py-2.5 px-3 text-right font-mono">
+								<span class="font-bold text-violet-600">{r.avgScore}%</span>
+								<span class="text-muted-foreground ml-1.5">(+{r.totalXp} XP)</span>
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td colspan="5" class="py-8 text-center text-muted-foreground">ยังไม่มีประวัติการสนทนา AI</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 	</section>
 </div>

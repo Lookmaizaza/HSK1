@@ -16,9 +16,8 @@
 				<Volume2 class="size-6" />
 			</div>
 			<div>
-				<div class="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Listening Behavior Analysis</div>
-				<h2 class="text-xl font-black text-foreground">การวิเคราะห์ผลกระทบของการฟังเสียงตัวอย่าง (Listening Impact Analysis)</h2>
-				<p class="text-xs text-muted-foreground mt-0.5">เปรียบเทียบผลสัมฤทธิ์ระหว่างกลุ่มที่กดฟังตัวอย่างก่อนเปิดไมค์ vs กลุ่มที่กดพูดทันที (Audio Gate Policy)</p>
+				<h2 class="text-xl font-black text-foreground">ผลกระทบจากการฟังเสียงตัวอย่าง</h2>
+				<p class="text-xs text-muted-foreground mt-0.5">เทียบคะแนนระหว่างกลุ่มที่ฟังตัวอย่างก่อนพูด vs พูดทันที</p>
 			</div>
 		</div>
 
@@ -117,26 +116,5 @@
 			{/if}
 		</div>
 	</div>
-
-	<!-- Plain-Thai Insight Box (LQ5 Listening Impact) -->
-	<section class="rounded-3xl border bg-card p-6 shadow-xs">
-		<div class="rounded-2xl bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 p-4">
-			<div class="flex items-start gap-3">
-				<div class="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
-					<Lightbulb class="size-5" />
-				</div>
-				<div class="space-y-1.5 text-xs">
-					<div class="font-bold text-foreground text-sm">💡 สรุปผล: ประสิทธิผลของการฟังก่อนพูด (Listening Friction Index)</div>
-					<div class="text-muted-foreground leading-relaxed">
-						<div class="flex flex-wrap items-center gap-2">
-							<span class="rounded-md bg-blue-500/15 text-blue-700 dark:text-blue-300 px-2 py-0.5 font-bold font-mono">GOP {activeLearningAnalytics?.lq5ListeningImpact?.deltaGop ? (activeLearningAnalytics.lq5ListeningImpact.deltaGop > 0 ? `+${activeLearningAnalytics.lq5ListeningImpact.deltaGop}%` : `${activeLearningAnalytics.lq5ListeningImpact.deltaGop}%`) : '+0%'}</span>
-							<span class="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-bold font-mono">วรรณยุกต์ {activeLearningAnalytics?.lq5ListeningImpact?.deltaTone ? (activeLearningAnalytics.lq5ListeningImpact.deltaTone > 0 ? `+${activeLearningAnalytics.lq5ListeningImpact.deltaTone}%` : `${activeLearningAnalytics.lq5ListeningImpact.deltaTone}%`) : '+0%'}</span>
-						</div>
-						<p class="pt-0.5">{activeLearningAnalytics?.lq5ListeningImpact?.pedagogicalTakeaway || 'กำลังวิเคราะห์ผลกระทบของการฟังตัวอย่างจากฐานข้อมูล...'}</p>
-					</div>
-				</div>
-			</div>
-		</div>
-	</section>
 </div>
 

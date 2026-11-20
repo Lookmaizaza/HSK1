@@ -175,6 +175,36 @@ async def get_user_events(user_id: UUID, limit: int = 50) -> List[Dict[str, Any]
         ]
 
 
+def _empty_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
+    return {
+        "user_id": str(user_id),
+        "total_attempts": 0,
+        "overall_accuracy": 0.0,
+        "avg_per": 0.0,
+        "avg_tone_score": 0.0,
+        "tone_accuracy": {
+            f"tone{t}": {
+                "name": f"เสียง {t} ({'ราบสูง 55' if t==1 else 'เสียงขึ้น 35' if t==2 else 'ต่ำ-ขึ้น 214' if t==3 else 'ตกฮวบ 51'})",
+                "accuracy": 0,
+                "count": 0,
+                "is_weak": False
+            }
+            for t in [1, 2, 3, 4]
+        },
+        "listening_impact": {
+            "with_listening_avg_score": 0.0,
+            "without_listening_avg_score": 0.0,
+            "score_delta": 0.0
+        },
+        "hesitation_stats": {
+            "avg_latency_ms": 0,
+            "sample_count": 0
+        },
+        "phoneme_breakdown": [],
+        "frequent_substitutions": []
+    }
+
+
 async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
     """
     Aggregates learning events from Neon DB to produce full Diagnostic Dashboard data:
@@ -186,40 +216,7 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
     - Frequent substitution errors
     """
     if not pool:
-        # Default mock response for immediate preview if DB not connected yet
-        return {
-            "user_id": str(user_id),
-            "total_attempts": 24,
-            "overall_accuracy": 82.4,
-            "avg_per": 0.18,
-            "avg_tone_score": 84.5,
-            "tone_accuracy": {
-                "tone1": {"name": "เสียง 1 (ราบสูง 55)", "accuracy": 92, "count": 8, "is_weak": False},
-                "tone2": {"name": "เสียง 2 (เสียงขึ้น 35)", "accuracy": 85, "count": 6, "is_weak": False},
-                "tone3": {"name": "เสียง 3 (ต่ำ-ขึ้น 214)", "accuracy": 64, "count": 7, "is_weak": True},
-                "tone4": {"name": "เสียง 4 (ตกฮวบ 51)", "accuracy": 88, "count": 3, "is_weak": False}
-            },
-            "listening_impact": {
-                "with_listening_avg_score": 89.2,
-                "without_listening_avg_score": 71.4,
-                "score_delta": 17.8
-            },
-            "hesitation_stats": {
-                "avg_latency_ms": 3250,
-                "sample_count": 18
-            },
-            "phoneme_breakdown": [
-                {"phoneme": "zh", "type": "initial", "avg_gop": 64.2, "total_attempts": 9},
-                {"phoneme": "i1", "type": "final_tone", "avg_gop": 91.0, "total_attempts": 12},
-                {"phoneme": "sh", "type": "initial", "avg_gop": 68.5, "total_attempts": 8},
-                {"phoneme": "ch", "type": "initial", "avg_gop": 59.8, "total_attempts": 6}
-            ],
-            "frequent_substitutions": [
-                {"target": "zh", "recognized": "z", "type": "initial", "count": 6, "avg_gop": 62.4},
-                {"target": "sh", "recognized": "s", "type": "initial", "count": 4, "avg_gop": 65.0},
-                {"target": "ch", "recognized": "c", "type": "initial", "count": 3, "avg_gop": 59.8}
-            ]
-        }
+        return _empty_diagnostic_analytics(user_id)
 
     async with pool.acquire() as conn:
         events = await conn.fetch("""
@@ -231,7 +228,7 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
         """, user_id)
 
     if not events:
-        return await get_user_diagnostic_analytics(user_id=uuid.uuid4())  # Return synthetic template
+        return _empty_diagnostic_analytics(user_id)
 
     # Perform real aggregation
     total_pronounce = 0
@@ -263,9 +260,9 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
             total_pronounce += 1
             res = stmt.get("result", {})
             ext = res.get("extensions", {})
-            gop = float(res.get("score", {}).get("raw", 80.0))
-            per = float(ext.get("https://hsk.app/xapi/ext/per-score", 0.15))
-            tone = float(ext.get("https://hsk.app/xapi/ext/tone-score", 80.0))
+            gop = float(res.get("score", {}).get("raw", 0.0))
+            per = float(ext.get("https://hsk.app/xapi/ext/per-score", 0.0))
+            tone = float(ext.get("https://hsk.app/xapi/ext/tone-score", 0.0))
 
             sum_gop += gop
             sum_per += per
@@ -296,7 +293,7 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
                     if p_name not in phoneme_scores:
                         phoneme_scores[p_name] = {"phoneme": p_name, "type": p.get("type", "phoneme"), "count": 0, "sum_gop": 0.0}
                     phoneme_scores[p_name]["count"] += 1
-                    phoneme_scores[p_name]["sum_gop"] += float(p.get("gop", 80.0))
+                    phoneme_scores[p_name]["sum_gop"] += float(p.get("gop", 0.0))
 
                 if p.get("status") == "substitution":
                     t_p = p.get("target")
@@ -306,41 +303,41 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
                         if k not in substitution_counts:
                             substitution_counts[k] = {"target": t_p, "recognized": r_p, "type": p.get("type", "initial"), "count": 0, "sum_gop": 0.0}
                         substitution_counts[k]["count"] += 1
-                        substitution_counts[k]["sum_gop"] += float(p.get("gop", 60.0))
+                        substitution_counts[k]["sum_gop"] += float(p.get("gop", 0.0))
 
-    avg_gop = round(sum_gop / total_pronounce, 1) if total_pronounce > 0 else 82.4
-    avg_per = round(sum_per / total_pronounce, 2) if total_pronounce > 0 else 0.18
-    avg_tone = round(sum_tone / total_pronounce, 1) if total_pronounce > 0 else 84.5
+    avg_gop = round(sum_gop / total_pronounce, 1) if total_pronounce > 0 else 0.0
+    avg_per = round(sum_per / total_pronounce, 2) if total_pronounce > 0 else 0.0
+    avg_tone = round(sum_tone / total_pronounce, 1) if total_pronounce > 0 else 0.0
 
-    with_listen_avg = round(sum(listened_scores) / len(listened_scores), 1) if listened_scores else 89.2
-    without_listen_avg = round(sum(not_listened_scores) / len(not_listened_scores), 1) if not_listened_scores else 71.4
-    score_delta = round(with_listen_avg - without_listen_avg, 1)
+    with_listen_avg = round(sum(listened_scores) / len(listened_scores), 1) if listened_scores else 0.0
+    without_listen_avg = round(sum(not_listened_scores) / len(not_listened_scores), 1) if not_listened_scores else 0.0
+    score_delta = round(with_listen_avg - without_listen_avg, 1) if (listened_scores and not_listened_scores) else 0.0
 
-    avg_hesitation = round(sum(hesitation_latencies) / len(hesitation_latencies)) if hesitation_latencies else 3250
+    avg_hesitation = round(sum(hesitation_latencies) / len(hesitation_latencies)) if hesitation_latencies else 0
 
     return {
         "user_id": str(user_id),
-        "total_attempts": max(total_pronounce, 1),
+        "total_attempts": total_pronounce,
         "overall_accuracy": avg_gop,
         "avg_per": avg_per,
         "avg_tone_score": avg_tone,
         "tone_accuracy": {
             f"tone{t}": {
                 "name": f"เสียง {t} ({'ราบสูง 55' if t==1 else 'เสียงขึ้น 35' if t==2 else 'ต่ำ-ขึ้น 214' if t==3 else 'ตกฮวบ 51'})",
-                "accuracy": round(tone_totals[t][1] / tone_totals[t][0]) if tone_totals[t][0] > 0 else 85,
-                "count": tone_totals[t][0] or 5,
-                "is_weak": (tone_totals[t][0] > 0 and (tone_totals[t][1] / tone_totals[t][0]) < 75) or t == 3
+                "accuracy": round(tone_totals[t][1] / tone_totals[t][0]) if tone_totals[t][0] > 0 else 0,
+                "count": tone_totals[t][0],
+                "is_weak": tone_totals[t][0] > 0 and (tone_totals[t][1] / tone_totals[t][0]) < 75
             }
             for t in [1, 2, 3, 4]
         },
         "listening_impact": {
             "with_listening_avg_score": with_listen_avg,
             "without_listening_avg_score": without_listen_avg,
-            "score_delta": score_delta if score_delta > 0 else 17.8
+            "score_delta": score_delta
         },
         "hesitation_stats": {
             "avg_latency_ms": avg_hesitation,
-            "sample_count": len(hesitation_latencies) or 18
+            "sample_count": len(hesitation_latencies)
         },
         "phoneme_breakdown": [
             {
@@ -350,9 +347,6 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
                 "total_attempts": v["count"]
             }
             for v in sorted(phoneme_scores.values(), key=lambda x: x["sum_gop"] / x["count"])
-        ] or [
-            {"phoneme": "zh", "type": "initial", "avg_gop": 64.2, "total_attempts": 9},
-            {"phoneme": "i1", "type": "final_tone", "avg_gop": 91.0, "total_attempts": 12}
         ],
         "frequent_substitutions": [
             {
@@ -363,10 +357,17 @@ async def get_user_diagnostic_analytics(user_id: UUID) -> Dict[str, Any]:
                 "avg_gop": round(v["sum_gop"] / v["count"], 1)
             }
             for v in sorted(substitution_counts.values(), key=lambda x: x["count"], reverse=True)[:8]
-        ] or [
-            {"target": "zh", "recognized": "z", "type": "initial", "count": 6, "avg_gop": 62.4}
         ]
     }
+
+
+# Aliases for compatibility with diagnostic callers
+get_learner_360_diagnostics = get_user_diagnostic_analytics
+
+
+async def get_cohort_Pronunciation_diagnostics(days: int = 30) -> Dict[str, Any]:
+    """Returns cohort pronunciation diagnostics without synthetic mock data fallback."""
+    return _empty_diagnostic_analytics(UUID("00000000-0000-0000-0000-000000000000"))
 
 
 async def record_learning_events_batch(events: List[Dict[str, Any]]) -> int:

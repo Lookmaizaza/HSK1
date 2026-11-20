@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Activity, Volume2, AlertTriangle, Lightbulb, Check, ArrowRightLeft, Sparkles, BookOpen } from '@lucide/svelte';
+	import { Activity, Volume2, AlertTriangle, Lightbulb, ArrowRightLeft, Sparkles, BookOpen, Clock } from '@lucide/svelte';
 	import { speak } from '$lib/speech';
 
 	interface Props {
@@ -38,7 +38,6 @@
 	}: Props = $props();
 
 	let activePitchTone = $state<number>(3);
-	let audioPlayingWord = $state<string | null>(null);
 
 	const toneAudioWords: Record<number, { word: string; pinyin: string }> = {
 		1: { word: '妈', pinyin: 'mā' },
@@ -52,15 +51,8 @@
 		if (typeof window === 'undefined') return;
 		const item = toneAudioWords[tone];
 		if (!item) return;
-		audioPlayingWord = item.word;
 		onShowToast(`🔊 ตัวอย่างเสียงวรรณยุกต์ที่ ${tone}: ${item.word} (${item.pinyin})`, 'info');
-		try {
-			await speak(item.word, 0.8);
-		} finally {
-			setTimeout(() => {
-				audioPlayingWord = null;
-			}, 800);
-		}
+		await speak(item.word, 0.8);
 	}
 </script>
 
@@ -72,9 +64,8 @@
 				<Activity class="size-6" />
 			</div>
 			<div>
-				<div class="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Tone & Pitch Analytics</div>
-				<h2 class="text-xl font-black text-foreground">วรรณยุกต์และระดับเสียง (Tone Mastery & Pitch Curves)</h2>
-				<p class="text-xs text-muted-foreground mt-0.5">วิเคราะห์ความแม่นยำ 4 วรรณยุกต์จีน ปรากฏการณ์สับสนเสียง (Tone Sandhi) และแบบจำลอง F0 Contour</p>
+				<h2 class="text-xl font-black text-foreground">วรรณยุกต์และระดับเสียง</h2>
+				<p class="text-xs text-muted-foreground mt-0.5">ความแม่นยำ 4 วรรณยุกต์ และตารางความสับสน</p>
 			</div>
 		</div>
 
@@ -156,9 +147,9 @@
 			</div>
 		</div>
 
-		<div class="grid lg:grid-cols-12 gap-6 items-start">
-			<!-- Left: 4x4 Confusion Matrix -->
-			<div class="lg:col-span-6 space-y-3">
+		<div class="space-y-4">
+			<!-- 4x4 Confusion Matrix (Full Width) -->
+			<div class="space-y-3">
 				<h4 class="font-bold text-xs text-foreground uppercase tracking-wider">
 					ตารางความสับสน (Target Tone 1-4 vs Recognized):
 				</h4>
@@ -179,7 +170,7 @@
 									<td class="py-3 px-3 text-left font-bold font-sans text-foreground">
 										{tm.label}
 									</td>
-									<td class="py-3 px-3 {tm.targetTone === 1 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}">
+									<td class="py-3 px-3 {tm.targetTone === 1 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT1 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
 										{tm.recognizedT1}%
 									</td>
 									<td class="py-3 px-3 {tm.targetTone === 2 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT2 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
@@ -188,7 +179,7 @@
 									<td class="py-3 px-3 {tm.targetTone === 3 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT3 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
 										{tm.recognizedT3}%
 									</td>
-									<td class="py-3 px-3 {tm.targetTone === 4 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}">
+									<td class="py-3 px-3 {tm.targetTone === 4 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT4 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
 										{tm.recognizedT4}%
 									</td>
 								</tr>
@@ -200,263 +191,136 @@
 				<div class="rounded-2xl bg-muted/20 border p-3.5 space-y-1.5 text-xs text-muted-foreground">
 					<div class="font-bold text-foreground flex items-center gap-1.5">
 						<AlertTriangle class="size-4 text-amber-500" />
-						<span>ข้อค้นพบสถิติเสียงวรรณยุกต์คนไทย:</span>
+						<span>ข้อค้นพบสถิติเสียงวรรณยุกต์:</span>
 					</div>
 					<p class="text-[11px] leading-relaxed">
 						{activeLearningAnalytics?.toneConfusionHeatmap?.keyFinding || 'กำลังประมวลผลสถิติเสียงวรรณยุกต์จากฐานข้อมูล...'}
 					</p>
 					{#if toneSandhiStats.confusionRate !== null}
 						<div class="pt-1 text-[11px] font-bold text-purple-700 dark:text-purple-300">
-							อัตราสับสนคู่ Tone Sandhi (เสียง 3 ↔ เสียง 2): {toneSandhiStats.confusionRate}% (จาก {toneSandhiStats.samples} ตัวอย่าง)
+							อัตราสับสนคู่เสียง 2 ↔ เสียง 3: {toneSandhiStats.confusionRate}% (จาก {toneSandhiStats.samples} ตัวอย่าง)
 						</div>
 					{/if}
-				</div>
-			</div>
-
-			<!-- Right: Interactive SVG Pitch Contour Visualizer -->
-			<div class="lg:col-span-6 rounded-2xl border bg-card p-5 space-y-4">
-				<div class="flex items-center justify-between">
-					<h4 class="font-bold text-xs text-foreground uppercase tracking-wider flex items-center gap-1.5">
-						<Activity class="size-4 text-purple-600" />
-						<span>แบบจำลองเส้นระดับเสียง (Chao 5-Scale Pitch Contour):</span>
-					</h4>
-					<span class="rounded bg-purple-500/10 text-purple-700 dark:text-purple-300 text-[10px] font-bold px-2 py-0.5">
-						F0 Pitch Feedback
-					</span>
-				</div>
-
-				<!-- SVG Diagram -->
-				<div class="relative bg-muted/20 rounded-xl p-3 border">
-					<svg viewBox="0 0 320 160" class="w-full h-40">
-						<!-- Background Grid Lines 1 to 5 -->
-						{#each [1, 2, 3, 4, 5] as lvl (lvl)}
-							{@const y = 140 - (lvl - 1) * 30}
-							<line x1="30" y1={y} x2="300" y2={y} stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="2,2" />
-							<text x="15" y={y + 4} font-size="10" fill="currentColor" opacity="0.5" font-family="monospace">{lvl}</text>
-						{/each}
-
-						<!-- Pitch Curves -->
-						<!-- Tone 1: [55] High Flat (Blue) -->
-						<path d="M 40 20 L 290 20" fill="none" stroke="#3b82f6" stroke-width={activePitchTone === 1 ? '4' : '2'} opacity={activePitchTone === 1 ? '1' : '0.4'} />
-						
-						<!-- Tone 2: [35] Mid-Rising (Green) -->
-						<path d="M 40 80 Q 160 70 290 20" fill="none" stroke="#10b981" stroke-width={activePitchTone === 2 ? '4' : '2'} opacity={activePitchTone === 2 ? '1' : '0.4'} />
-						
-						<!-- Tone 3: [214] Low Dipping (Purple) -->
-						<path d="M 40 110 Q 140 145 200 135 T 290 50" fill="none" stroke="#8b5cf6" stroke-width={activePitchTone === 3 ? '4' : '2'} opacity={activePitchTone === 3 ? '1' : '0.4'} />
-						
-						<!-- Premature Rise Thai Error Warning Line (Red Dashed) -->
-						<path d="M 40 110 Q 130 90 290 20" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="4,3" opacity="0.9" />
-
-						<!-- Tone 4: [51] High Falling (Orange) -->
-						<path d="M 40 20 L 290 140" fill="none" stroke="#f59e0b" stroke-width={activePitchTone === 4 ? '4' : '2'} opacity={activePitchTone === 4 ? '1' : '0.4'} />
-					</svg>
-
-					<!-- Legend & Annotation -->
-					<div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] pt-1 border-t">
-						<div class="flex items-center gap-3">
-							<span class="flex items-center gap-1 font-bold text-blue-600">● เสียง 1 (55)</span>
-							<span class="flex items-center gap-1 font-bold text-emerald-600">● เสียง 2 (35)</span>
-							<span class="flex items-center gap-1 font-bold text-purple-600">● เสียง 3 (214)</span>
-							<span class="flex items-center gap-1 font-bold text-amber-600">● เสียง 4 (51)</span>
-						</div>
-						<span class="flex items-center gap-1 font-bold text-rose-600">
-							- - - จุดที่คนไทยผิดบ่อย (ตวัดขึ้น 35 เร็วเกินไป)
-						</span>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<!-- Plain-Thai Insight Box (Tone Confusion Heatmap) -->
-		<div class="mt-4 rounded-2xl bg-purple-500/5 dark:bg-purple-500/10 border border-purple-500/20 p-4">
-			<div class="flex items-start gap-3">
-				<div class="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">
-					<Lightbulb class="size-5" />
-				</div>
-				<div class="space-y-1.5 text-xs">
-					<div class="font-bold text-foreground text-sm">💡 สรุปผล: เมทริกซ์ความสับสนของวรรณยุกต์ (Tone Confusion Heatmap)</div>
-					<div class="text-muted-foreground leading-relaxed">
-						<div class="flex flex-wrap items-center gap-2">
-							<span class="rounded-md bg-purple-500/15 text-purple-700 dark:text-purple-300 px-2 py-0.5 font-bold">จุดสับสนหลัก: เสียง 3 → เสียง 2</span>
-						</div>
-						<p class="pt-0.5">เสียง 3 มักลากหางเสียงเหินไปคล้ายเสียง 2 แนะนำเน้นกดระดับเสียงต่ำ (สเกล 214) ให้ชัดเจนก่อนตวัดขึ้น</p>
-					</div>
 				</div>
 			</div>
 		</div>
 	</section>
 
-	<!-- DEEP-DIVE: Mandarin Tone Sandhi & Bidirectional 2 <-> 3 Analysis -->
-	<section class="rounded-2xl border border-border bg-card p-6 space-y-6">
-		<!-- Deep Dive Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
-			<div class="flex items-center gap-3">
-				<div class="flex size-10 items-center justify-center rounded-xl border border-border bg-background text-primary shrink-0">
-					<ArrowRightLeft class="size-5" />
-				</div>
-				<div>
-					<div class="flex items-center gap-2">
-						<h3 class="text-base sm:text-lg font-bold text-foreground">
-							ความสับสนวรรณยุกต์ 2 ↔ 3 และ Tone Sandhi
-						</h3>
-						<span class="rounded-md border border-border bg-muted text-foreground px-2 py-0.5 text-xs font-medium font-mono">
-							2 ↔ 3
-						</span>
-					</div>
-					<p class="text-xs text-muted-foreground mt-0.5">
-						เทียบทิศทาง 2→3 และ 3→2 จากผลประเมินจริงในฐานข้อมูล
-					</p>
-				</div>
-			</div>
-
-			<div class="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-mono">
-				<span class="text-muted-foreground">ตัวอย่าง:</span>
-				<span class="font-semibold text-foreground">N = {toneSandhiStats.samples}</span>
-				<span class="text-muted-foreground">({toneSandhiStats.confusionRate !== null ? `${toneSandhiStats.confusionRate}%` : '—'})</span>
-			</div>
-		</div>
-
-		<!-- Directional Breakdown Comparison Grid -->
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-			<!-- CARD 1: Direction 2 -> 3 -->
-			<div class="rounded-xl border border-border bg-background p-5 space-y-3">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<span class="size-2 rounded-full bg-primary"></span>
-						<span class="text-xs font-semibold text-foreground">
-							เสียง 2 → เสียง 3
-						</span>
-					</div>
-					<span class="rounded border border-border bg-card text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
-						ระดับเสียงตั้งต้นต่ำ
-					</span>
-				</div>
-
-				<div class="flex items-baseline gap-3 pt-1">
-					<span class="text-3xl font-bold font-mono text-primary">
-						{toneSandhiStats.t2AsT3Pct !== null ? `${toneSandhiStats.t2AsT3Pct}%` : '—'}
-					</span>
-					<div class="text-xs text-muted-foreground">
-						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t2AsT3Count ?? 0}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples2 ?? 0}</strong> ครั้ง
-					</div>
-				</div>
-
-				<div class="space-y-2 text-xs leading-relaxed text-muted-foreground pt-2 border-t border-border">
-					<div class="text-foreground font-semibold flex items-center gap-1.5 text-xs">
-						<BookOpen class="size-3.5 text-muted-foreground" />
-						<span>สาเหตุหลัก</span>
-					</div>
-					<p class="text-xs">
-						ผู้เรียนมักเริ่มเสียง 2 (35) ต่ำเกินไป (F0 &lt; 150 Hz) คล้ายเสียงจัตวาไทย ทำให้ระบบตรวจเป็นเสียง 3 (214)
-					</p>
-					<div class="rounded-lg border border-border bg-card p-2.5 text-xs text-foreground">
-						<strong>วิธีแก้:</strong> เริ่มเปล่งเสียงจากระดับกลาง (สเกล 3) แล้วไต่ขึ้นระดับ 5 ทันที
-					</div>
-				</div>
-
-				<div class="pt-2 flex items-center justify-between">
-					<div class="text-xs font-mono font-semibold text-foreground">
-						ตัวอย่าง: <span class="text-base font-serif">麻</span> <span class="text-muted-foreground font-sans">má (เสียง 2)</span>
-					</div>
-					<button
-						type="button"
-						onclick={() => playToneAudio(2)}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium text-xs transition cursor-pointer"
-					>
-						<Volume2 class="size-3.5 text-primary" />
-						<span>ฟังเสียง 2</span>
-					</button>
-				</div>
-			</div>
-
-			<!-- CARD 2: Direction 3 -> 2 (Tone Sandhi) -->
-			<div class="rounded-xl border border-border bg-background p-5 space-y-3">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<span class="size-2 rounded-full bg-slate-500"></span>
-						<span class="text-xs font-semibold text-foreground">
-							เสียง 3 → เสียง 2 (Tone Sandhi)
-						</span>
-					</div>
-					<span class="rounded border border-border bg-card text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
-						ตวัดเสียงเร็ว
-					</span>
-				</div>
-
-				<div class="flex items-baseline gap-3 pt-1">
-					<span class="text-3xl font-bold font-mono text-foreground">
-						{toneSandhiStats.t3AsT2Pct !== null ? `${toneSandhiStats.t3AsT2Pct}%` : '—'}
-					</span>
-					<div class="text-xs text-muted-foreground">
-						พบ <strong class="text-foreground font-mono">{toneSandhiStats.t3AsT2Count ?? 0}</strong> / <strong class="text-foreground font-mono">{toneSandhiStats.samples3 ?? 0}</strong> ครั้ง
-					</div>
-				</div>
-
-				<div class="space-y-2 text-xs leading-relaxed text-muted-foreground pt-2 border-t border-border">
-					<div class="text-foreground font-semibold flex items-center gap-1.5 text-xs">
-						<BookOpen class="size-3.5 text-muted-foreground" />
-						<span>สาเหตุหลัก</span>
-					</div>
-					<p class="text-xs">
-						เกิดจากกฎ Tone Sandhi (3+3 ➔ 2+3 เช่น 你好) หรือผู้เรียนตวัดเสียงขึ้นเร็วเกินไปก่อนถึงระดับต่ำสุด (Chao Scale 1)
-					</p>
-					<div class="rounded-lg border border-border bg-card p-2.5 text-xs text-foreground">
-						<strong>วิธีแก้:</strong> กดระดับเสียงลงต่ำสุด (สเกล 1) สั้นๆ ก่อนยกปลายเสียงขึ้น
-					</div>
-				</div>
-
-				<div class="pt-2 flex items-center justify-between">
-					<div class="text-xs font-mono font-semibold text-foreground">
-						ตัวอย่าง: <span class="text-base font-serif">马</span> <span class="text-muted-foreground font-sans">mǎ (เสียง 3)</span>
-					</div>
-					<button
-						type="button"
-						onclick={() => playToneAudio(3)}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium text-xs transition cursor-pointer"
-					>
-						<Volume2 class="size-3.5 text-primary" />
-						<span>ฟังเสียง 3</span>
-					</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- Minimal Pair Contrast Strip -->
-		<div class="rounded-xl bg-background border border-border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-			<div class="flex items-center gap-3">
-				<div class="size-9 rounded-lg border border-border bg-card text-primary flex items-center justify-center shrink-0">
-					<Sparkles class="size-4" />
-				</div>
-				<div>
-					<div class="text-xs font-semibold text-foreground">
-						คู่เทียบเสียง: 麻 (má) vs 马 (mǎ)
-					</div>
-					<div class="text-xs text-muted-foreground">
-						({toneSandhiStats.t2AsT3Count ?? 0} + {toneSandhiStats.t3AsT2Count ?? 0}) ÷ {toneSandhiStats.samples} = <strong>{toneSandhiStats.confusionRate !== null ? `${toneSandhiStats.confusionRate}%` : '—'}</strong>
-					</div>
-				</div>
-			</div>
-
+	<!-- COMPACT: 2 <-> 3 Tone Confusion Comparison -->
+	<section class="rounded-2xl border border-border bg-card p-5 space-y-4">
+		<div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border">
 			<div class="flex items-center gap-2">
+				<ArrowRightLeft class="size-4 text-primary" />
+				<h3 class="text-sm font-bold text-foreground">ความสับสนวรรณยุกต์ 2 ↔ 3</h3>
+			</div>
+			<div class="inline-flex items-center gap-2 text-xs font-mono text-muted-foreground">
+				<span>N = <strong class="text-foreground">{toneSandhiStats.samples}</strong></span>
+				<span>({toneSandhiStats.confusionRate !== null ? `${toneSandhiStats.confusionRate}%` : '—'})</span>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<!-- CARD 1: 2 -> 3 -->
+			<div class="rounded-xl border border-border bg-background p-4 flex items-center justify-between gap-3">
+				<div>
+					<div class="text-xs font-semibold text-muted-foreground">เสียง 2 → เสียง 3</div>
+					<div class="flex items-baseline gap-2 mt-1">
+						<span class="text-2xl font-bold font-mono text-primary">
+							{toneSandhiStats.t2AsT3Pct !== null ? `${toneSandhiStats.t2AsT3Pct}%` : '—'}
+						</span>
+						<span class="text-xs text-muted-foreground font-mono">
+							({toneSandhiStats.t2AsT3Count ?? 0}/{toneSandhiStats.samples2 ?? 0} ครั้ง)
+						</span>
+					</div>
+				</div>
 				<button
 					type="button"
 					onclick={() => playToneAudio(2)}
-					class="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-mono font-semibold flex items-center gap-1.5 transition cursor-pointer"
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium text-xs transition cursor-pointer shrink-0"
 				>
-					<Volume2 class="size-3 text-primary" />
-					<span>má [35]</span>
+					<Volume2 class="size-3.5 text-primary" />
+					<span>麻 má</span>
 				</button>
-				<span class="text-xs text-muted-foreground font-mono">vs</span>
+			</div>
+
+			<!-- CARD 2: 3 -> 2 -->
+			<div class="rounded-xl border border-border bg-background p-4 flex items-center justify-between gap-3">
+				<div>
+					<div class="text-xs font-semibold text-muted-foreground">เสียง 3 → เสียง 2</div>
+					<div class="flex items-baseline gap-2 mt-1">
+						<span class="text-2xl font-bold font-mono text-foreground">
+							{toneSandhiStats.t3AsT2Pct !== null ? `${toneSandhiStats.t3AsT2Pct}%` : '—'}
+						</span>
+						<span class="text-xs text-muted-foreground font-mono">
+							({toneSandhiStats.t3AsT2Count ?? 0}/{toneSandhiStats.samples3 ?? 0} ครั้ง)
+						</span>
+					</div>
+				</div>
 				<button
 					type="button"
 					onclick={() => playToneAudio(3)}
-					class="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-xs font-mono font-semibold flex items-center gap-1.5 transition cursor-pointer"
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium text-xs transition cursor-pointer shrink-0"
 				>
-					<Volume2 class="size-3 text-foreground" />
-					<span>mǎ [214]</span>
+					<Volume2 class="size-3.5 text-foreground" />
+					<span>马 mǎ</span>
 				</button>
 			</div>
+		</div>
+	</section>
+
+	<!-- Recent Pronunciation Sessions Log -->
+	<section class="rounded-3xl border bg-card p-6 shadow-xs space-y-4">
+		<div class="flex items-center justify-between border-b pb-3">
+			<div class="flex items-center gap-2">
+				<Clock class="size-4 text-purple-500" />
+				<h3 class="font-bold text-sm text-foreground uppercase tracking-wider">
+					ประวัติการฝึกออกเสียงล่าสุด (Recent Completed Sessions)
+				</h3>
+			</div>
+			<span class="text-xs text-muted-foreground">แสดงประวัติล่าสุด 50 รายการ</span>
+		</div>
+
+		<div class="overflow-x-auto rounded-2xl border">
+			<table class="w-full text-left text-xs">
+				<thead class="border-b bg-muted/30 font-bold uppercase tracking-wider text-muted-foreground">
+					<tr>
+						<th class="py-2.5 px-3">เวลา</th>
+						<th class="py-2.5 px-3">ผู้เรียน</th>
+						<th class="py-2.5 px-3">คำศัพท์</th>
+						<th class="py-2.5 px-3 text-center">โหมด</th>
+						<th class="py-2.5 px-3 text-right">GOP / Tone</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y">
+					{#each (activeLearningAnalytics?.recentPronunciationSessions ?? []) as r (r.id)}
+						<tr class="hover:bg-muted/10 transition">
+							<td class="py-2.5 px-3 font-mono text-muted-foreground text-[11px]">
+								{r.createdAt ? new Date(r.createdAt).toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+							</td>
+							<td class="py-2.5 px-3 font-bold text-foreground">@{r.username}</td>
+							<td class="py-2.5 px-3">
+								<span class="font-bold text-foreground">{r.wordId}</span>
+								{#if r.pinyin}
+									<span class="font-mono text-muted-foreground ml-1">({r.pinyin})</span>
+								{/if}
+							</td>
+							<td class="py-2.5 px-3 text-center">
+								<span class="rounded bg-muted px-2 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+									{r.practiceMode === 'stage' ? 'ด่าน Quest' : r.practiceMode === 'assessment' ? 'แบบทดสอบ' : 'ฝึกคำเดี่ยว'}
+								</span>
+							</td>
+							<td class="py-2.5 px-3 text-right font-mono">
+								<span class="font-bold text-purple-600">GOP {r.gopScore}%</span>
+								<span class="text-muted-foreground ml-1.5">· Tone {r.toneScore}%</span>
+							</td>
+						</tr>
+					{:else}
+						<tr>
+							<td colspan="5" class="py-8 text-center text-muted-foreground">ยังไม่มีประวัติการฝึกออกเสียง</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 	</section>
 </div>

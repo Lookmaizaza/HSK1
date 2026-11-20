@@ -1,7 +1,7 @@
 import type { LayoutServerLoad } from './$types';
-import { getUserConsent } from '$lib/server/db';
+import { getUserConsentsSummary } from '$lib/server/db';
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, cookies }) => {
 	const user = locals.user;
 	let showConsent = false;
 
@@ -9,13 +9,26 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!user) {
 		showConsent = true;
 	} else if (!user.isAdmin && !user.isImpersonated) {
-		try {
-			const userId = String(user.id);
-			const audio = await getUserConsent(userId, 'audio_processing');
-			const research = await getUserConsent(userId, 'pdpa_research_telemetry');
-			showConsent = !(audio && research);
-		} catch {
+		const userId = String(user.id);
+		const cachedCookie = cookies.get('pdpa_consent_uid');
+		if (cachedCookie === userId) {
 			showConsent = false;
+		} else {
+			try {
+				const { audio, research } = await getUserConsentsSummary(userId);
+				const hasBoth = audio && research;
+				showConsent = !hasBoth;
+				if (hasBoth) {
+					cookies.set('pdpa_consent_uid', userId, {
+						path: '/',
+						httpOnly: true,
+						sameSite: 'lax',
+						maxAge: 30 * 24 * 60 * 60
+					});
+				}
+			} catch {
+				showConsent = false;
+			}
 		}
 	}
 

@@ -1,8 +1,8 @@
-import { json } from '@sveltejs/kit';
+import { json, type RequestEvent } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { env } from '$env/dynamic/private';
 
-export const GET = async () => {
+export const GET = async ({ locals }: RequestEvent) => {
 	const rawUrl = env.TURSO_DATABASE_URL?.trim();
 	const rawToken = env.TURSO_AUTH_TOKEN?.trim();
 	const hasUrl = !!rawUrl;
@@ -22,14 +22,28 @@ export const GET = async () => {
 		}
 	}
 
+	const authAdmin = locals.realAdmin || locals.user;
+	const isAdmin = Boolean(authAdmin?.isAdmin);
+
+	if (!isAdmin) {
+		return json({
+			status: dbStatus === 'connected' ? 'ok' : 'degraded',
+			timestamp: new Date().toISOString(),
+			database: {
+				status: dbStatus
+			}
+		});
+	}
+
 	return json({
+		status: dbStatus === 'connected' ? 'ok' : 'degraded',
 		timestamp: new Date().toISOString(),
 		database: {
 			hasTursoUrl: hasUrl,
 			hasTursoToken: hasToken,
 			urlPreview: rawUrl ? `${rawUrl.slice(0, 16)}...` : null,
 			status: dbStatus,
-			error: dbError
+			error: dbError ? 'Database connection check failed' : null
 		}
 	});
 };

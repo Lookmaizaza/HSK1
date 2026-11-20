@@ -25,8 +25,8 @@
 
 	let { data } = $props();
 
-	const stageId = $page.params.stage || '';
-	const baseStage: QuestStage | undefined = QUEST_STAGE_MAP.get(stageId);
+	const stageId = $derived($page.params.stage || '');
+	const baseStage = $derived<QuestStage | undefined>(QUEST_STAGE_MAP.get(stageId));
 	const stageData = $derived(
 		baseStage
 			? ({
@@ -43,6 +43,7 @@
 	let hintsUsed = 0;
 	let retriesCount = 0;
 	let stageCompleted = false;
+	let isDestroyed = false;
 
 	function sendStageTelemetry(eventType: 'view' | 'attempt' | 'pass' | 'fail' | 'hint' | 'listen', score = 0) {
 		if (!stageId || typeof window === 'undefined') return;
@@ -71,12 +72,28 @@
 	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
 	let audioDelayTimer: ReturnType<typeof setTimeout> | null = null;
 	let maxRecordTimeout: ReturnType<typeof setTimeout> | null = null;
+	let feedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function clearAudioTimer() {
 		if (audioDelayTimer) {
 			clearTimeout(audioDelayTimer);
 			audioDelayTimer = null;
 		}
+	}
+
+	function clearFeedbackTimer() {
+		if (feedbackTimer) {
+			clearTimeout(feedbackTimer);
+			feedbackTimer = null;
+		}
+	}
+
+	function scheduleFeedbackTimer(fn: () => void, delayMs: number) {
+		clearFeedbackTimer();
+		feedbackTimer = setTimeout(() => {
+			feedbackTimer = null;
+			if (!isDestroyed) fn();
+		}, delayMs);
 	}
 	
 	let hasVoicedSpeech = false;
@@ -104,11 +121,34 @@
 	});
 
 	onDestroy(() => {
-		if (!stageCompleted) {
+		isDestroyed = true;
+		if (!stageCompleted && (retriesCount > 0 || currentIndex > 0)) {
 			sendStageTelemetry('fail');
 		}
 		clearAudioTimer();
-		stopRecording();
+		clearFeedbackTimer();
+		if (silenceTimeout) {
+			clearTimeout(silenceTimeout);
+			silenceTimeout = null;
+		}
+		if (maxRecordTimeout) {
+			clearTimeout(maxRecordTimeout);
+			maxRecordTimeout = null;
+		}
+		if (speechRecognizer) {
+			try {
+				speechRecognizer.abort();
+			} catch {}
+			try {
+				speechRecognizer.stop();
+			} catch {}
+			speechRecognizer = null;
+		}
+		if (tracker) {
+			tracker.destroy();
+			tracker = null;
+		}
+		isRecording = false;
 	});
 
 	const currentChallenge = $derived(stageData?.challenges[currentIndex]);
@@ -150,6 +190,7 @@
 
 	function nextChallenge() {
 		clearAudioTimer();
+		clearFeedbackTimer();
 		if (stageData && currentIndex < stageData.challenges.length - 1) {
 			currentIndex++;
 			feedbackType = 'none';
@@ -167,13 +208,13 @@
 			if (index === currentChallenge.correctChoiceIndex) {
 				feedbackType = 'success';
 				feedbackMessage = 'ถูกต้อง!';
-				setTimeout(nextChallenge, 1500);
+				scheduleFeedbackTimer(nextChallenge, 1500);
 			} else {
 				feedbackType = 'error';
 				feedbackMessage = 'ผิด! คำแปลที่ถูกคือ: ' + currentChallenge.word.thai;
 				stageMistakes++;
 				progress.recordMistake();
-				setTimeout(nextChallenge, 2000);
+				scheduleFeedbackTimer(nextChallenge, 2000);
 			}
 		}
 	}
@@ -187,6 +228,7 @@
 		retriesCount++;
 		sendStageTelemetry('attempt');
 		clearAudioTimer();
+		clearFeedbackTimer();
 		if (typeof window !== 'undefined' && window.speechSynthesis) {
 			try {
 				window.speechSynthesis.cancel();
@@ -259,12 +301,38 @@
 		};
 
 		const ok = await tracker.start();
+		if (isDestroyed) {
+			if (speechRecognizer) {
+				try {
+					speechRecognizer.abort();
+				} catch {}
+				try {
+					speechRecognizer.stop();
+				} catch {}
+				speechRecognizer = null;
+			}
+			if (tracker) {
+				tracker.destroy();
+				tracker = null;
+			}
+			isRecording = false;
+			return;
+		}
 		if (ok) {
 			isRecording = true;
 			if (maxRecordTimeout) clearTimeout(maxRecordTimeout);
 			maxRecordTimeout = setTimeout(() => {
 				if (isRecording) stopRecording();
 			}, 3500);
+		} else {
+			isRecording = false;
+			if (speechRecognizer) {
+				try {
+					speechRecognizer.stop();
+				} catch {}
+				speechRecognizer = null;
+			}
+			feedbackType = 'none';
 		}
 	}
 
@@ -289,6 +357,7 @@
 
 		const recorded = tracker.stop();
 		isRecording = false;
+		if (isDestroyed) return;
 
 		try {
 			if (recorded.length > 0 && currentChallenge) {
@@ -308,7 +377,7 @@
 				if (candidatePool.length === 0 && !isRealHumanVoice && recorded.length < 5) {
 					feedbackType = 'error';
 					feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
-					setTimeout(() => {
+					scheduleFeedbackTimer(() => {
 						if (feedbackType === 'error') feedbackType = 'none';
 					}, 1500);
 					return;
@@ -319,7 +388,7 @@
 					if (candidatePool.length === 0) {
 						feedbackType = 'error';
 						feedbackMessage = 'ไม่พบเสียงพูด กรุณาอ่านประโยคให้ชัดเจน';
-						setTimeout(() => {
+						scheduleFeedbackTimer(() => {
 							if (feedbackType === 'error') feedbackType = 'none';
 						}, 1500);
 						return;
@@ -332,13 +401,13 @@
 					if (sentenceRes.isAllCorrect) {
 						feedbackType = 'success';
 						feedbackMessage = sentenceRes.feedback;
-						setTimeout(nextChallenge, 800);
+						scheduleFeedbackTimer(nextChallenge, 800);
 					} else {
 						feedbackType = 'error';
 						feedbackMessage = sentenceRes.feedback;
 						stageMistakes++;
 						progress.recordMistake();
-						setTimeout(() => {
+						scheduleFeedbackTimer(() => {
 							if (feedbackType === 'error') feedbackType = 'none';
 						}, 2000);
 					}
@@ -359,6 +428,7 @@
 					syllables,
 					predictToneNeuralNetwork
 				);
+				if (isDestroyed) return;
 
 				// ASR analysis: check spoken words & candidates
 				const targetHanzi = currentChallenge.word.hanzi;
@@ -396,8 +466,8 @@
 						expectedTone: currentChallenge.word.tone
 					},
 					behavior: {
-						listenedToExample: currentChallenge.type === 'listen_speak' || showHint,
-						listenCount: currentChallenge.type === 'listen_speak' ? 1 : 0,
+						listenedToExample: currentChallenge.type === 'listen_speak' || showHint || listenCount > 0,
+						listenCount,
 						listenTimestamps: []
 					},
 					assessment: {
@@ -437,7 +507,7 @@
 					feedbackMessage = isAllTonesMatch
 						? 'ยอดเยี่ยม! เสียงและวรรณยุกต์ถูกต้อง'
 						: `ดีมาก! ออกเสียงคำว่า "${targetHanzi}" ถูกต้อง`;
-					setTimeout(nextChallenge, 750);
+					scheduleFeedbackTimer(nextChallenge, 750);
 				} else {
 					feedbackType = 'error';
 					if (isWordCorrect && !isToneReasonable) {
@@ -469,20 +539,21 @@
 
 					stageMistakes++;
 					progress.recordMistake();
-					setTimeout(() => {
+					scheduleFeedbackTimer(() => {
 						if (feedbackType === 'error') feedbackType = 'none';
 					}, 1800);
 				}
 			} else {
 				feedbackType = 'error';
 				feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
-				setTimeout(() => {
+				scheduleFeedbackTimer(() => {
 					if (feedbackType === 'error') feedbackType = 'none';
 				}, 1500);
 			}
 		} catch (err) {
 			console.error('Error during pronunciation evaluation:', err);
-			feedbackType = 'error';
+			isRecording = false;
+			feedbackType = 'none';
 			feedbackMessage = 'ยังตรวจเสียงไม่ได้ ลองพูดอีกครั้งนะ';
 		}
 	}

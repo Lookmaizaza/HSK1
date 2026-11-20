@@ -163,7 +163,7 @@
 					แดชบอร์ดพัฒนาการเรียนรู้ 6 ทักษะ
 				</h1>
 				<p class="text-xs text-muted-foreground">
-					วิเคราะห์จากข้อมูลการฝึกจริงทั้งการพูด คัดอักษรจีน ผจญภัย ข้อสอบ HSK และสนทนา AI
+					วิเคราะห์จากข้อมูลการฝึกจริงทั้งการพูด แฟลชการ์ด ผจญภัย ข้อสอบ HSK และสนทนา AI
 				</p>
 			</div>
 
@@ -225,7 +225,7 @@
 					<p class="text-[11px] text-muted-foreground">ภาพรวมความสมดุลจากทุกโหมดในระบบ</p>
 				</div>
 				<span class="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-extrabold text-primary">
-					{vocabOverview.practicedWords}/{vocabOverview.totalWords} คำ
+					{vocabOverview?.practicedWords ?? 0}/{vocabOverview?.totalWords ?? 0} คำ
 				</span>
 			</div>
 			<StudentSkillRadar axes={data.radarAxes || []} overallScore={data.holisticReadinessScore} />
@@ -306,37 +306,37 @@
 	<!-- TAB 1: CROSS-SKILL OVERVIEW -->
 	{#if activeTab === 'overview'}
 		<section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-			<!-- Card 1: Hanzi Writing -->
+			<!-- Card 1: Flashcards -->
 			<div class="rounded-3xl border bg-card p-5 space-y-3 shadow-sm">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2.5">
 						<div class="rounded-xl bg-emerald-500/15 p-2.5 text-emerald-600 dark:text-emerald-400">
-							<PenTool class="size-4" />
+							<BookOpen class="size-4" />
 						</div>
 						<div>
-							<h3 class="text-sm font-black text-foreground">คัดอักษรจีนตามลำดับขีด</h3>
-							<p class="text-[11px] text-muted-foreground">ฝึกแล้ว {crossSkill?.writing.attempts ?? 0} ครั้ง</p>
+							<h3 class="text-sm font-black text-foreground">แฟลชการ์ด (ทบทวนคำศัพท์)</h3>
+							<p class="text-[11px] text-muted-foreground">จบแล้ว {crossSkill?.flashcard.setsCompleted ?? 0} ชุด · ฝึก {crossSkill?.flashcard.totalWords ?? 0} คำ</p>
 						</div>
 					</div>
 					<span class="font-mono text-lg font-black text-emerald-600 dark:text-emerald-400">
-						{crossSkill?.writing.avgScore !== null && crossSkill?.writing.avgScore !== undefined ? `${crossSkill.writing.avgScore}%` : '—'}
+						{crossSkill?.flashcard.totalWords ? `${Math.round((crossSkill.flashcard.totalMastered / crossSkill.flashcard.totalWords) * 100)}%` : '—'}
 					</span>
 				</div>
-				{#if crossSkill?.writing.weakCharacters.length}
-					<div class="flex flex-wrap items-center gap-1.5 text-xs">
-						<span class="text-[11px] text-muted-foreground">ตัวที่ผิดบ่อย:</span>
-						{#each crossSkill.writing.weakCharacters as wc (wc.character)}
-							<span class="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 font-bold text-rose-600 dark:text-rose-400">
-								{wc.character} ({wc.avgMistakes.toFixed(1)} ขีด)
-							</span>
-						{/each}
+				{#if crossSkill?.flashcard.totalWords}
+					<div class="flex flex-wrap items-center gap-2 text-xs">
+						<span class="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 font-bold text-emerald-600 dark:text-emerald-400">
+							จำได้แล้ว {crossSkill.flashcard.totalMastered} คำ
+						</span>
+						<span class="rounded-lg bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 font-bold text-amber-600 dark:text-amber-400">
+							ต้องทวน {crossSkill.flashcard.totalReview} คำ
+						</span>
 					</div>
 				{:else}
-					<p class="text-xs text-muted-foreground">ยังไม่มีข้อมูลตัวอักษรที่ผิดลำดับขีดบ่อย</p>
+					<p class="text-xs text-muted-foreground">ทบทวนคำศัพท์ด้วย Flashcards เพื่อเพิ่มคลังคำจำแม่นยำ</p>
 				{/if}
 				<div class="pt-1">
-					<a href="/quest" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
-						<span>ไปฝึกคัดในบทเรียน</span>
+					<a href="/flashcard" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+						<span>เปิด Flashcards</span>
 						<ArrowRight class="size-3" />
 					</a>
 				</div>
@@ -362,7 +362,7 @@
 				</div>
 				{#if crossSkill?.exam.latestExam}
 					{@const ex = crossSkill.exam.latestExam}
-					<div class="grid grid-cols-3 gap-2 text-center rounded-2xl bg-muted/40 p-2.5 text-xs">
+					<div class="grid {ex.hskLevel >= 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-2 text-center rounded-2xl bg-muted/40 p-2.5 text-xs">
 						<div>
 							<div class="text-[10px] text-muted-foreground">ฟัง</div>
 							<div class="font-mono font-bold text-foreground">{ex.listeningScore}</div>
@@ -371,10 +371,12 @@
 							<div class="text-[10px] text-muted-foreground">อ่าน</div>
 							<div class="font-mono font-bold text-foreground">{ex.readingScore}</div>
 						</div>
-						<div>
-							<div class="text-[10px] text-muted-foreground">เขียน</div>
-							<div class="font-mono font-bold text-foreground">{ex.writingScore}</div>
-						</div>
+						{#if ex.hskLevel >= 3}
+							<div>
+								<div class="text-[10px] text-muted-foreground">เขียน</div>
+								<div class="font-mono font-bold text-foreground">{ex.writingScore}</div>
+							</div>
+						{/if}
 					</div>
 				{:else}
 					<p class="text-xs text-muted-foreground">ลองทำข้อสอบจำลอง HSK เพื่อวัดระดับความพร้อม</p>
@@ -420,7 +422,7 @@
 				</div>
 			</div>
 
-			<!-- Card 4: Flashcards & Adventure Quest -->
+			<!-- Card 4: Adventure Quest -->
 			<div class="rounded-3xl border bg-card p-5 space-y-3 shadow-sm">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2.5">
@@ -428,28 +430,24 @@
 							<Compass class="size-4" />
 						</div>
 						<div>
-							<h3 class="text-sm font-black text-foreground">Flashcards & ด่านผจญภัย</h3>
+							<h3 class="text-sm font-black text-foreground">ด่านผจญภัย (Quest Stages)</h3>
 							<p class="text-[11px] text-muted-foreground">
-								Flashcards {crossSkill?.flashcard.setsCompleted ?? 0} ชุด · ดาวด่าน {crossSkill?.progress.totalStars ?? 0} ★
+								สะสมดาว {crossSkill?.progress.totalStars ?? 0} ★ · ลองเล่น {crossSkill?.quest.totalAttempts ?? 0} ครั้ง
 							</p>
 						</div>
 					</div>
 					<span class="font-mono text-lg font-black text-violet-600 dark:text-violet-400">
-						{crossSkill?.progress.lessonsCompleted ?? 0} บท
+						{crossSkill?.progress.lessonsCompleted ?? 0} ด่าน
 					</span>
 				</div>
 				<p class="text-xs text-muted-foreground">
-					{#if crossSkill?.flashcard.totalWords}
-						จำได้แล้ว {crossSkill.flashcard.totalMastered} คำ · ต้องทวน {crossSkill.flashcard.totalReview} คำ
+					{#if crossSkill?.quest.passedStages}
+						ผ่านด่านแล้ว {crossSkill.quest.passedStages} ด่าน · สะสม {crossSkill?.progress.totalStars ?? 0} ดาว
 					{:else}
-						ทบทวนคำศัพท์ด้วย Flashcards และตะลุยด่านผจญภัยเพื่อสะสมดาว
+						ตะลุยด่านผจญภัยทีละบทเรียนเพื่อฝึกออกเสียงและสะสมดาว
 					{/if}
 				</p>
-				<div class="flex items-center gap-4 pt-1">
-					<a href="/flashcard" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
-						<span>เปิด Flashcards</span>
-						<ArrowRight class="size-3" />
-					</a>
+				<div class="pt-1">
 					<a href="/quest" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
 						<span>ลุยด่านผจญภัย</span>
 						<ArrowRight class="size-3" />
@@ -467,7 +465,7 @@
 				เลือกระดับคำศัพท์ (HSK Levels)
 			</span>
 			<span class="text-xs text-muted-foreground">
-				ฝึกแล้ว <strong class="text-foreground">{totalPracticedWords}</strong> จาก {vocabOverview.totalWords} คำ
+				ฝึกแล้ว <strong class="text-foreground">{totalPracticedWords}</strong> จาก {vocabOverview?.totalWords ?? 0} คำ
 			</span>
 		</div>
 
@@ -481,7 +479,7 @@
 				<div class="flex items-center justify-between">
 					<span class="text-xs font-black text-foreground">ทุกระดับ (HSK 1-3)</span>
 					<span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-						1,000 คำ
+						{(vocabOverview?.totalWords ?? 1000).toLocaleString()} คำ
 					</span>
 				</div>
 				<div class="mt-2 flex items-center justify-between text-xs">
@@ -825,7 +823,7 @@
 										<span class="text-rose-500 font-mono">คะแนนเฉลี่ย {guide.avgMistakeGop}</span>
 									</div>
 									<div class="flex flex-wrap gap-1.5 pt-1">
-										{#each guide.mistakeWords as mw}
+										{#each guide.mistakeWords as mw (mw.hanzi)}
 											<a
 												href="/pitch?word={encodeURIComponent(mw.hanzi)}"
 												class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-xs font-medium border transition group"
@@ -950,7 +948,7 @@
 				</div>
 			{:else}
 				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-					{#each displayedRemedialCards as card}
+					{#each displayedRemedialCards as card (`${card.hanzi}_${card.hskLevel}`)}
 						<div class="group rounded-3xl border bg-card p-5 shadow-xs hover:shadow-md hover:border-emerald-500/60 transition flex flex-col justify-between space-y-3">
 							<div>
 								<div class="flex items-start justify-between">
@@ -1070,7 +1068,7 @@
 			>
 				ทั้งหมด
 			</button>
-			{#each [1, 2, 3, 4] as t}
+			{#each [1, 2, 3, 4] as t (t)}
 				{@const badge = getToneBadge(t)}
 				<button
 					type="button"
