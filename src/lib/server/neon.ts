@@ -22,9 +22,9 @@ function getNeonConfig() {
 }
 
 /**
- * Executes raw SQL query on Neon Serverless PostgreSQL via HTTP API
+ * Executes parameterized SQL query on Neon Serverless PostgreSQL via HTTP API
  */
-export async function executeNeonQuery<T = any>(query: string): Promise<T[]> {
+export async function queryNeon<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {
 	const cfg = getNeonConfig();
 	if (!cfg) return [];
 
@@ -35,7 +35,7 @@ export async function executeNeonQuery<T = any>(query: string): Promise<T[]> {
 				'Content-Type': 'application/json',
 				'Neon-Connection-String': cfg.connectionString
 			},
-			body: JSON.stringify({ query }),
+			body: JSON.stringify({ query: sql, params }),
 			signal: AbortSignal.timeout(6000)
 		});
 
@@ -52,6 +52,8 @@ export async function executeNeonQuery<T = any>(query: string): Promise<T[]> {
 		return [];
 	}
 }
+
+export const executeNeonQuery = queryNeon;
 
 /**
  * Records stage telemetry event to Neon DB (view, attempt, pass, fail, hint, listen)
@@ -77,7 +79,7 @@ export async function recordNeonStageTelemetry(params: {
 		hintsUsed = 0
 	} = params;
 
-	const safeStageId = stageId.replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 64);
+	const safeStageId = String(stageId || '').replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 64);
 	const safeUserId = String(userId || 'anonymous').replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 64);
 	const ALLOWED = new Set(['view', 'attempt', 'pass', 'fail', 'hint', 'listen']);
 	const safeEventType = ALLOWED.has(eventType) ? eventType : 'view';
@@ -92,13 +94,20 @@ export async function recordNeonStageTelemetry(params: {
 		INSERT INTO stage_telemetry (
 			id, stage_id, user_id, event_type, score, time_spent_ms, retries_count, listen_count, hints_used, created_at
 		) VALUES (
-			gen_random_uuid(), '${safeStageId}', '${safeUserId}', '${safeEventType}',
-			${safeScore}, ${safeTime}, ${safeRetries},
-			${safeListen}, ${safeHints}, CURRENT_TIMESTAMP
+			gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP
 		);
 	`;
 
-	return executeNeonQuery(query);
+	return queryNeon(query, [
+		safeStageId,
+		safeUserId,
+		safeEventType,
+		safeScore,
+		safeTime,
+		safeRetries,
+		safeListen,
+		safeHints
+	]);
 }
 
 /**
@@ -127,7 +136,7 @@ export async function getNeonStageTelemetryStats(): Promise<Record<string, {
 		GROUP BY stage_id;
 	`;
 
-	const rows = await executeNeonQuery<any>(query);
+	const rows = await queryNeon<any>(query);
 	const statsMap: Record<string, any> = {};
 
 	for (const row of rows) {
@@ -159,24 +168,23 @@ export async function recordNeonAuditLog(params: {
 }) {
 	const { actorUsername, action, resourceType, resourceId, details = {}, ipAddress = '', userAgent = '' } = params;
 
-	const safeActor = actorUsername.replace(/'/g, "''");
-	const safeAction = action.replace(/'/g, "''");
-	const safeType = resourceType.replace(/'/g, "''");
-	const safeId = resourceId.replace(/'/g, "''");
-	const safeDetails = JSON.stringify(details).replace(/'/g, "''");
-	const safeIp = ipAddress.replace(/'/g, "''");
-	const safeUa = userAgent.slice(0, 500).replace(/'/g, "''");
-
 	const query = `
 		INSERT INTO audit_logs (
 			id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at
 		) VALUES (
-			gen_random_uuid(), '${safeActor}', '${safeAction}', '${safeType}', '${safeId}',
-			'${safeDetails}'::jsonb, '${safeIp}', '${safeUa}', CURRENT_TIMESTAMP
+			gen_random_uuid(), $1, $2, $3, $4, $5::jsonb, $6, $7, CURRENT_TIMESTAMP
 		);
 	`;
 
-	return executeNeonQuery(query);
+	return queryNeon(query, [
+		String(actorUsername || ''),
+		String(action || ''),
+		String(resourceType || ''),
+		String(resourceId || ''),
+		JSON.stringify(details ?? {}),
+		String(ipAddress || ''),
+		String(userAgent || '').slice(0, 500)
+	]);
 }
 
 /**
@@ -191,14 +199,15 @@ export async function getNeonAuditLogs(limit = 50): Promise<Array<{
 	details: any;
 	createdAt: string;
 }>> {
+	const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(500, Math.trunc(Number(limit)))) : 50;
 	const query = `
 		SELECT id, actor_username, action, resource_type, resource_id, details, created_at
 		FROM audit_logs
 		ORDER BY created_at DESC
-		LIMIT ${limit};
+		LIMIT $1;
 	`;
 
-	const rows = await executeNeonQuery<any>(query);
+	const rows = await queryNeon<any>(query, [safeLimit]);
 	return rows.map((r) => ({
 		id: r.id,
 		actorUsername: r.actor_username,
@@ -212,7 +221,7 @@ export async function getNeonAuditLogs(limit = 50): Promise<Array<{
 
 let pronunciationEvaluationSchemaReady: Promise<void> | null = null;
 
-async function executeNeonQueryOrThrow<T = any>(query: string): Promise<T[]> {
+async function executeNeonQueryOrThrow<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {
 	const cfg = getNeonConfig();
 	if (!cfg) throw new Error('DATABASE_URL is not configured.');
 
@@ -222,7 +231,7 @@ async function executeNeonQueryOrThrow<T = any>(query: string): Promise<T[]> {
 			'Content-Type': 'application/json',
 			'Neon-Connection-String': cfg.connectionString
 		},
-		body: JSON.stringify({ query }),
+		body: JSON.stringify({ query: sql, params }),
 		signal: AbortSignal.timeout(6000)
 	});
 	if (!res.ok) {
@@ -291,22 +300,33 @@ export async function recordNeonPronunciationEvaluation(params: {
 	}
 
 	await ensurePronunciationEvaluationSchema();
-	const text = (value: string) => `'${value.replace(/'/g, "''")}'`;
-	const numeric = (value: number) => (Number.isFinite(value) ? value : 0);
-	const stageId = params.stageId ? text(params.stageId) : 'NULL';
-	const details = `${text(JSON.stringify(params.phonemeDetails))}::jsonb`;
-	await executeNeonQueryOrThrow(`
+	const numeric = (value: number) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+	await executeNeonQueryOrThrow(
+		`
 		INSERT INTO pronunciation_evaluations (
 			evaluation_id, user_id, word_id, pinyin, attempt_number, audio_duration_sec,
 			gop_overall, per_overall, tone_score, phoneme_details, practice_mode, stage_id, created_at
 		) VALUES (
-			${text(params.evaluationId)}, ${text(params.userId)}, ${text(params.wordId)}, ${text(params.pinyin)},
-			${Math.max(1, Math.trunc(numeric(params.attemptNumber)))}, ${numeric(params.audioDurationSec)},
-			${numeric(params.gopOverall)}, ${numeric(params.perOverall)}, ${numeric(params.toneScore)},
-			${details}, ${text(params.practiceMode)}, ${stageId}, ${Math.trunc(numeric(params.createdAt))}
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13
 		)
 		ON CONFLICT (evaluation_id) DO NOTHING
-	`);
+	`,
+		[
+			String(params.evaluationId),
+			String(params.userId),
+			String(params.wordId),
+			String(params.pinyin),
+			Math.max(1, Math.trunc(numeric(params.attemptNumber))),
+			numeric(params.audioDurationSec),
+			numeric(params.gopOverall),
+			numeric(params.perOverall),
+			numeric(params.toneScore),
+			JSON.stringify(params.phonemeDetails ?? []),
+			String(params.practiceMode),
+			params.stageId ? String(params.stageId) : null,
+			Math.trunc(numeric(params.createdAt))
+		]
+	);
 	return true;
 }
 
@@ -325,20 +345,30 @@ export async function recordNeonLearningEvent(params: {
 		throw new Error('Neon Quest event requires a stage ID.');
 	}
 	await ensureAppLearningEventSchema();
-	const text = (value: string) => `'${value.replace(/'/g, "''")}'`;
-	const stageId = params.stageId ? text(params.stageId) : 'NULL';
-	await executeNeonQueryOrThrow(`
+	const safeCreatedAt = Number.isFinite(Number(params.createdAt)) ? Math.trunc(Number(params.createdAt)) : Date.now();
+	await executeNeonQueryOrThrow(
+		`
 		INSERT INTO app_learning_events (
 			statement_id, user_id, event_type, word_id, xapi_statement, practice_mode, stage_id, created_at
 		) VALUES (
-			${text(params.statementId)}, ${text(params.userId)}, ${text(params.eventType)}, ${text(params.wordId)},
-			${text(JSON.stringify(params.xapiStatement))}::jsonb, ${text(params.practiceMode)}, ${stageId}, ${Math.trunc(params.createdAt)}
+			$1, $2, $3, $4, $5::jsonb, $6, $7, $8
 		)
 		ON CONFLICT (statement_id) DO UPDATE SET
 			xapi_statement = EXCLUDED.xapi_statement,
 			practice_mode = EXCLUDED.practice_mode,
 			stage_id = EXCLUDED.stage_id
-	`);
+	`,
+		[
+			String(params.statementId),
+			String(params.userId),
+			String(params.eventType),
+			String(params.wordId),
+			JSON.stringify(params.xapiStatement ?? {}),
+			String(params.practiceMode),
+			params.stageId ? String(params.stageId) : null,
+			safeCreatedAt
+		]
+	);
 }
 
 export async function recordNeonPhonemeEvaluation(params: {
@@ -361,21 +391,33 @@ export async function recordNeonPhonemeEvaluation(params: {
 		throw new Error('Neon Quest phoneme evaluation requires a stage ID.');
 	}
 	await ensureNeonPhonemeEvaluationSchema();
-	const text = (value: string) => `'${value.replace(/'/g, "''")}'`;
-	const numeric = (value: number) => (Number.isFinite(value) ? value : 0);
-	const stageId = params.stageId ? text(params.stageId) : 'NULL';
-	await executeNeonQueryOrThrow(`
+	const numeric = (value: number) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+	await executeNeonQueryOrThrow(
+		`
 		INSERT INTO phoneme_evaluations (
 			id, source_record_id, user_id, word_id, pinyin, phoneme, phoneme_type, gop,
 			status, target, recognized, practice_mode, stage_id, created_at
 		) VALUES (
-			gen_random_uuid(), ${text(params.id)}, ${text(params.userId)}, ${text(params.wordId)},
-			${text(params.pinyin)}, ${text(params.phoneme)}, ${text(params.phonemeType)}, ${numeric(params.gop)},
-			${text(params.status)}, ${text(params.target)}, ${text(params.recognized)},
-			${text(params.practiceMode)}, ${stageId}, to_timestamp(${Math.trunc(numeric(params.createdAt))} / 1000.0)
+			gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, to_timestamp($13 / 1000.0)
 		)
 		ON CONFLICT (source_record_id) DO NOTHING
-	`);
+	`,
+		[
+			String(params.id),
+			String(params.userId),
+			String(params.wordId),
+			String(params.pinyin),
+			String(params.phoneme),
+			String(params.phonemeType),
+			numeric(params.gop),
+			String(params.status),
+			String(params.target),
+			String(params.recognized),
+			String(params.practiceMode),
+			params.stageId ? String(params.stageId) : null,
+			Math.trunc(numeric(params.createdAt))
+		]
+	);
 }
 
 let appLearningEventSchemaReady: Promise<void> | null = null;
@@ -390,7 +432,7 @@ function ensureAppLearningEventSchema(): Promise<void> {
 				word_id TEXT NOT NULL,
 				xapi_statement JSONB NOT NULL,
 				practice_mode TEXT NOT NULL DEFAULT 'unknown'
-					CHECK (practice_mode IN ('word', 'stage', 'unknown')),
+					CHECK (practice_mode IN ('word', 'stage', 'assessment', 'unknown')),
 				stage_id TEXT,
 				created_at BIGINT NOT NULL
 			)
@@ -432,8 +474,8 @@ let stageContentSchemaReady: Promise<void> | null = null;
 function ensureNeonStageContentSchema(): Promise<void> {
 	if (!stageContentSchemaReady) {
 		stageContentSchemaReady = (async () => {
-			await executeNeonQuery('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS custom_words TEXT;');
-			await executeNeonQuery('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS content_json TEXT;');
+			await queryNeon('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS custom_words TEXT;');
+			await queryNeon('ALTER TABLE stage_overrides ADD COLUMN IF NOT EXISTS content_json TEXT;');
 		})();
 	}
 	return stageContentSchemaReady;
@@ -457,7 +499,7 @@ export async function getNeonStageOverrides(): Promise<Record<string, {
 		FROM stage_overrides;
 	`;
 
-	const rows = await executeNeonQuery<any>(query);
+	const rows = await queryNeon<any>(query);
 	const map: Record<string, any> = {};
 	for (const r of rows) {
 		map[r.stage_id] = {
@@ -486,17 +528,10 @@ export async function saveNeonStageOverride(params: {
 	updatedBy: string;
 }) {
 	await ensureNeonStageContentSchema();
-	const safeId = params.stageId.replace(/'/g, "''");
-	const safeTitle = params.title.replace(/'/g, "''");
-	const safeCat = params.category.replace(/'/g, "''");
-	const safeDesc = params.description.replace(/'/g, "''");
-	const safeContent = (params.contentJson ?? '').replace(/'/g, "''");
-	const safeUser = params.updatedBy.replace(/'/g, "''");
-	const isActive = params.isActive ? 'TRUE' : 'FALSE';
 
 	const query = `
 		INSERT INTO stage_overrides (stage_id, title, category, description, is_active, content_json, updated_by, updated_at)
-		VALUES ('${safeId}', '${safeTitle}', '${safeCat}', '${safeDesc}', ${isActive}, '${safeContent}', '${safeUser}', CURRENT_TIMESTAMP)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
 		ON CONFLICT (stage_id) DO UPDATE SET
 			title = EXCLUDED.title,
 			category = EXCLUDED.category,
@@ -507,7 +542,15 @@ export async function saveNeonStageOverride(params: {
 			updated_at = CURRENT_TIMESTAMP;
 	`;
 
-	return executeNeonQuery(query);
+	return queryNeon(query, [
+		String(params.stageId || ''),
+		String(params.title || ''),
+		String(params.category || ''),
+		String(params.description || ''),
+		Boolean(params.isActive),
+		params.contentJson != null ? String(params.contentJson) : '',
+		String(params.updatedBy || '')
+	]);
 }
 
 /**
@@ -528,25 +571,52 @@ export async function recordNeonAssessmentRecord(params: {
 	createdAt?: number;
 }): Promise<void> {
 	if (!getNeonConfig()) return;
-	const text = (v: string) => `'${String(v || '').replace(/'/g, "''")}'`;
-	const num = (v: number) => (Number.isFinite(v) ? v : 0);
-	const createdAt = params.createdAt ?? Date.now();
+	const num = (v: number) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+	const createdAt = Math.round(num(params.createdAt ?? Date.now()));
 
-	const idCol = params.id ? 'id, ' : '';
-	const idVal = params.id ? `${Number(params.id)}, ` : '';
+	if (params.id != null && Number.isFinite(Number(params.id))) {
+		const query = `
+			INSERT INTO assessment_records (
+				id, user_id, test_type, word_id, pinyin, target_tone, detected_tone,
+				tone_confidence, tone_score, gop_overall, per_overall, created_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+		`;
+		await queryNeon(query, [
+			Math.round(Number(params.id)),
+			String(params.userId || ''),
+			String(params.testType || ''),
+			String(params.wordId || ''),
+			String(params.pinyin || ''),
+			Math.round(num(params.targetTone)),
+			Math.round(num(params.detectedTone)),
+			num(params.toneConfidence),
+			num(params.toneScore),
+			num(params.gopOverall),
+			num(params.perOverall),
+			createdAt
+		]);
+		return;
+	}
 
 	const query = `
 		INSERT INTO assessment_records (
-			${idCol}user_id, test_type, word_id, pinyin, target_tone, detected_tone,
+			user_id, test_type, word_id, pinyin, target_tone, detected_tone,
 			tone_confidence, tone_score, gop_overall, per_overall, created_at
-		) VALUES (
-			${idVal}${text(params.userId)}, ${text(params.testType)}, ${text(params.wordId)}, ${text(params.pinyin)},
-			${Math.round(num(params.targetTone))}, ${Math.round(num(params.detectedTone))},
-			${num(params.toneConfidence)}, ${num(params.toneScore)}, ${num(params.gopOverall)}, ${num(params.perOverall)},
-			${Math.round(num(createdAt))}
-		);
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
 	`;
-	await executeNeonQuery(query);
+	await queryNeon(query, [
+		String(params.userId || ''),
+		String(params.testType || ''),
+		String(params.wordId || ''),
+		String(params.pinyin || ''),
+		Math.round(num(params.targetTone)),
+		Math.round(num(params.detectedTone)),
+		num(params.toneConfidence),
+		num(params.toneScore),
+		num(params.gopOverall),
+		num(params.perOverall),
+		createdAt
+	]);
 }
 
 /**
@@ -564,24 +634,44 @@ export async function recordNeonAssessmentSummary(params: {
 	completedAt?: number;
 }): Promise<void> {
 	if (!getNeonConfig()) return;
-	const text = (v: string) => `'${String(v || '').replace(/'/g, "''")}'`;
-	const num = (v: number) => (Number.isFinite(v) ? v : 0);
-	const completedAt = params.completedAt ?? Date.now();
+	const num = (v: number) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+	const completedAt = Math.round(num(params.completedAt ?? Date.now()));
 
-	const idCol = params.id ? 'id, ' : '';
-	const idVal = params.id ? `${Number(params.id)}, ` : '';
+	if (params.id != null && Number.isFinite(Number(params.id))) {
+		const query = `
+			INSERT INTO assessment_summaries (
+				id, user_id, test_type, total_words, correct_tones, avg_tone_score, avg_gop, avg_per, completed_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+		`;
+		await queryNeon(query, [
+			Math.round(Number(params.id)),
+			String(params.userId || ''),
+			String(params.testType || ''),
+			Math.round(num(params.totalWords)),
+			Math.round(num(params.correctTones)),
+			num(params.avgToneScore),
+			num(params.avgGop),
+			num(params.avgPer),
+			completedAt
+		]);
+		return;
+	}
 
 	const query = `
 		INSERT INTO assessment_summaries (
-			${idCol}user_id, test_type, total_words, correct_tones, avg_tone_score, avg_gop, avg_per, completed_at
-		) VALUES (
-			${idVal}${text(params.userId)}, ${text(params.testType)},
-			${Math.round(num(params.totalWords))}, ${Math.round(num(params.correctTones))},
-			${num(params.avgToneScore)}, ${num(params.avgGop)}, ${num(params.avgPer)},
-			${Math.round(num(completedAt))}
-		);
+			user_id, test_type, total_words, correct_tones, avg_tone_score, avg_gop, avg_per, completed_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 	`;
-	await executeNeonQuery(query);
+	await queryNeon(query, [
+		String(params.userId || ''),
+		String(params.testType || ''),
+		Math.round(num(params.totalWords)),
+		Math.round(num(params.correctTones)),
+		num(params.avgToneScore),
+		num(params.avgGop),
+		num(params.avgPer),
+		completedAt
+	]);
 }
 
 /**
@@ -593,17 +683,17 @@ export async function recordNeonLessonCompletion(params: {
 	stars: number;
 }): Promise<void> {
 	if (!getNeonConfig()) return;
-	const text = (v: string) => `'${String(v || '').replace(/'/g, "''")}'`;
 	const userId = Number(params.userId);
+	if (!Number.isFinite(userId)) return;
 	const stars = Math.max(0, Math.min(3, Math.round(Number(params.stars || 0))));
 
 	const query = `
 		INSERT INTO lesson_completions (user_id, lesson_key, stars)
-		VALUES (${userId}, ${text(params.lessonKey)}, ${stars})
+		VALUES ($1, $2, $3)
 		ON CONFLICT (user_id, lesson_key) DO UPDATE SET
 			stars = GREATEST(lesson_completions.stars, EXCLUDED.stars);
 	`;
-	await executeNeonQuery(query);
+	await queryNeon(query, [userId, String(params.lessonKey || ''), stars]);
 }
 
 /**
@@ -617,19 +707,20 @@ export async function recordNeonProgressUpdate(params: {
 }): Promise<void> {
 	if (!getNeonConfig()) return;
 	const userId = Number(params.userId);
-	const xpDelta = Number(params.xpDelta || 0);
-	const streak = Number(params.streak || 0);
-	const lp = params.lastPracticed ? `'${params.lastPracticed.replace(/'/g, "''")}'` : 'NULL';
+	if (!Number.isFinite(userId)) return;
+	const xpDelta = Number.isFinite(Number(params.xpDelta)) ? Number(params.xpDelta) : 0;
+	const streak = Number.isFinite(Number(params.streak)) ? Number(params.streak) : 0;
+	const lp = params.lastPracticed ? String(params.lastPracticed) : null;
 
 	const query = `
 		INSERT INTO progress (user_id, xp, hearts, streak, last_practiced)
-		VALUES (${userId}, ${Math.max(0, xpDelta)}, 5, ${streak}, ${lp})
+		VALUES ($1, $2, 5, $3, $4)
 		ON CONFLICT (user_id) DO UPDATE SET
-			xp = progress.xp + ${xpDelta},
-			streak = ${streak},
-			last_practiced = ${lp};
+			xp = progress.xp + $5,
+			streak = $3,
+			last_practiced = $4;
 	`;
-	await executeNeonQuery(query);
+	await queryNeon(query, [userId, Math.max(0, xpDelta), streak, lp, xpDelta]);
 }
 
 /**
@@ -648,25 +739,49 @@ export async function recordNeonMistake(params: {
 	createdAt?: number;
 }): Promise<void> {
 	if (!getNeonConfig()) return;
-	const text = (v: string) => `'${String(v || '').replace(/'/g, "''")}'`;
 	const userId = Number(params.userId);
-	const expTone = params.expectedTone != null ? Number(params.expectedTone) : 'NULL';
-	const score = Number(params.score || 0);
-	const createdAt = params.createdAt ?? Date.now();
+	if (!Number.isFinite(userId)) return;
+	const expTone = params.expectedTone != null && Number.isFinite(Number(params.expectedTone)) ? Number(params.expectedTone) : null;
+	const score = Number.isFinite(Number(params.score)) ? Number(params.score) : 0;
+	const createdAt = Math.round(Number.isFinite(Number(params.createdAt)) ? Number(params.createdAt) : Date.now());
 
-	const idCol = params.id ? 'id, ' : '';
-	const idVal = params.id ? `${Number(params.id)}, ` : '';
+	if (params.id != null && Number.isFinite(Number(params.id))) {
+		const query = `
+			INSERT INTO user_mistakes (
+				id, user_id, hanzi, pinyin, meaning, expected_tone, heard_text, score, feedback, created_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+		`;
+		await queryNeon(query, [
+			Math.round(Number(params.id)),
+			userId,
+			String(params.hanzi || ''),
+			String(params.pinyin || ''),
+			String(params.meaning || ''),
+			expTone,
+			String(params.heardText || ''),
+			score,
+			String(params.feedback || ''),
+			createdAt
+		]);
+		return;
+	}
 
 	const query = `
 		INSERT INTO user_mistakes (
-			${idCol}user_id, hanzi, pinyin, meaning, expected_tone, heard_text, score, feedback, created_at
-		) VALUES (
-			${idVal}${userId}, ${text(params.hanzi)}, ${text(params.pinyin)}, ${text(params.meaning)},
-			${expTone}, ${text(params.heardText || '')}, ${score}, ${text(params.feedback || '')},
-			${Math.round(Number(createdAt))}
-		);
+			user_id, hanzi, pinyin, meaning, expected_tone, heard_text, score, feedback, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
 	`;
-	await executeNeonQuery(query);
+	await queryNeon(query, [
+		userId,
+		String(params.hanzi || ''),
+		String(params.pinyin || ''),
+		String(params.meaning || ''),
+		expTone,
+		String(params.heardText || ''),
+		score,
+		String(params.feedback || ''),
+		createdAt
+	]);
 }
 
 /**
@@ -679,18 +794,18 @@ export async function recordNeonUser(params: {
 	createdAt?: number;
 }): Promise<void> {
 	if (!getNeonConfig()) return;
-	const text = (v: string) => `'${String(v || '').replace(/'/g, "''")}'`;
 	const userId = Number(params.id);
-	const createdAt = params.createdAt ?? Date.now();
+	if (!Number.isFinite(userId)) return;
+	const createdAt = Math.round(Number.isFinite(Number(params.createdAt)) ? Number(params.createdAt) : Date.now());
 
 	const query = `
 		INSERT INTO users (id, username, password_hash, created_at)
-		VALUES (${userId}, ${text(params.username)}, ${text(params.passwordHash)}, ${Math.round(Number(createdAt))})
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (id) DO UPDATE SET
 			username = EXCLUDED.username,
 			password_hash = EXCLUDED.password_hash;
 	`;
-	await executeNeonQuery(query);
+	await queryNeon(query, [userId, String(params.username || ''), String(params.passwordHash || ''), createdAt]);
 }
 
 /**
@@ -714,9 +829,8 @@ export async function recordNeonHanziWritingAttempt(params: {
 	createdAt?: number;
 }): Promise<void> {
 	if (!getNeonConfig()) return;
-	const text = (v: string) => `'${String(v || '').replace(/'/g, "''")}'`;
-	const num = (v: number) => (Number.isFinite(v) ? v : 0);
-	const createdAt = params.createdAt ?? Date.now();
+	const num = (v: number) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+	const createdAt = Math.round(num(params.createdAt ?? Date.now()));
 
 	const query = `
 		INSERT INTO hanzi_writing_attempts (
@@ -724,18 +838,28 @@ export async function recordNeonHanziWritingAttempt(params: {
 			attempt_number, stroke_count, correct_strokes, mistake_count,
 			sequence_correct, score, max_score, writing_details, created_at
 		) VALUES (
-			${text(params.attemptId)}, ${text(params.userId)}, ${text(params.wordId)}, ${text(params.pinyin)},
-			${text(params.character)}, ${Math.round(num(params.characterIndex))},
-			${Math.round(num(params.attemptNumber))}, ${Math.round(num(params.strokeCount))},
-			${Math.round(num(params.correctStrokes))}, ${Math.round(num(params.mistakeCount))},
-			${Math.round(num(params.sequenceCorrect))}, ${Math.round(num(params.score))},
-			${Math.round(num(params.maxScore))}, ${text(params.writingDetails || '{}')},
-			${Math.round(num(createdAt))}
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 		)
 		ON CONFLICT (attempt_id) DO UPDATE SET
 			mistake_count = EXCLUDED.mistake_count,
 			score = EXCLUDED.score,
 			writing_details = EXCLUDED.writing_details;
 	`;
-	await executeNeonQuery(query);
+	await queryNeon(query, [
+		String(params.attemptId || ''),
+		String(params.userId || ''),
+		String(params.wordId || ''),
+		String(params.pinyin || ''),
+		String(params.character || ''),
+		Math.round(num(params.characterIndex)),
+		Math.round(num(params.attemptNumber)),
+		Math.round(num(params.strokeCount)),
+		Math.round(num(params.correctStrokes)),
+		Math.round(num(params.mistakeCount)),
+		Math.round(num(params.sequenceCorrect)),
+		Math.round(num(params.score)),
+		Math.round(num(params.maxScore)),
+		String(params.writingDetails || '{}'),
+		createdAt
+	]);
 }

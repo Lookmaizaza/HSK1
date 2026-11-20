@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AlertTriangle, Volume2, Mic } from '@lucide/svelte';
+	import { AlertTriangle, Volume2 } from '@lucide/svelte';
 	import { speak } from '$lib/speech';
 
 	let {

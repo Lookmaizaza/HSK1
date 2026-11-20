@@ -6,7 +6,12 @@ import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { findScenario } from '$lib/data/scenarios';
 import { recordChatbotSession } from '$lib/server/db';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 import type { RequestHandler } from './$types';
+
+const MAX_TURNS = 20;
+const MAX_TEXT_LENGTH = 300;
+const UPSTREAM_TIMEOUT_MS = 15000;
 
 type Turn = {
 	role: 'ai' | 'user';
@@ -48,24 +53,38 @@ function buildSystem(scenario: { aiRole: string; userRole: string; context: stri
 {"reply":{"hanzi":"<คำพูดของคุณภาษาจีน>","pinyin":"<pinyin>","translation":"<คำแปลภาษาไทย>"},"feedback":"<feedback ภาษาไทยสั้นๆ ต่อคำพูดผู้เรียน หรือ null ถ้าเป็นเทิร์นแรก>","score":<0-100 คะแนนคำตอบผู้เรียน 0 ถ้าเทิร์นแรก>,"endScenario":<true|false>}`;
 }
 
+function sanitizeTurnText(raw: unknown): string {
+	if (typeof raw !== 'string') return '';
+	return raw.replace(/[\r\n\0]+/g, ' ').trim().slice(0, MAX_TEXT_LENGTH);
+}
+
 function buildMessages(scenario: NonNullable<ReturnType<typeof findScenario>>, turns: Turn[], userSaid: string) {
 	const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
 		{ role: 'system', content: buildSystem(scenario) }
 	];
 
-	// Replay history. AI turns become assistant messages (just the hanzi),
+	// Replay history (capped to MAX_TURNS). AI turns become assistant messages (just the hanzi),
 	// user turns become user messages with what they said.
-	for (const t of turns) {
+	const boundedTurns = Array.isArray(turns) ? turns.slice(-MAX_TURNS) : [];
+	for (const t of boundedTurns) {
+		if (!t || typeof t !== 'object') continue;
 		if (t.role === 'ai' && t.hanzi) {
-			messages.push({ role: 'assistant', content: JSON.stringify({ reply: { hanzi: t.hanzi } }) });
+			const cleanHanzi = sanitizeTurnText(t.hanzi);
+			if (cleanHanzi) {
+				messages.push({ role: 'assistant', content: JSON.stringify({ reply: { hanzi: cleanHanzi } }) });
+			}
 		} else if (t.role === 'user' && t.said) {
-			messages.push({ role: 'user', content: `HEARD: ${t.said}` });
+			const cleanSaid = sanitizeTurnText(t.said);
+			if (cleanSaid) {
+				messages.push({ role: 'user', content: `HEARD: ${cleanSaid}` });
+			}
 		}
 	}
 
 	// Final turn: either user's latest reply, or "start the scenario" if this is turn 0.
-	if (userSaid) {
-		messages.push({ role: 'user', content: `HEARD: ${userSaid}` });
+	const cleanUserSaid = sanitizeTurnText(userSaid);
+	if (cleanUserSaid) {
+		messages.push({ role: 'user', content: `HEARD: ${cleanUserSaid}` });
 	} else {
 		messages.push({
 			role: 'user',
@@ -107,7 +126,8 @@ async function callOpenRouter(messages: ReturnType<typeof buildMessages>, apiKey
 			temperature: 0.6,
 			max_tokens: 500,
 			response_format: { type: 'json_object' }
-		})
+		}),
+		signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
 	});
 	if (!resp.ok) throw error(502, `OpenRouter error: ${(await resp.text()).slice(0, 200)}`);
 	const data = await resp.json();
@@ -126,7 +146,8 @@ async function callThaiLLM(messages: ReturnType<typeof buildMessages>, apiKey: s
 			messages,
 			temperature: 0.7,
 			max_tokens: 2048
-		})
+		}),
+		signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
 	});
 	if (!resp.ok) throw error(502, `ThaiLLM error: ${(await resp.text()).slice(0, 200)}`);
 	const data = await resp.json();
@@ -361,16 +382,50 @@ function generateSmartDialogueResponse(
 	}
 }
 
-export const POST: RequestHandler = async ({ request, fetch, locals }) => {
-	const body = (await request.json()) as ConverseRequest;
+export const POST: RequestHandler = async (event) => {
+	const { request, fetch, locals } = event;
+	if (!locals.user) {
+		throw error(401, 'Unauthorized: Authentication required.');
+	}
+
+	const rate = consumeRateLimit(
+		`converse:u${locals.user.id}:${extractClientIp(event)}`,
+		30,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many conversation requests. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
+	let body: ConverseRequest;
+	try {
+		body = (await request.json()) as ConverseRequest;
+	} catch {
+		throw error(400, 'Invalid JSON body');
+	}
+
+	if (typeof body?.scenarioId !== 'string' || body.scenarioId.length > 64) {
+		throw error(400, 'Invalid scenarioId');
+	}
 	const scenario = findScenario(body.scenarioId);
 	if (!scenario) throw error(404, 'Unknown scenario');
 
+	const rawTurns = Array.isArray(body.turns) ? body.turns : [];
+	if (rawTurns.length > MAX_TURNS) {
+		throw error(400, `Conversation exceeds maximum turn limit (${MAX_TURNS}).`);
+	}
+	const boundedTurns: Turn[] = rawTurns.slice(-MAX_TURNS).map((t) => ({
+		role: t?.role === 'ai' ? 'ai' : 'user',
+		hanzi: t?.hanzi ? sanitizeTurnText(t.hanzi) : undefined,
+		said: t?.said ? sanitizeTurnText(t.said) : undefined
+	}));
+	const safeUserSaid = sanitizeTurnText(body.userSaid);
+
 	const modelId = body.model ?? 'pathumma-thaillm';
-	const messages = buildMessages(scenario, body.turns ?? [], body.userSaid ?? '');
+	const messages = buildMessages(scenario, boundedTurns, safeUserSaid);
 
 	// Check if API key is available
-	const openRouterKey = body.apiKey?.trim() || env.OPENROUTER_API_KEY;
+	const openRouterKey = body.apiKey?.trim().slice(0, 256) || env.OPENROUTER_API_KEY;
 	const thaiLLMKey = env.THAILLM_API_KEY;
 
 	let content = '';
@@ -398,15 +453,15 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 			if (jsonStr) {
 				const parsed = JSON.parse(jsonStr) as ConverseResponse;
 				if (parsed.reply?.hanzi) {
-					parsed.score = parsed.score ?? 85;
-					parsed.endScenario = parsed.endScenario ?? false;
+					parsed.score = Math.max(0, Math.min(100, Number(parsed.score ?? 85) || 0));
+					parsed.endScenario = Boolean(parsed.endScenario);
 					parsed.feedback = parsed.feedback ?? null;
 					if (parsed.endScenario && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
 						recordChatbotSession({
 							userId: String(locals.user.id),
 							scenarioId: scenario.id,
 							scenarioTitle: scenario.title,
-							turnsCount: (body.turns?.length || 0) + 1,
+							turnsCount: boundedTurns.length + 1,
 							avgScore: parsed.score,
 							totalXp: Math.round(parsed.score / 10)
 						}).catch(() => {});
@@ -420,13 +475,13 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 	}
 
 	// Smart Offline Dialogue Engine (No API key required!)
-	const smartResponse = generateSmartDialogueResponse(scenario, body.turns ?? [], body.userSaid);
+	const smartResponse = generateSmartDialogueResponse(scenario, boundedTurns, safeUserSaid);
 	if (smartResponse.endScenario && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
 		recordChatbotSession({
 			userId: String(locals.user.id),
 			scenarioId: scenario.id,
 			scenarioTitle: scenario.title,
-			turnsCount: (body.turns?.length || 0) + 1,
+			turnsCount: boundedTurns.length + 1,
 			avgScore: smartResponse.score,
 			totalXp: Math.round(smartResponse.score / 10)
 		}).catch(() => {});

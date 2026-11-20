@@ -6,11 +6,13 @@ Compliant with:
 - Neon Serverless PostgreSQL
 """
 
+import hmac
+import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List
-from fastapi import FastAPI, HTTPException, status
+from typing import Any, Dict, List, Optional
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -27,11 +29,37 @@ from .db import (
     close_db_pool,
     record_user_consent,
     record_learning_event,
+    record_learning_events_batch,
     get_user_events,
     get_user_diagnostic_analytics,
 )
 
 load_dotenv()
+logger = logging.getLogger("yupakjeen.backend")
+
+
+async def verify_bearer_token(authorization: Optional[str] = Header(default=None)) -> str:
+    """Enforce Bearer token authentication against BACKEND_API_TOKEN."""
+    expected_token = (os.environ.get("BACKEND_API_TOKEN") or "").strip()
+    if not expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service authentication token is not configured.",
+        )
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization Bearer header.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    provided_token = authorization[7:].strip()
+    if not provided_token or not hmac.compare_digest(provided_token, expected_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid bearer token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return provided_token
 
 
 @asynccontextmanager
@@ -97,7 +125,12 @@ async def health_check():
 # -------------------------------------------------------------
 # 1. PDPA Consent Endpoint
 # -------------------------------------------------------------
-@app.post("/api/v1/consent", response_model=ConsentResponse, tags=["PDPA Consent"])
+@app.post(
+    "/api/v1/consent",
+    response_model=ConsentResponse,
+    tags=["PDPA Consent"],
+    dependencies=[Depends(verify_bearer_token)],
+)
 async def save_consent(body: ConsentRequest):
     """
     Record user PDPA consent before collecting speech telemetry.
@@ -116,10 +149,13 @@ async def save_consent(body: ConsentRequest):
             user_id=body.user_id,
             consented_at=datetime.utcnow(),
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Failed to record PDPA consent: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to record PDPA consent: {str(e)}",
+            detail="Failed to record PDPA consent.",
         )
 
 
@@ -130,6 +166,7 @@ async def save_consent(body: ConsentRequest):
     "/api/v1/telemetry/score-ingest",
     response_model=IngestResponse,
     tags=["Telemetry Ingestion"],
+    dependencies=[Depends(verify_bearer_token)],
 )
 async def ingest_score(payload: FriendScorePayload):
     """
@@ -180,9 +217,6 @@ async def ingest_score(payload: FriendScorePayload):
             )
             inserted_ids.append(ev_id)
 
-        # Record default consent implicitly if not present
-        await record_user_consent(user_id=user_uuid)
-
         return IngestResponse(
             user_id=user_uuid_str,
             word=word_text,
@@ -191,10 +225,13 @@ async def ingest_score(payload: FriendScorePayload):
             statements=raw_statements,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Telemetry transformation and ingestion failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Telemetry transformation and ingestion failed: {str(e)}",
+            detail="Telemetry transformation and ingestion failed.",
         )
 
 
@@ -205,6 +242,7 @@ async def ingest_score(payload: FriendScorePayload):
     "/api/v1/analytics/diagnostic/{user_id}",
     response_model=DiagnosticSummaryResponse,
     tags=["Diagnostic Analytics"],
+    dependencies=[Depends(verify_bearer_token)],
 )
 async def get_diagnostic(user_id: str):
     """
@@ -222,28 +260,39 @@ async def get_diagnostic(user_id: str):
         user_uuid = uuid.UUID(user_uuid_str)
         data = await get_user_diagnostic_analytics(user_uuid)
         return data
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Failed to fetch diagnostic analytics: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch diagnostic analytics: {str(e)}",
+            detail="Failed to fetch diagnostic analytics.",
         )
 
 
 # -------------------------------------------------------------
 # 4. Learning Events Log Endpoint
 # -------------------------------------------------------------
-@app.get("/api/v1/events/{user_id}", tags=["Learning Events"])
+@app.get(
+    "/api/v1/events/{user_id}",
+    tags=["Learning Events"],
+    dependencies=[Depends(verify_bearer_token)],
+)
 async def list_events(user_id: str, limit: int = 50):
     """
     Fetches raw IEEE 9274.1.1 xAPI statement logs from Neon DB for inspection.
     """
     try:
+        safe_limit = max(1, min(500, int(limit)))
         user_uuid_str = ensure_valid_uuid(user_id)
         user_uuid = uuid.UUID(user_uuid_str)
-        events = await get_user_events(user_uuid, limit=limit)
+        events = await get_user_events(user_uuid, limit=safe_limit)
         return {"user_id": user_uuid_str, "count": len(events), "events": events}
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Failed to fetch learning events: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch learning events: {str(e)}",
+            detail="Failed to fetch learning events.",
         )

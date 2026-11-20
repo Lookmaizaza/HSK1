@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Activity, Volume2, AlertTriangle, Lightbulb, Check, ArrowRightLeft, Sparkles, BookOpen } from '@lucide/svelte';
+	import { Activity, Volume2, AlertTriangle, Lightbulb, ArrowRightLeft, Sparkles, BookOpen } from '@lucide/svelte';
 	import { speak } from '$lib/speech';
 
 	interface Props {
@@ -38,7 +38,6 @@
 	}: Props = $props();
 
 	let activePitchTone = $state<number>(3);
-	let audioPlayingWord = $state<string | null>(null);
 
 	const toneAudioWords: Record<number, { word: string; pinyin: string }> = {
 		1: { word: '妈', pinyin: 'mā' },
@@ -52,15 +51,8 @@
 		if (typeof window === 'undefined') return;
 		const item = toneAudioWords[tone];
 		if (!item) return;
-		audioPlayingWord = item.word;
 		onShowToast(`🔊 ตัวอย่างเสียงวรรณยุกต์ที่ ${tone}: ${item.word} (${item.pinyin})`, 'info');
-		try {
-			await speak(item.word, 0.8);
-		} finally {
-			setTimeout(() => {
-				audioPlayingWord = null;
-			}, 800);
-		}
+		await speak(item.word, 0.8);
 	}
 </script>
 
@@ -179,7 +171,7 @@
 									<td class="py-3 px-3 text-left font-bold font-sans text-foreground">
 										{tm.label}
 									</td>
-									<td class="py-3 px-3 {tm.targetTone === 1 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}">
+									<td class="py-3 px-3 {tm.targetTone === 1 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT1 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
 										{tm.recognizedT1}%
 									</td>
 									<td class="py-3 px-3 {tm.targetTone === 2 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT2 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
@@ -188,7 +180,7 @@
 									<td class="py-3 px-3 {tm.targetTone === 3 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT3 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
 										{tm.recognizedT3}%
 									</td>
-									<td class="py-3 px-3 {tm.targetTone === 4 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}">
+									<td class="py-3 px-3 {tm.targetTone === 4 ? 'bg-emerald-500/15 font-black text-emerald-700 dark:text-emerald-300' : (tm.recognizedT4 >= 15 ? 'bg-rose-500/20 font-bold text-rose-700 dark:text-rose-300' : 'text-muted-foreground')}">
 										{tm.recognizedT4}%
 									</td>
 								</tr>

@@ -19,7 +19,7 @@ export interface PhonemeDetail {
 
 export interface PronunciationScores {
 	gop_overall: number; // Average GOP score across all phonemes (0 - 100)
-	per_overall: number; // Phoneme Error Rate: (Substitutions + Deletions + Insertions) / Total Targets (0.0 - 1.0)
+	per_overall: number; // Phoneme Error Rate percentage (0 - 100): ((Substitutions + Deletions + Insertions) / Total Targets) * 100
 	tone_score: number; // Tone pitch accuracy score (0 - 100)
 	phoneme_details: PhonemeDetail[]; // Granular phoneme breakdown
 }
@@ -164,7 +164,7 @@ export function extractTargetPhonemes(pinyin: string): Array<{ phoneme: string; 
 }
 
 /**
- * Calculates overall GOP (0-100) and PER (0.0-1.0) from phoneme details list.
+ * Calculates overall GOP (0-100) and PER percentage (0-100) from phoneme details list.
  */
 export function calculatePronunciationMetrics(details: PhonemeDetail[]): {
 	gop_overall: number;
@@ -185,7 +185,7 @@ export function calculatePronunciationMetrics(details: PhonemeDetail[]): {
 	}
 
 	const gop_overall = Number((totalGop / details.length).toFixed(1));
-	const per_overall = Number((errorCount / details.length).toFixed(2));
+	const per_overall = Number(((errorCount / details.length) * 100).toFixed(1));
 
 	return { gop_overall, per_overall };
 }

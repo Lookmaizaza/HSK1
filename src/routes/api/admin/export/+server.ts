@@ -11,9 +11,12 @@ import { extractClientIp } from '$lib/server/rateLimit';
 
 function escapeCsvField(val: any): string {
 	if (val === null || val === undefined) return '';
+	if (typeof val === 'number' && Number.isFinite(val)) {
+		return String(val);
+	}
 	let str = String(val);
-	// Neutralize CSV Formula Injection while preserving valid negative numbers (e.g., -4.50)
-	if (/^[=+\t\r@]/.test(str) || (/^-/.test(str) && !/^-?\d+(\.\d+)?$/.test(str))) {
+	// Neutralize CSV Formula Injection for string cells starting with =, +, -, @, \t, \r
+	if (/^[=+\-@\t\r]/.test(str)) {
 		str = `'${str}`;
 	}
 	if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
@@ -35,7 +38,8 @@ export const GET: RequestHandler = async (event) => {
 
 	const format = url.searchParams.get('format')?.toLowerCase() || 'csv';
 	const dataset = url.searchParams.get('dataset')?.toLowerCase() || 'evaluations';
-	const limitParam = Math.min(Math.max(1, Number(url.searchParams.get('limit')) || 10000), 100000);
+	const limitParam = Math.min(Math.max(1, Math.floor(Number(url.searchParams.get('limit')) || 10000)), 50000);
+	const daysParam = Math.min(Math.max(1, Math.floor(Number(url.searchParams.get('days')) || 365)), 3650);
 	const dateStr = new Date().toISOString().slice(0, 10);
 
 	const logExport = (rowCount: number, exportFormat: string, exportDataset: string) =>
@@ -44,7 +48,7 @@ export const GET: RequestHandler = async (event) => {
 			action: 'EXPORT_RESEARCH_DATA',
 			resourceType: 'research_export',
 			resourceId: exportDataset,
-			details: { format: exportFormat, dataset: exportDataset, rowCount },
+			details: { format: exportFormat, dataset: exportDataset, rowCount, limit: limitParam, days: daysParam },
 			ipAddress: extractClientIp(event),
 			userAgent: request.headers.get('user-agent')
 		}).catch(() => {});

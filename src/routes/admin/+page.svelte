@@ -103,6 +103,61 @@
 	// OmniRoute Quick Nav & Quick Actions
 	let quickNavOpen = $state(false);
 	let quickNavQuery = $state('');
+	const QUICK_NAV_ITEMS: Array<{
+		id: AdminTab;
+		label: string;
+		keywords: string;
+	}> = [
+		{ id: 'dashboard', label: 'ภาพรวมทั้งระบบ (Overview)', keywords: 'dashboard overview ภาพรวม สถิติ' },
+		{ id: 'users', label: 'รายชื่อผู้เรียนทั้งหมด (Learners)', keywords: 'users learners ผู้เรียน นักเรียน' },
+		{ id: 'admins', label: 'รายชื่อผู้ดูแลระบบทั้งหมด (Admins)', keywords: 'admins administrator แอดมิน ผู้ดูแล' },
+		{ id: 'tone_analytics', label: 'วรรณยุกต์และระดับเสียง (Tone Mastery & Pitch)', keywords: 'tone pitch pronunciation วรรณยุกต์ เสียง' },
+		{ id: 'listening_analytics', label: 'การฟัง & Audio Gate (Listening Impact & LQ5)', keywords: 'listening audio lq5 การฟัง ฟัง' },
+		{ id: 'hanzi_writing', label: 'ลำดับขีดอักษรจีน (Hanzi Writing)', keywords: 'hanzi writing stroke คัดลายมือ อักษรจีน ขีด' },
+		{ id: 'ai_dialogue', label: 'สนทนาตามสถานการณ์จริง (Dialogue Practice)', keywords: 'dialogue talk chat ai สนทนา พูดคุย' },
+		{ id: 'mock_exams', label: 'การสอบวัดระดับ HSK (HSK Exam Diagnostics)', keywords: 'exam hsk mock test ข้อสอบ สอบ' },
+		{ id: 'stages', label: 'จัดการด่าน & เส้นทางเรียนรู้ (Stages & Progression Funnel)', keywords: 'stages quest funnel ด่าน บทเรียน' },
+		{ id: 'flashcards', label: 'การฝึกชุดคำศัพท์ (Flashcards Analytics)', keywords: 'flashcards vocab แฟลชการ์ด คำศัพท์' },
+		{ id: 'audit', label: 'ประวัติการใช้งานระบบ (Audit Logs)', keywords: 'audit logs history ประวัติ' },
+		{ id: 'export', label: 'ส่งออกข้อมูลวิจัย (Research Data Export)', keywords: 'export csv json วิจัย ส่งออก' }
+	];
+
+	const quickNavMenuResults = $derived.by(() => {
+		const q = quickNavQuery.trim().toLowerCase();
+		if (!q) return QUICK_NAV_ITEMS;
+		return QUICK_NAV_ITEMS.filter(
+			(item) =>
+				item.label.toLowerCase().includes(q) ||
+				item.keywords.toLowerCase().includes(q) ||
+				item.id.toLowerCase().includes(q)
+		);
+	});
+
+	const quickNavStageResults = $derived.by(() => {
+		const q = quickNavQuery.trim().toLowerCase();
+		if (!q || !data.stages) return [];
+		return (data.stages as any[])
+			.filter(
+				(s) =>
+					String(s.title ?? '').toLowerCase().includes(q) ||
+					String(s.category ?? '').toLowerCase().includes(q) ||
+					String(s.id ?? '').toLowerCase().includes(q)
+			)
+			.slice(0, 5);
+	});
+
+	const quickNavUserResults = $derived.by(() => {
+		const q = quickNavQuery.trim().toLowerCase();
+		if (!q || !data.users) return [];
+		return (data.users as any[])
+			.filter(
+				(u) =>
+					!u.isAdmin &&
+					u.role !== 'admin' &&
+					(String(u.username ?? '').toLowerCase().includes(q) || String(u.id ?? '').toLowerCase() === q)
+			)
+			.slice(0, 5);
+	});
 
 	// Users State
 	let userSearchQuery = $state('');
@@ -623,8 +678,18 @@
 		};
 	};
 
-	// Function to open user drilldown modal
+	// Function to open user drilldown modal (guarded against out-of-order fetch races)
+	let userDrilldownAbortController: AbortController | null = null;
+	let userDrilldownRequestId = 0;
+
 	async function openUserDrilldown(user: any) {
+		if (userDrilldownAbortController) {
+			userDrilldownAbortController.abort();
+		}
+		const abortController = new AbortController();
+		userDrilldownAbortController = abortController;
+		const requestId = ++userDrilldownRequestId;
+
 		selectedUserModal = {
 			...user,
 			loading: true,
@@ -633,9 +698,13 @@
 		selectedUserTab = '360_profile';
 
 		try {
-			const res = await fetch(`/api/admin/user-detail/${user.id}`);
+			const res = await fetch(`/api/admin/user-detail/${user.id}`, {
+				signal: abortController.signal
+			});
+			if (requestId !== userDrilldownRequestId || abortController.signal.aborted) return;
 			if (res.ok) {
 				const detail = await res.json();
+				if (requestId !== userDrilldownRequestId || abortController.signal.aborted) return;
 				selectedUserModal = {
 					...user,
 					...detail,
@@ -649,7 +718,8 @@
 					fullDetail: null
 				};
 			}
-		} catch {
+		} catch (err: any) {
+			if (err?.name === 'AbortError' || requestId !== userDrilldownRequestId) return;
 			selectedUserModal = {
 				...user,
 				loading: false,
@@ -1129,16 +1199,16 @@
 						<div class="mt-3">
 							<div class="flex items-baseline gap-3">
 								<div class="flex items-baseline gap-1">
-									<span class="font-mono tabular-nums text-3xl font-bold text-foreground">{data.classPhonemeStats.totalAttempts ? data.classPhonemeStats.avgGop + '%' : '—'}</span>
+									<span class="font-mono tabular-nums text-3xl font-bold text-foreground">{data.classPhonemeStats.totalAttempts > 0 && data.classPhonemeStats.avgGop != null ? data.classPhonemeStats.avgGop + '%' : '—'}</span>
 									<span class="text-[11px] font-medium text-muted-foreground">GOP</span>
 								</div>
 								<div class="flex items-baseline gap-1 border-l border-border pl-3">
-									<span class="font-mono tabular-nums text-xl font-bold text-foreground">{data.classPhonemeStats.totalAttempts ? data.classPhonemeStats.avgPer + '%' : '—'}</span>
+									<span class="font-mono tabular-nums text-xl font-bold text-foreground">{data.classPhonemeStats.totalAttempts > 0 && data.classPhonemeStats.avgPer != null ? data.classPhonemeStats.avgPer + '%' : '—'}</span>
 									<span class="text-[11px] font-medium text-muted-foreground">PER</span>
 								</div>
 							</div>
 							<div class="mt-2 text-xs text-muted-foreground">
-								{data.classPhonemeStats.totalAttempts ? 'ประเมินสะสม ' + data.classPhonemeStats.totalAttempts.toLocaleString() + ' ครั้ง' : 'ยังไม่มีข้อมูล'}
+								{data.classPhonemeStats.totalAttempts > 0 ? 'ประเมินสะสม ' + data.classPhonemeStats.totalAttempts.toLocaleString() + ' ครั้ง' : 'ยังไม่มีข้อมูล'}
 							</div>
 						</div>
 					</div>
@@ -1609,8 +1679,8 @@
 												{/if}
 												<span class="ml-1 text-[10px] text-muted-foreground">#{u.id}</span>
 											</td>
-											<td class="px-3 text-right font-mono tabular-nums font-bold text-rose-600">{u.avgGop ? u.avgGop.toFixed(1) + '%' : '—'}</td>
-											<td class="px-3 text-right font-mono tabular-nums text-muted-foreground">{u.avgPer ? u.avgPer.toFixed(1) + '%' : '—'}</td>
+											<td class="px-3 text-right font-mono tabular-nums font-bold text-rose-600">{u.avgGop != null ? u.avgGop.toFixed(1) + '%' : '—'}</td>
+											<td class="px-3 text-right font-mono tabular-nums text-muted-foreground">{u.avgPer != null ? u.avgPer.toFixed(1) + '%' : '—'}</td>
 											<td class="px-3 text-right font-mono tabular-nums">{u.evaluationCount} ครั้ง</td>
 											<td class="px-3.5 text-right">
 												<button
@@ -2651,77 +2721,87 @@
 			</div>
 
 			<div class="mt-3 max-h-64 overflow-y-auto space-y-1 text-xs">
-				<div class="text-[10px] font-bold text-muted-foreground uppercase px-2 py-1">เมนูระบบ</div>
-				<button
-					onclick={() => { activeTab = 'dashboard'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<LayoutDashboard class="size-4 text-primary" />
-					<span>ภาพรวมทั้งระบบ (Overview)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'users'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Users class="size-4 text-rose-500" />
-					<span>รายชื่อผู้เรียนทั้งหมด (Learners)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'admins'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Shield class="size-4 text-purple-500" />
-					<span>รายชื่อผู้ดูแลระบบทั้งหมด (Admins)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'tone_analytics'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Activity class="size-4 text-purple-500" />
-					<span>วรรณยุกต์และระดับเสียง (Tone Mastery & Pitch)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'listening_analytics'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Volume2 class="size-4 text-blue-500" />
-					<span>การฟัง & Audio Gate (Listening Impact & LQ5)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'hanzi_writing'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Edit3 class="size-4 text-rose-500" />
-					<span>ลำดับขีดอักษรจีน (Hanzi Writing)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'ai_dialogue'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<MessageSquare class="size-4 text-violet-500" />
-					<span>สนทนาตามสถานการณ์จริง (Dialogue Practice)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'mock_exams'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Award class="size-4 text-amber-500" />
-					<span>การสอบวัดระดับ HSK (HSK Exam Diagnostics)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'stages'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<Layers class="size-4 text-purple-500" />
-					<span>จัดการด่าน & เส้นทางเรียนรู้ (Stages & Progression Funnel)</span>
-				</button>
-				<button
-					onclick={() => { activeTab = 'flashcards'; quickNavOpen = false; }}
-					class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
-				>
-					<BookOpen class="size-4 text-emerald-500" />
-					<span>การฝึกชุดคำศัพท์ (Flashcards Analytics)</span>
-				</button>
+				{#if quickNavMenuResults.length > 0}
+					<div class="text-[10px] font-bold text-muted-foreground uppercase px-2 py-1">เมนูระบบ</div>
+					{#each quickNavMenuResults as item (item.id)}
+						<button
+							onclick={() => { activeTab = item.id; quickNavOpen = false; }}
+							class="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
+						>
+							{#if item.id === 'dashboard'}
+								<LayoutDashboard class="size-4 text-primary" />
+							{:else if item.id === 'users'}
+								<Users class="size-4 text-rose-500" />
+							{:else if item.id === 'admins'}
+								<Shield class="size-4 text-purple-500" />
+							{:else if item.id === 'tone_analytics'}
+								<Activity class="size-4 text-purple-500" />
+							{:else if item.id === 'listening_analytics'}
+								<Volume2 class="size-4 text-blue-500" />
+							{:else if item.id === 'hanzi_writing'}
+								<Edit3 class="size-4 text-rose-500" />
+							{:else if item.id === 'ai_dialogue'}
+								<MessageSquare class="size-4 text-violet-500" />
+							{:else if item.id === 'mock_exams'}
+								<Award class="size-4 text-amber-500" />
+							{:else if item.id === 'stages'}
+								<Layers class="size-4 text-purple-500" />
+							{:else if item.id === 'flashcards'}
+								<BookOpen class="size-4 text-emerald-500" />
+							{:else if item.id === 'audit'}
+								<History class="size-4 text-sky-500" />
+							{:else}
+								<Download class="size-4 text-emerald-500" />
+							{/if}
+							<span>{item.label}</span>
+						</button>
+					{/each}
+				{/if}
+
+				{#if quickNavStageResults.length > 0}
+					<div class="text-[10px] font-bold text-muted-foreground uppercase px-2 py-1 pt-2">ด่านฝึกคำศัพท์ (Stages)</div>
+					{#each quickNavStageResults as st (st.id)}
+						<button
+							onclick={() => {
+								activeTab = 'stages';
+								stageSearchQuery = st.id;
+								quickNavOpen = false;
+							}}
+							class="w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
+						>
+							<div class="flex items-center gap-2 min-w-0">
+								<Layers class="size-4 text-purple-500 shrink-0" />
+								<span class="truncate">{st.title} ({st.id})</span>
+							</div>
+							<span class="text-[10px] font-mono text-muted-foreground shrink-0">HSK {st.hskLevel}</span>
+						</button>
+					{/each}
+				{/if}
+
+				{#if quickNavUserResults.length > 0}
+					<div class="text-[10px] font-bold text-muted-foreground uppercase px-2 py-1 pt-2">ผู้เรียน (Learners)</div>
+					{#each quickNavUserResults as u (u.id)}
+						<button
+							onclick={() => {
+								quickNavOpen = false;
+								openUserDrilldown(u);
+							}}
+							class="w-full flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 font-bold hover:bg-muted text-left"
+						>
+							<div class="flex items-center gap-2 min-w-0">
+								<Users class="size-4 text-rose-500 shrink-0" />
+								<span class="truncate">@{u.username}</span>
+							</div>
+							<span class="text-[10px] font-mono text-muted-foreground shrink-0">ID: {u.id} · {u.xp} XP</span>
+						</button>
+					{/each}
+				{/if}
+
+				{#if quickNavMenuResults.length === 0 && quickNavStageResults.length === 0 && quickNavUserResults.length === 0}
+					<div class="py-6 text-center text-muted-foreground">
+						ไม่พบเมนู ด่าน หรือผู้เรียนที่ตรงกับ "{quickNavQuery}"
+					</div>
+				{/if}
 			</div>
 		</div>
 	</div>

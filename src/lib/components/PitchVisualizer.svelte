@@ -29,33 +29,56 @@
 	let animationFrameId: number | null = null;
 	let wavePhase = 0;
 
-	// Redraw when points, target, or live state changes
+	function stopLoop() {
+		if (animationFrameId !== null) {
+			cancelAnimationFrame(animationFrameId);
+			animationFrameId = null;
+		}
+	}
+
+	function startLoop() {
+		if (animationFrameId !== null || typeof window === 'undefined') return;
+		const loop = () => {
+			if (!isLive) {
+				animationFrameId = null;
+				return;
+			}
+			wavePhase += 0.08;
+			render();
+			animationFrameId = requestAnimationFrame(loop);
+		};
+		animationFrameId = requestAnimationFrame(loop);
+	}
+
+	// Manage animation loop lifecycle based on isLive, and redraw once when static props change
 	$effect(() => {
 		const _pts = points;
+		const _ptsLen = points.length;
 		const _tone = targetTone;
 		const _syls = syllables;
 		const _live = isLive;
 		const _hz = currentHz;
-		render();
+		const _show = showTargetCurve;
+		const _h = height;
+
+		if (_live) {
+			startLoop();
+		} else {
+			stopLoop();
+			render();
+		}
+
+		return () => {
+			stopLoop();
+		};
 	});
 
 	onMount(() => {
 		render();
-
-		// Start continuous animation loop if live for fluid 60fps audio waveform ripple
-		const loop = () => {
-			if (isLive) {
-				wavePhase += 0.08;
-				render();
-			}
-			animationFrameId = requestAnimationFrame(loop);
-		};
-		animationFrameId = requestAnimationFrame(loop);
-
 		window.addEventListener('resize', handleResize);
 		return () => {
 			window.removeEventListener('resize', handleResize);
-			if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+			stopLoop();
 		};
 	});
 

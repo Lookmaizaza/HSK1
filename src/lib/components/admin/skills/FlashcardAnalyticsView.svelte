@@ -5,8 +5,6 @@
 		Target,
 		Users,
 		Sparkles,
-		CheckCircle2,
-		RotateCcw,
 		Clock,
 		Search,
 		TrendingUp,

@@ -17,8 +17,11 @@ function isIntegerInRange(value: unknown, min: number, max: number): value is nu
 
 export const POST: RequestHandler = async (event) => {
 	const { locals, request } = event;
+	if (!locals.user) {
+		throw error(401, 'Unauthorized: Authentication required.');
+	}
 	const rate = consumeRateLimit(
-		`hanzi:${locals.user ? `u${locals.user.id}` : extractClientIp(event)}`,
+		`hanzi:u${locals.user.id}:${extractClientIp(event)}`,
 		120,
 		10 * 60 * 1000
 	);

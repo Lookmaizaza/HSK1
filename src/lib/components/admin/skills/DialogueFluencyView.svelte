@@ -63,7 +63,7 @@
 
 		{#if Array.isArray(skillsAnalytics?.chatbot?.byScenario) && skillsAnalytics.chatbot.byScenario.length > 0}
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-				{#each skillsAnalytics.chatbot.byScenario as sc}
+				{#each skillsAnalytics.chatbot.byScenario as sc (sc.scenarioId ?? sc.scenarioTitle)}
 					<div class="rounded-2xl border p-4 space-y-3 bg-muted/10 hover:bg-muted/20 transition">
 						<div class="flex items-start justify-between gap-2">
 							<div class="font-bold text-sm text-foreground leading-tight">{sc.scenarioTitle}</div>

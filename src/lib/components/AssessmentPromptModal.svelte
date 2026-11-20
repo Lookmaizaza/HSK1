@@ -1,6 +1,5 @@
 <!-- src/lib/components/AssessmentPromptModal.svelte -->
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import {
@@ -18,27 +17,30 @@
 	let promptSubtitle = $state('');
 	let promptBadge = $state('');
 	let promptBadgeColor = $state('');
-
-	onMount(async () => {
-		await checkAssessmentEligibility();
-	});
+	let lastCheckedKey = '';
 
 	$effect(() => {
-		// Re-check when user or progress changes
+		const pathname = page.url.pathname;
 		if (user && user.id && !user.isAdmin && !user.isImpersonated) {
-			checkAssessmentEligibility();
+			const checkKey = `${user.id}:${pathname}`;
+			if (checkKey !== lastCheckedKey) {
+				lastCheckedKey = checkKey;
+				checkAssessmentEligibility(pathname);
+			}
 		} else {
+			lastCheckedKey = '';
 			isOpen = false;
 		}
 	});
 
-	async function checkAssessmentEligibility() {
+	async function checkAssessmentEligibility(currentPath?: string) {
 		// Strict guard: Admin accounts and impersonation mode MUST NEVER see assessment prompts
 		if (!user || !user.id || user.isAdmin || user.isImpersonated || typeof window === 'undefined') {
 			isOpen = false;
 			return;
 		}
-		if (window.location.pathname.startsWith('/assessment')) {
+		const pathname = currentPath ?? window.location.pathname;
+		if (pathname.startsWith('/assessment')) {
 			isOpen = false;
 			return;
 		}

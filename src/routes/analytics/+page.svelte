@@ -225,7 +225,7 @@
 					<p class="text-[11px] text-muted-foreground">ภาพรวมความสมดุลจากทุกโหมดในระบบ</p>
 				</div>
 				<span class="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-extrabold text-primary">
-					{vocabOverview.practicedWords}/{vocabOverview.totalWords} คำ
+					{vocabOverview?.practicedWords ?? 0}/{vocabOverview?.totalWords ?? 0} คำ
 				</span>
 			</div>
 			<StudentSkillRadar axes={data.radarAxes || []} overallScore={data.holisticReadinessScore} />
@@ -467,7 +467,7 @@
 				เลือกระดับคำศัพท์ (HSK Levels)
 			</span>
 			<span class="text-xs text-muted-foreground">
-				ฝึกแล้ว <strong class="text-foreground">{totalPracticedWords}</strong> จาก {vocabOverview.totalWords} คำ
+				ฝึกแล้ว <strong class="text-foreground">{totalPracticedWords}</strong> จาก {vocabOverview?.totalWords ?? 0} คำ
 			</span>
 		</div>
 
@@ -481,7 +481,7 @@
 				<div class="flex items-center justify-between">
 					<span class="text-xs font-black text-foreground">ทุกระดับ (HSK 1-3)</span>
 					<span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-						1,000 คำ
+						{(vocabOverview?.totalWords ?? 1000).toLocaleString()} คำ
 					</span>
 				</div>
 				<div class="mt-2 flex items-center justify-between text-xs">
@@ -825,7 +825,7 @@
 										<span class="text-rose-500 font-mono">คะแนนเฉลี่ย {guide.avgMistakeGop}</span>
 									</div>
 									<div class="flex flex-wrap gap-1.5 pt-1">
-										{#each guide.mistakeWords as mw}
+										{#each guide.mistakeWords as mw (mw.hanzi)}
 											<a
 												href="/pitch?word={encodeURIComponent(mw.hanzi)}"
 												class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-xs font-medium border transition group"
@@ -950,7 +950,7 @@
 				</div>
 			{:else}
 				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-					{#each displayedRemedialCards as card}
+					{#each displayedRemedialCards as card (`${card.hanzi}_${card.hskLevel}`)}
 						<div class="group rounded-3xl border bg-card p-5 shadow-xs hover:shadow-md hover:border-emerald-500/60 transition flex flex-col justify-between space-y-3">
 							<div>
 								<div class="flex items-start justify-between">
@@ -1070,7 +1070,7 @@
 			>
 				ทั้งหมด
 			</button>
-			{#each [1, 2, 3, 4] as t}
+			{#each [1, 2, 3, 4] as t (t)}
 				{@const badge = getToneBadge(t)}
 				<button
 					type="button"

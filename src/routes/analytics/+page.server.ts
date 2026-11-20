@@ -118,8 +118,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 		if (!key) continue;
 		const score = ev.scores.gop_overall;
 		const details = ev.scores.phoneme_details || [];
-		const explicitMode = details[0]?.mode;
-		const isPitch = explicitMode ? explicitMode === 'free_pitch' : true;
+		const explicitMode = details[0]?.mode || ev.practice_mode;
+		const isQuest =
+			ev.practice_mode === 'stage' ||
+			ev.practice_mode === 'lesson' ||
+			Boolean(ev.stage_id) ||
+			explicitMode === 'quest' ||
+			explicitMode === 'stage' ||
+			explicitMode === 'auto';
+		const isPitch = !isQuest;
 
 		const existing = wordStatsMap.get(key);
 		if (!existing) {

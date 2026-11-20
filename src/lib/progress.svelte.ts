@@ -35,9 +35,10 @@ function loadLocal(): Progress {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return defaultProgress();
 		const saved = JSON.parse(raw);
+		const parsedHearts = Number(saved.hearts);
 		return {
 			xp: Math.max(0, Number(saved.xp) || 0),
-			hearts: Math.max(0, Number(saved.hearts) || MAX_HEARTS),
+			hearts: Number.isFinite(parsedHearts) ? Math.min(MAX_HEARTS, Math.max(0, parsedHearts)) : MAX_HEARTS,
 			streak: Math.max(0, Number(saved.streak) || 0),
 			learnerLevel: Math.min(MAX_LEARNER_LEVEL, Math.max(1, Math.floor(Number(saved.learnerLevel) || 1))),
 			mistakes: Math.max(0, Number(saved.mistakes) || 0),

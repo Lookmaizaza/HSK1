@@ -9,11 +9,30 @@ function hashPassword(plain) {
 	return `${salt.toString('hex')}:${hash.toString('hex')}`;
 }
 
-const client = createClient({ url: 'file:data/hsk.db' });
+fs.mkdirSync(path.resolve('data'), { recursive: true });
+const client = createClient({ url: process.env.TURSO_DATABASE_URL || 'file:data/hsk.db', authToken: process.env.TURSO_AUTH_TOKEN });
 
 async function main() {
+	await client.executeMultiple(`
+		CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+			password_hash TEXT NOT NULL,
+			created_at INTEGER NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS progress (
+			user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+			xp INTEGER NOT NULL DEFAULT 0,
+			hearts INTEGER NOT NULL DEFAULT 5,
+			streak INTEGER NOT NULL DEFAULT 0,
+			last_practiced TEXT,
+			learner_level INTEGER NOT NULL DEFAULT 1
+		);
+	`);
+
 	const adminUser = 'testadmin';
-	const adminPass = 'admin123456';
+	const envPassword = (process.env.ADMIN_INITIAL_PASSWORD || '').trim();
+	const adminPass = envPassword || randomBytes(12).toString('base64url');
 	const passHash = hashPassword(adminPass);
 	const now = Date.now();
 
@@ -49,8 +68,8 @@ async function main() {
 		sql: 'SELECT id, username FROM users WHERE LOWER(username) = ?',
 		args: ['admin']
 	});
+	const adminHash = hashPassword(adminPass);
 	if (existingAdmin.rows.length === 0) {
-		const adminHash = hashPassword('admin123456');
 		const res2 = await client.execute({
 			sql: 'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)',
 			args: ['admin', adminHash, now]
@@ -61,8 +80,6 @@ async function main() {
 		});
 		console.log('Also ensured default "admin" account.');
 	} else {
-		// Update admin password as well for convenience
-		const adminHash = hashPassword('admin123456');
 		await client.execute({
 			sql: 'UPDATE users SET password_hash = ? WHERE id = ?',
 			args: [adminHash, existingAdmin.rows[0].id]
@@ -70,33 +87,11 @@ async function main() {
 		console.log('Also updated "admin" account password.');
 	}
 
-	// Update .env file to ensure ADMIN_USERNAMES includes both
-	const envPath = path.resolve('.env');
-	let envContent = '';
-	if (fs.existsSync(envPath)) {
-		envContent = fs.readFileSync(envPath, 'utf-8');
-	} else {
-		envContent = fs.readFileSync(path.resolve('.env.example'), 'utf-8');
-	}
-
-	const adminList = 'admin,testadmin';
-	if (/^ADMIN_USERNAMES=.*$/m.test(envContent)) {
-		envContent = envContent.replace(/^ADMIN_USERNAMES=.*$/m, `ADMIN_USERNAMES=${adminList}`);
-	} else {
-		envContent += `\nADMIN_USERNAMES=${adminList}\n`;
-	}
-
-	fs.writeFileSync(envPath, envContent, 'utf-8');
-	console.log('.env updated successfully with ADMIN_USERNAMES=' + adminList);
-
 	console.log('\n=============================================');
-	console.log('SUCCESS! Admin accounts ready for testing:');
-	console.log('Account 1:');
-	console.log('  Username: testadmin');
-	console.log('  Password: ' + adminPass);
-	console.log('Account 2:');
-	console.log('  Username: admin');
-	console.log('  Password: admin123456');
+	console.log('SUCCESS! Admin accounts ready:');
+	console.log('  Usernames: admin, testadmin');
+	console.log('  Initial Password (save now, printed once): ' + adminPass);
+	console.log('  Note: Ensure ADMIN_USERNAMES in your .env includes admin,testadmin');
 	console.log('=============================================');
 }
 

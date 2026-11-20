@@ -1,42 +1,23 @@
 <script lang="ts">
 	import {
 		TrendingUp,
-		Award,
 		Zap,
 		Target,
-		BarChart3,
 		PieChart,
 		Lightbulb,
-		CheckCircle2,
-		AlertTriangle,
-		Info,
-		Layers,
-		ArrowRight,
-		Sparkles,
-		BookOpen,
 		Mic,
 		PenTool,
 		GraduationCap,
 		MessageSquare,
-		Users,
-		Compass,
-		Star
+		Compass
 	} from '@lucide/svelte';
 
 	let {
 		skillsSummary,
-		diagnostic,
-		advAnalytics,
-		totalStudents = 0,
-		onSelectUser,
-		onAssignRemedial
+		totalStudents = 0
 	}: {
 		skillsSummary: any;
-		diagnostic?: any;
-		advAnalytics?: any;
 		totalStudents?: number;
-		onSelectUser?: (user: any) => void;
-		onAssignRemedial?: (user: any, words?: string[]) => void;
 	} = $props();
 
 	// ==========================================
@@ -144,10 +125,13 @@
 		}
 	]);
 
+	const activeAxes = $derived(radarAxesList.filter((a) => a.score > 0));
 	const classOverallAvg = $derived(
 		typeof classRadar?.overallClassAvg === 'number'
 			? Math.round(classRadar.overallClassAvg)
-			: Math.round(radarAxesList.reduce((acc, a) => acc + a.score, 0) / 6)
+			: activeAxes.length > 0
+				? Math.round(activeAxes.reduce((acc, a) => acc + a.score, 0) / activeAxes.length)
+				: 0
 	);
 
 	// Radar Chart Coordinates Math (Center 200, 180, R=120)
@@ -176,7 +160,6 @@
 	);
 
 	// Strongest and Weakest Axis calculation
-	const activeAxes = $derived(radarAxesList.filter((a) => a.score > 0));
 	const strongestAxis = $derived(
 		activeAxes.length > 0 ? [...activeAxes].sort((a, b) => b.score - a.score)[0] : null
 	);
@@ -305,7 +288,7 @@
 			<div class="w-full bg-muted/10 rounded-2xl border border-border/50 p-4 overflow-hidden">
 				<svg viewBox="0 0 760 250" class="w-full h-auto max-h-[300px] select-none font-sans" preserveAspectRatio="xMidYMid meet">
 					<!-- Grid lines -->
-					{#each [0, 25, 50, 75, 100] as yVal}
+					{#each [0, 25, 50, 75, 100] as yVal (yVal)}
 						{@const y = 200 - (yVal / 100) * 165}
 						<line x1="55" y1={y} x2="725" y2={y} stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
 						<text x="46" y={y + 4} text-anchor="end" class="text-[10px] fill-muted-foreground font-mono">{yVal}%</text>
@@ -325,7 +308,7 @@
 					{/if}
 
 					<!-- Draw Grouped Bars for each phase -->
-					{#each phasesList as { label, data, cx }}
+					{#each phasesList as { label, data, cx } (label)}
 						{@const gopY = 200 - (Math.max(0, Math.min(100, data.avgGop)) / 100) * 165}
 						{@const toneY = 200 - (Math.max(0, Math.min(100, data.avgToneScore)) / 100) * 165}
 						{@const correctY = 200 - (Math.max(0, Math.min(100, data.correctTonesPct)) / 100) * 165}
@@ -568,7 +551,7 @@
 				<div class="w-full max-w-[400px]">
 					<svg viewBox="0 0 400 360" class="w-full h-auto overflow-visible select-none font-sans">
 						<!-- Concentric regular hexagonal grid rings (20%, 40%, 60%, 80%, 100%) -->
-						{#each [0.2, 0.4, 0.6, 0.8, 1.0] as ringFrac}
+						{#each [0.2, 0.4, 0.6, 0.8, 1.0] as ringFrac (ringFrac)}
 							{@const ringPts = [0, 1, 2, 3, 4, 5]
 								.map((i) => {
 									const angle = -90 + i * 60;
@@ -596,7 +579,7 @@
 						{/each}
 
 						<!-- 6 Radial Axis Lines -->
-						{#each [0, 1, 2, 3, 4, 5] as i}
+						{#each [0, 1, 2, 3, 4, 5] as i (i)}
 							{@const angle = -90 + i * 60}
 							{@const rad = (angle * Math.PI) / 180}
 							{@const endX = radarCx + radarMaxR * Math.cos(rad)}
@@ -624,7 +607,7 @@
 							/>
 
 							<!-- Vertex Dots & glowing circles -->
-							{#each radarAxesList as axis, i}
+							{#each radarAxesList as axis, i (axis.key)}
 								{@const pt = getRadarCoords(i, axis.score)}
 								<circle
 									cx={pt.x}
@@ -639,7 +622,7 @@
 						{/if}
 
 						<!-- Outer Axis Labels with Score Badges -->
-						{#each radarAxesList as axis, i}
+						{#each radarAxesList as axis, i (axis.key)}
 							{@const angle = -90 + i * 60}
 							{@const rad = (angle * Math.PI) / 180}
 							{@const labelR = radarMaxR + 28}
@@ -674,7 +657,7 @@
 
 			<!-- 6 Mini KPI Cards -->
 			<div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
-				{#each radarAxesList as axis}
+				{#each radarAxesList as axis (axis.key)}
 					<div class="rounded-2xl border border-border/60 bg-muted/20 p-2.5 flex items-center justify-between">
 						<div class="flex items-center gap-2">
 							<div class="p-1.5 rounded-lg bg-card border border-border/50 text-muted-foreground">
@@ -768,7 +751,7 @@
 						<!-- Donut Segments (Rotated by -90 deg to start from 12 o'clock) -->
 						{#if totalCrossEvents > 0}
 							<g transform="rotate(-90 120 120)">
-								{#each donutSlices as slice}
+								{#each donutSlices as slice (slice.key)}
 									{#if slice.strokeLength > 0}
 										<circle
 											cx="120"
@@ -802,7 +785,7 @@
 
 			<!-- Breakdown List with Horizontal Bars -->
 			<div class="space-y-2.5 pt-2">
-				{#each crossFeatureList as feat}
+				{#each crossFeatureList as feat (feat.key)}
 					<div class="rounded-xl border border-border/50 bg-muted/20 p-2 text-xs space-y-1">
 						<div class="flex items-center justify-between font-bold">
 							<div class="flex items-center gap-2 truncate">

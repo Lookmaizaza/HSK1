@@ -1,7 +1,16 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { recordMistake } from '$lib/server/db';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 import type { RequestHandler } from './$types';
+
+const MAX_FIELD_LENGTH = 200;
+const UPSTREAM_TIMEOUT_MS = 15000;
+
+function sanitizePromptText(raw: unknown, maxLen = MAX_FIELD_LENGTH): string {
+	if (typeof raw !== 'string') return '';
+	return raw.replace(/[\r\n\0]+/g, ' ').trim().slice(0, maxLen);
+}
 
 type Tone = 2 | 3;
 
@@ -48,10 +57,14 @@ function toneInstruction(tone: Tone): string {
 
 function buildMessages(target: EvalRequest['target'], said: string, tone: Tone | undefined) {
 	const system = SYSTEM_BASE + (tone ? toneInstruction(tone) : '');
-	const user = `TARGET hanzi: ${target.hanzi}
-TARGET pinyin: ${target.pinyin}
-TARGET english: ${target.english}
-HEARD: ${said || '(ไม่ได้ยินเสียง)'}`;
+	const safeHanzi = sanitizePromptText(target.hanzi, 64);
+	const safePinyin = sanitizePromptText(target.pinyin, 128);
+	const safeEnglish = sanitizePromptText(target.english, MAX_FIELD_LENGTH);
+	const safeSaid = sanitizePromptText(said, MAX_FIELD_LENGTH);
+	const user = `TARGET hanzi: ${safeHanzi}
+TARGET pinyin: ${safePinyin}
+TARGET english: ${safeEnglish}
+HEARD: ${safeSaid || '(ไม่ได้ยินเสียง)'}`;
 	return [
 		{ role: 'system', content: system },
 		{ role: 'user', content: user }
@@ -96,7 +109,8 @@ async function callOpenRouter(
 			temperature: 0.2,
 			max_tokens: 300,
 			response_format: { type: 'json_object' }
-		})
+		}),
+		signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
 	});
 	if (!resp.ok) {
 		const text = await resp.text();
@@ -122,7 +136,8 @@ async function callThaiLLM(
 			messages,
 			temperature: 0.3,
 			max_tokens: 2048
-		})
+		}),
+		signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
 	});
 	if (!resp.ok) {
 		const text = await resp.text();
@@ -132,16 +147,50 @@ async function callThaiLLM(
 	return data?.choices?.[0]?.message?.content ?? '';
 }
 
-export const POST: RequestHandler = async ({ request, fetch, locals }) => {
-	const body = (await request.json()) as EvalRequest;
+export const POST: RequestHandler = async (event) => {
+	const { request, fetch, locals } = event;
+	if (!locals.user) {
+		throw error(401, 'Unauthorized: Authentication required.');
+	}
+
+	const rate = consumeRateLimit(
+		`evaluate:u${locals.user.id}:${extractClientIp(event)}`,
+		60,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many evaluation requests. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
+	let body: EvalRequest;
+	try {
+		body = (await request.json()) as EvalRequest;
+	} catch {
+		throw error(400, 'Invalid JSON body');
+	}
 	const { target, said, tone } = body;
 
-	if (!target?.hanzi || typeof said !== 'string') {
+	if (
+		!target ||
+		typeof target.hanzi !== 'string' ||
+		!target.hanzi.trim() ||
+		target.hanzi.length > 64 ||
+		typeof said !== 'string' ||
+		said.length > MAX_FIELD_LENGTH
+	) {
 		throw error(400, 'Invalid request');
 	}
 
+	const safeTarget = {
+		hanzi: sanitizePromptText(target.hanzi, 64),
+		pinyin: sanitizePromptText(target.pinyin, 128),
+		english: sanitizePromptText(target.english, MAX_FIELD_LENGTH)
+	};
+	const safeSaid = sanitizePromptText(said, MAX_FIELD_LENGTH);
+	const safeTone: Tone | undefined = tone === 2 || tone === 3 ? tone : undefined;
+
 	const modelId = body.model ?? 'pathumma-thaillm';
-	const messages = buildMessages(target, said, tone);
+	const messages = buildMessages(safeTarget, safeSaid, safeTone);
 
 	let content = '';
 	if (modelId === 'pathumma-thaillm') {
@@ -149,7 +198,7 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 		if (!key) throw error(401, 'THAILLM_API_KEY is not configured on the server.');
 		content = await callThaiLLM(messages, key, fetch);
 	} else {
-		const key = body.apiKey?.trim() || env.OPENROUTER_API_KEY;
+		const key = body.apiKey?.trim().slice(0, 256) || env.OPENROUTER_API_KEY;
 		if (!key)
 			throw error(
 				401,
@@ -164,26 +213,26 @@ export const POST: RequestHandler = async ({ request, fetch, locals }) => {
 		if (!jsonStr) throw new Error('no_json');
 		parsed = JSON.parse(jsonStr);
 	} catch {
-		const anyMatch = [...target.hanzi].some((c) => said.includes(c));
+		const anyMatch = [...safeTarget.hanzi].some((c) => safeSaid.includes(c));
 		parsed = {
 			correct: anyMatch,
 			score: anyMatch ? 60 : 0,
 			feedback: anyMatch ? 'ใกล้แล้ว! แต่ยังไม่สามารถวิเคราะห์ได้ละเอียด' : 'ลองอีกครั้งนะ',
-			corrected: anyMatch ? null : target.hanzi
+			corrected: anyMatch ? null : safeTarget.hanzi
 		};
 	}
 
-	if (!parsed.correct && locals.user) {
+	if (!parsed.correct && locals.user && !locals.user.isAdmin && !locals.user.isImpersonated) {
 		try {
 			await recordMistake({
 				userId: locals.user.id,
-				hanzi: target.hanzi,
-				pinyin: target.pinyin,
-				meaning: target.english || '',
-				expectedTone: tone ?? null,
-				heardText: said,
-				score: parsed.score,
-				feedback: parsed.feedback
+				hanzi: safeTarget.hanzi,
+				pinyin: safeTarget.pinyin,
+				meaning: safeTarget.english || '',
+				expectedTone: safeTone ?? null,
+				heardText: safeSaid,
+				score: Math.max(0, Math.min(100, Number(parsed.score) || 0)),
+				feedback: String(parsed.feedback || '').slice(0, 500)
 			});
 		} catch (err) {
 			console.error('Failed to record mistake:', err);

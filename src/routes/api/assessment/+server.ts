@@ -6,7 +6,6 @@ import {
 	getUserAssessmentStatus,
 	recordPronunciationEvaluation,
 	recordPhonemeEvaluations,
-	syncAllAssessmentsToEvaluations,
 	isUserAdmin,
 	getProgress
 } from '$lib/server/db';
@@ -72,31 +71,40 @@ export const POST: RequestHandler = async (event) => {
 				perOverall 
 			} = body;
 
+			const isToneMatch = Number(targetTone) === Number(detectedTone);
 			const safeToneConfidence = clampScore(toneConfidence, 0, 100);
 			const safeToneScore = clampScore(toneScore, 0, 100);
-			const safeGopOverall = clampScore(gopOverall, 0, 100);
-			const safePerOverall = clampScore(perOverall, 0, 100);
+			const safeGopOverall = clampScore(gopOverall ?? safeToneScore, 0, 100);
+			const rawPer = perOverall !== undefined && perOverall !== null ? Number(perOverall) : (isToneMatch ? 0 : 25);
+			const normalizedPer = Number.isFinite(rawPer) && rawPer > 0 && rawPer <= 1 ? rawPer * 100 : rawPer;
+			const safePerOverall = clampScore(normalizedPer, 0, 100);
+			const timestamp = Date.now();
+			const safeTestType = String(testType || 'pre').toLowerCase();
+			const safeWordId = String(wordId || '');
+			const safePinyin = String(pinyin || '');
 
 			await recordAssessmentWord({
 				userId: String(user.id),
-				testType,
-				wordId,
-				pinyin,
-				targetTone,
-				detectedTone,
+				testType: safeTestType,
+				wordId: safeWordId,
+				pinyin: safePinyin,
+				targetTone: Number(targetTone) || 0,
+				detectedTone: Number(detectedTone) || 0,
 				toneConfidence: safeToneConfidence,
 				toneScore: safeToneScore,
 				gopOverall: safeGopOverall,
 				perOverall: safePerOverall
 			});
 
-			// If not admin, mirror evaluation into main pronunciation & phoneme tables for analytics
+			// Mirror evaluation once into main pronunciation & phoneme tables with clamped scores, type: 'final_tone', practiceMode: 'assessment', and single consistent timestamp
 			if (!user.isAdmin && !isUserAdmin(user.username)) {
 				try {
-					const isToneMatch = Number(targetTone) === Number(detectedTone);
 					const phonemeDetails = [{
-						phoneme: wordId,
-						score: toneScore ?? 0,
+						phoneme: safeWordId,
+						score: safeToneScore,
+						gop: safeGopOverall,
+						toneScore: safeToneScore,
+						type: 'final_tone',
 						isMatch: isToneMatch,
 						targetTone: Number(targetTone),
 						detectedTone: Number(detectedTone)
@@ -104,34 +112,37 @@ export const POST: RequestHandler = async (event) => {
 
 					await recordPronunciationEvaluation({
 						user_id: String(user.id),
-						word_id: String(wordId),
-						pinyin: String(pinyin),
+						word_id: safeWordId,
+						pinyin: safePinyin,
 						practice_mode: 'assessment',
-						stage_id: String(testType || 'pre'),
+						stage_id: safeTestType,
 						attempt_number: 1,
 						audio_duration_sec: 1.0,
+						created_at: timestamp,
+						idempotency_key: `${user.id}_${safeWordId}_${timestamp}`,
 						scores: {
-							gop_overall: Number(gopOverall ?? toneScore ?? 0),
-							per_overall: Number(perOverall ?? (isToneMatch ? 0 : 25)),
-							tone_score: Number(toneScore ?? 0),
+							gop_overall: safeGopOverall,
+							per_overall: safePerOverall,
+							tone_score: safeToneScore,
 							phoneme_details: phonemeDetails
 						}
 					});
 
-					const targetPhonemes = extractTargetPhonemes(String(pinyin || ''));
+					const targetPhonemes = extractTargetPhonemes(safePinyin);
 					if (targetPhonemes.length > 0) {
 						const phonemeRecords = targetPhonemes.map((pt) => ({
 							userId: String(user.id),
-							wordId: String(wordId),
-							pinyin: String(pinyin),
+							wordId: safeWordId,
+							pinyin: safePinyin,
 							phoneme: pt.phoneme,
 							phonemeType: pt.type,
-							gop: Number(gopOverall ?? toneScore ?? 0),
-							status: isToneMatch ? 'correct' : 'substitution',
+							gop: safeGopOverall,
+							status: (isToneMatch ? 'correct' : 'substitution') as 'correct' | 'substitution',
 							target: pt.phoneme,
 							recognized: isToneMatch ? pt.phoneme : '?',
-							practiceMode: 'word' as const,
-							stageId: undefined
+							practiceMode: 'assessment' as const,
+							stageId: safeTestType,
+							createdAt: timestamp
 						}));
 						await recordPhonemeEvaluations(phonemeRecords);
 					}
@@ -148,25 +159,18 @@ export const POST: RequestHandler = async (event) => {
 
 			const safeTotalWords = Math.min(200, Math.max(1, Math.round(Number(totalWords ?? 20)) || 20));
 			const safeCorrectTones = Math.min(safeTotalWords, Math.max(0, Math.round(Number(correctTones ?? 0)) || 0));
+			const rawAvgPer = Number(avgPer ?? 0);
+			const normalizedAvgPer = Number.isFinite(rawAvgPer) && rawAvgPer > 0 && rawAvgPer <= 1 ? rawAvgPer * 100 : rawAvgPer;
 
 			await saveAssessmentSummary({
 				userId: String(user.id),
-				testType,
+				testType: String(testType || 'pre').toLowerCase(),
 				totalWords: safeTotalWords,
 				correctTones: safeCorrectTones,
 				avgToneScore: clampScore(avgToneScore, 0, 100),
 				avgGop: clampScore(avgGop, 0, 100),
-				avgPer: clampScore(avgPer, 0, 100)
+				avgPer: clampScore(normalizedAvgPer, 0, 100)
 			});
-
-			// If not admin, backfill and ensure all words from this assessment are in pronunciation & phoneme tables
-			if (!user.isAdmin && !isUserAdmin(user.username)) {
-				try {
-					await syncAllAssessmentsToEvaluations(String(user.id));
-				} catch (syncErr) {
-					console.warn('⚠️ [Pretest Assessment] Failed to sync assessments to evaluations on finish:', syncErr);
-				}
-			}
 
 			return json({ success: true });
 		}
@@ -174,6 +178,6 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Invalid action' }, { status: 400 });
 	} catch (err: any) {
 		console.error('Error in assessment API:', err);
-		return json({ error: err.message || 'Internal server error' }, { status: 500 });
+		return json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

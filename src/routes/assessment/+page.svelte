@@ -149,8 +149,10 @@
 	let pitchPoints = $state<PitchPoint[]>([]);
 	let currentVolume = $state(0);
 	let errorMessage = $state<string | null>(null);
-	let autoAdvanceTimer: any = null;
-	let maxDurationTimeout: any = null;
+	let autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
+	let maxDurationTimeout: ReturnType<typeof setTimeout> | null = null;
+	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
+	let isDestroyed = false;
 
 	onMount(async () => {
 		try {
@@ -161,12 +163,24 @@
 	});
 
 	onDestroy(() => {
+		isDestroyed = true;
+		if (silenceTimeout) {
+			clearTimeout(silenceTimeout);
+			silenceTimeout = null;
+		}
+		if (autoAdvanceTimer) {
+			clearTimeout(autoAdvanceTimer);
+			autoAdvanceTimer = null;
+		}
+		if (maxDurationTimeout) {
+			clearTimeout(maxDurationTimeout);
+			maxDurationTimeout = null;
+		}
 		if (tracker) {
-			tracker.stop();
+			tracker.destroy();
 			tracker = null;
 		}
-		if (autoAdvanceTimer) clearTimeout(autoAdvanceTimer);
-		if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
+		isRecording = false;
 	});
 
 	async function startRecording() {
@@ -174,21 +188,28 @@
 		currentResult = null;
 		hasAnsweredCurrent = false;
 		pitchPoints = [];
-		if (autoAdvanceTimer) clearTimeout(autoAdvanceTimer);
+		if (autoAdvanceTimer) {
+			clearTimeout(autoAdvanceTimer);
+			autoAdvanceTimer = null;
+		}
+		if (silenceTimeout) {
+			clearTimeout(silenceTimeout);
+			silenceTimeout = null;
+		}
 
 		if (!tracker) {
 			tracker = new RealtimePitchTracker();
 			tracker.onError = (err) => {
 				errorMessage = `ไมโครโฟนไม่พร้อมใช้งาน: ${err.message}`;
-				stopRecording();
+				isRecording = false;
+				if (tracker) tracker.stop();
 			};
 		}
 
 		let hasVoiced = false;
-		let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
 
 		tracker.onPitchUpdate = (point, all) => {
-			pitchPoints = [...all];
+			pitchPoints = all;
 			currentVolume = point.volume;
 
 			if (point.volume > 0.015 && point.f0 > 0 && point.clarity > 0.28) {
@@ -202,6 +223,7 @@
 				if (isSilent) {
 					if (!silenceTimeout) {
 						silenceTimeout = setTimeout(() => {
+							silenceTimeout = null;
 							if (isRecording) stopRecording();
 						}, 280);
 					}
@@ -213,24 +235,43 @@
 		};
 
 		const ok = await tracker.start();
+		if (isDestroyed) {
+			if (tracker) {
+				tracker.destroy();
+				tracker = null;
+			}
+			isRecording = false;
+			return;
+		}
 		if (ok) {
 			isRecording = true;
 			// Max recording window for one syllable: 3 seconds
 			if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
 			maxDurationTimeout = setTimeout(() => {
+				maxDurationTimeout = null;
 				if (isRecording) stopRecording();
 			}, 3000);
+		} else {
+			isRecording = false;
 		}
 	}
 
 	async function stopRecording() {
 		if (!isRecording) return;
 		isRecording = false;
-		if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
+		if (silenceTimeout) {
+			clearTimeout(silenceTimeout);
+			silenceTimeout = null;
+		}
+		if (maxDurationTimeout) {
+			clearTimeout(maxDurationTimeout);
+			maxDurationTimeout = null;
+		}
 
 		if (tracker) {
-			tracker.stop();
+			pitchPoints = tracker.stop();
 		}
+		if (isDestroyed) return;
 
 		await evaluateRecording();
 	}
@@ -244,24 +285,38 @@
 				return;
 			}
 
-			// 1. Run AI Tone Classifier
+			// 1. Run AI Tone Classifier & Geometric Contour Analysis
 			let detectedTone: number = currentWord.tone;
 			let toneConfidence = 0.8;
-			let toneScore = 75;
+			const geom = analyzeToneContour(pitchPoints, currentWord.tone as any);
 
 			const aiResult = await predictToneNeuralNetwork(pitchPoints);
+			if (isDestroyed) return;
+
 			if (aiResult && aiResult.detectedTone !== undefined) {
 				detectedTone = Number(aiResult.detectedTone);
 				toneConfidence = aiResult.confidence;
 			} else {
 				// Fallback to geometric pitch contour analysis
-				const geom = analyzeToneContour(pitchPoints, currentWord.tone as any);
 				detectedTone = Number(geom.detectedTone) || currentWord.tone;
+				toneConfidence = Math.max(0, Math.min(1, (geom.score || 0) / 100));
 			}
 
+			const voicedFrames = pitchPoints.filter((p) => p.f0 > 0 && p.clarity > 0.25);
+			const avgClarity =
+				voicedFrames.length > 0
+					? voicedFrames.reduce((sum, p) => sum + p.clarity, 0) / voicedFrames.length
+					: 0.5;
+			const contourScore = Math.max(0, Math.min(100, geom.score || Math.round(toneConfidence * 100)));
+
 			const isCorrect = detectedTone === currentWord.tone;
-			toneScore = isCorrect ? Math.round(80 + toneConfidence * 20) : Math.round(30 + toneConfidence * 20);
-			const gop = isCorrect ? Math.round(75 + Math.random() * 20) : Math.round(35 + Math.random() * 25);
+			const toneScore = isCorrect
+				? Math.round(80 + toneConfidence * 20)
+				: Math.round(30 + toneConfidence * 20);
+			const rawGop = Math.round(contourScore * 0.5 + avgClarity * 100 * 0.25 + toneConfidence * 100 * 0.25);
+			const gop = isCorrect
+				? Math.max(75, Math.min(98, rawGop))
+				: Math.max(30, Math.min(65, rawGop));
 			const per = isCorrect ? 0.0 : 0.5;
 
 			currentResult = {
@@ -305,7 +360,8 @@
 
 			// Auto advance after 2.2 seconds if user doesn't click next
 			autoAdvanceTimer = setTimeout(() => {
-				nextWord();
+				autoAdvanceTimer = null;
+				if (!isDestroyed) nextWord();
 			}, 2200);
 
 		} catch (err: any) {
@@ -317,7 +373,11 @@
 	}
 
 	function skipWord() {
-		if (autoAdvanceTimer) clearTimeout(autoAdvanceTimer);
+		if (isRecording || isEvaluating) return;
+		if (autoAdvanceTimer) {
+			clearTimeout(autoAdvanceTimer);
+			autoAdvanceTimer = null;
+		}
 		answers.push({
 			word: currentWord,
 			detectedTone: 0,
@@ -564,7 +624,7 @@
 						variant="ghost" 
 						size="sm" 
 						onclick={skipWord}
-						disabled={isRecording}
+						disabled={isRecording || isEvaluating}
 						class="text-xs text-muted-foreground hover:text-foreground"
 					>
 						ข้ามข้อนี้

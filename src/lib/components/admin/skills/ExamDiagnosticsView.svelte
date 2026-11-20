@@ -6,6 +6,34 @@
 	}
 
 	let { skillsAnalytics }: Props = $props();
+
+	function getLevelMaxScore(level: number, lvlData?: any): number {
+		const rawMax = Number(lvlData?.maxScore);
+		if (Number.isFinite(rawMax) && rawMax > 0) return rawMax;
+		return level === 3 ? 300 : 200;
+	}
+
+	function getLevelPassScore(level: number, lvlData?: any): number {
+		const rawPass = Number(lvlData?.passScore);
+		if (Number.isFinite(rawPass) && rawPass > 0) return rawPass;
+		return level === 3 ? 180 : 120;
+	}
+
+	const mostReadyLevel = $derived.by(() => {
+		const total = Number(skillsAnalytics?.exam?.totalAttempts ?? 0);
+		if (total <= 0) return null;
+		const byLevel = skillsAnalytics?.exam?.byLevel || {};
+		const candidates = [1, 2, 3]
+			.map((lvl) => ({
+				level: lvl,
+				attempts: Number(byLevel?.[lvl]?.attempts ?? 0),
+				passRate: Number(byLevel?.[lvl]?.passRate ?? 0)
+			}))
+			.filter((item) => item.attempts > 0);
+		if (candidates.length === 0) return 1;
+		candidates.sort((a, b) => b.passRate - a.passRate || b.attempts - a.attempts);
+		return candidates[0].level;
+	});
 </script>
 
 <div class="space-y-6">
@@ -18,7 +46,7 @@
 			<div>
 				<div class="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">HSK Diagnostic Assessment</div>
 				<h2 class="text-xl font-black text-foreground">การประเมินผลการสอบวัดระดับ HSK 1–3 (HSK Exam Diagnostics)</h2>
-				<p class="text-xs text-muted-foreground mt-0.5">วิเคราะห์ผลสัมฤทธิ์ตามเกณฑ์มาตรฐานสากล (เกณฑ์ผ่าน 180/300 คะแนน) จำแนกตามทักษะการฟัง การอ่าน และการเขียน</p>
+				<p class="text-xs text-muted-foreground mt-0.5">วิเคราะห์ผลสัมฤทธิ์ตามเกณฑ์มาตรฐานสากล (HSK 1–2 เกณฑ์ผ่าน 120/200 · HSK 3 เกณฑ์ผ่าน 180/300 คะแนน) จำแนกตามทักษะการฟัง การอ่าน และการเขียน</p>
 			</div>
 		</div>
 	</div>
@@ -36,7 +64,7 @@
 				{(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? `${skillsAnalytics?.exam?.passRate ?? 0}%` : '—'}
 			</div>
 			<div class="text-[11px] text-muted-foreground">
-				{(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? `ผ่าน ${skillsAnalytics?.exam?.passedCount ?? 0} จาก ${skillsAnalytics?.exam?.totalAttempts ?? 0} ครั้ง` : 'เกณฑ์ผ่าน 180/300 คะแนน'}
+				{(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? `ผ่าน ${skillsAnalytics?.exam?.passedCount ?? 0} จาก ${skillsAnalytics?.exam?.totalAttempts ?? 0} ครั้ง` : 'เกณฑ์ผ่าน 60% (120/200 หรือ 180/300)'}
 			</div>
 		</div>
 		<div class="rounded-2xl border bg-card p-5 space-y-1">
@@ -44,21 +72,19 @@
 			<div class="text-2xl font-black font-mono {(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}">
 				{(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? `${skillsAnalytics?.exam?.avgScore ?? 0} คะแนน` : '—'}
 			</div>
-			<div class="text-[11px] text-muted-foreground">เต็ม 300 คะแนน</div>
+			<div class="text-[11px] text-muted-foreground">HSK 1–2 เต็ม 200 · HSK 3 เต็ม 300</div>
 		</div>
 		<div class="rounded-2xl border bg-card p-5 space-y-1">
 			<div class="text-xs text-muted-foreground font-semibold">ระดับที่มีความพร้อมสูงสุด</div>
 			<div class="text-2xl font-black font-mono {(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? 'text-amber-600' : 'text-muted-foreground'}">
-				{#if (skillsAnalytics?.exam?.totalAttempts ?? 0) === 0}
+				{#if mostReadyLevel === null}
 					—
-				{:else if (skillsAnalytics?.exam?.byLevel?.[1]?.passRate ?? 0) >= (skillsAnalytics?.exam?.byLevel?.[2]?.passRate ?? 0)}
-					HSK 1
 				{:else}
-					HSK 2
+					HSK {mostReadyLevel}
 				{/if}
 			</div>
 			<div class="text-[11px] text-muted-foreground">
-				{(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? 'ประเมินจากอัตราสอบผ่าน' : 'รอการประเมินจากผลสอบจริง'}
+				{(skillsAnalytics?.exam?.totalAttempts ?? 0) > 0 ? 'ประเมินจากอัตราสอบผ่าน (HSK 1–3)' : 'รอการประเมินจากผลสอบจริง'}
 			</div>
 		</div>
 	</div>
@@ -93,14 +119,14 @@
 		<div class="w-full bg-muted/10 rounded-2xl border p-4 overflow-hidden">
 			<svg viewBox="0 0 540 210" class="w-full h-auto max-h-[240px] select-none font-sans" preserveAspectRatio="xMidYMid meet">
 				<!-- Grid Lines 0, 25, 50, 75, 100 -->
-				{#each [0, 25, 50, 75, 100] as gVal}
+				{#each [0, 25, 50, 75, 100] as gVal (gVal)}
 					{@const y = 170 - (gVal / 100) * 140}
 					<line x1="45" y1={y} x2="520" y2={y} stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
 					<text x="38" y={y + 4} text-anchor="end" class="text-[9.5px] fill-muted-foreground font-mono">{gVal}%</text>
 				{/each}
 
 				<!-- 3 HSK Levels -->
-				{#each [1, 2, 3] as lvl, lvlIdx}
+				{#each [1, 2, 3] as lvl, lvlIdx (lvl)}
 					{@const lvlData = skillsAnalytics?.exam?.byLevel?.[lvl] || { attempts: 0, passRate: 0, avgListening: 0, avgReading: 0, avgWriting: 0 }}
 					{@const lcx = 125 + lvlIdx * 160}
 					{@const barW = 16}
@@ -167,13 +193,15 @@
 								<span>การอ่าน (Reading):</span>
 								<span class="font-mono font-bold text-foreground">{lvlData?.avgReading ?? 0} คะแนน</span>
 							</div>
-							<div class="flex justify-between">
-								<span>การเขียน (Writing):</span>
-								<span class="font-mono font-bold text-foreground">{lvlData?.avgWriting ?? 0} คะแนน</span>
-							</div>
+							{#if lvl === 3 || (lvlData?.avgWriting ?? 0) > 0}
+								<div class="flex justify-between">
+									<span>การเขียน (Writing):</span>
+									<span class="font-mono font-bold text-foreground">{lvlData?.avgWriting ?? 0} คะแนน</span>
+								</div>
+							{/if}
 						{:else}
 							<div class="py-2 text-center text-[11px] text-muted-foreground">
-								ยังไม่มีประวัติการสอบในระดับนี้ (เกณฑ์ผ่าน {lvlData?.passScore ?? 180}/{lvlData?.maxScore ?? 300} คะแนน)
+								ยังไม่มีประวัติการสอบในระดับนี้ (เกณฑ์ผ่าน {getLevelPassScore(lvl, lvlData)}/{getLevelMaxScore(lvl, lvlData)} คะแนน)
 							</div>
 						{/if}
 					</div>
@@ -195,13 +223,13 @@
 								<span class="rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 font-bold">อัตราผ่านรวม: {skillsAnalytics?.exam?.passRate ?? 0}%</span>
 								<span class="rounded-md bg-muted px-2 py-0.5 font-semibold text-muted-foreground">สอบสะสม {skillsAnalytics?.exam?.totalAttempts ?? 0} ครั้ง</span>
 							</div>
-							<p class="pt-0.5">การวิเคราะห์ผลสัมฤทธิ์ตามเกณฑ์คะแนนจริงของผู้เรียนในแต่ละพาร์ท (การฟัง การอ่าน การเขียน)</p>
+							<p class="pt-0.5">การวิเคราะห์ผลสัมฤทธิ์ตามเกณฑ์คะแนนจริงของผู้เรียนในแต่ละพาร์ท (การฟัง การอ่าน และการเขียนสำหรับ HSK 3)</p>
 						{:else}
 							<div class="flex flex-wrap items-center gap-2">
 								<span class="rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 font-bold">สถานะ: รอการบันทึกผลสอบจริง</span>
 								<span class="rounded-md bg-muted px-2 py-0.5 font-semibold text-muted-foreground">ข้อสอบมาตรฐาน HSK 1–3</span>
 							</div>
-							<p class="pt-0.5">ปัจจุบันยังไม่มีประวัติการทำแบบทดสอบจำลองในฐานข้อมูล เมื่อผู้เรียนเริ่มทำข้อสอบ ระบบจะประมวลผลคะแนนเฉลี่ยรายพาร์ทและอัตราผ่านเกณฑ์ 180/300 คะแนนให้โดยอัตโนมัติ</p>
+							<p class="pt-0.5">ปัจจุบันยังไม่มีประวัติการทำแบบทดสอบจำลองในฐานข้อมูล เมื่อผู้เรียนเริ่มทำข้อสอบ ระบบจะประมวลผลคะแนนเฉลี่ยรายพาร์ทและอัตราผ่านเกณฑ์ (HSK 1–2: 120/200 · HSK 3: 180/300 คะแนน) ให้โดยอัตโนมัติ</p>
 						{/if}
 					</div>
 				</div>

@@ -10,6 +10,7 @@ import {
 	type LearnerPronunciationPayload,
 	type PhonemeDetail
 } from '$lib/pronunciation';
+import { consumeRateLimit, extractClientIp } from '$lib/server/rateLimit';
 
 // GET /api/analytics/pronunciation
 // Query params:
@@ -17,15 +18,22 @@ import {
 // - mode: 'history' (list of evaluations) | 'stats' (aggregated phoneme error stats)
 // - limit: number of records (default: 50)
 export const GET = async ({ locals, url }: RequestEvent) => {
-	const paramUserId = url.searchParams.get('userId')?.trim();
-	const targetUserId = paramUserId || (locals.user ? String(locals.user.id) : null);
+	const authUser = locals.realAdmin || locals.user;
+	if (!authUser) {
+		throw error(401, 'Unauthorized: Authentication required.');
+	}
 
-	if (!targetUserId) {
-		throw error(400, 'Missing userId parameter or not authenticated.');
+	const paramUserId = url.searchParams.get('userId')?.trim();
+	const currentUserId = String(locals.user?.id ?? authUser.id);
+	const targetUserId = paramUserId || currentUserId;
+
+	const isAdmin = Boolean(authUser.isAdmin || locals.user?.isAdmin);
+	if (String(authUser.id) !== targetUserId && String(locals.user?.id) !== targetUserId && !isAdmin) {
+		throw error(403, 'Forbidden: Cannot access pronunciation analytics for another user.');
 	}
 
 	const mode = url.searchParams.get('mode') || 'history';
-	const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 200);
+	const limit = Math.min(Math.max(1, Number(url.searchParams.get('limit')) || 50), 200);
 
 	if (mode === 'stats') {
 		const stats = await getPronunciationPhonemeErrorStats(targetUserId);
@@ -61,7 +69,31 @@ function normalizeWordId(rawId: string): string {
 
 // POST /api/analytics/pronunciation
 // Body: LearnerPronunciationPayload or { items: LearnerPronunciationPayload[] }
-export const POST = async ({ locals, request }: RequestEvent) => {
+export const POST = async (event: RequestEvent) => {
+	const { locals, request } = event;
+	if (!locals.user) {
+		throw error(401, 'Unauthorized: Authentication required.');
+	}
+
+	const rate = consumeRateLimit(
+		`pronunciation:u${locals.user.id}:${extractClientIp(event)}`,
+		120,
+		10 * 60 * 1000
+	);
+	if (!rate.allowed) {
+		throw error(429, `Too many pronunciation submissions. Please retry in ${rate.remainingSeconds}s.`);
+	}
+
+	if (locals.user.isAdmin || locals.user.isImpersonated) {
+		return json({
+			success: true,
+			ignored: true,
+			reason: 'admin_or_impersonated',
+			saved_count: 0,
+			items: []
+		});
+	}
+
 	let body: any;
 	try {
 		body = await request.json();
@@ -78,45 +110,66 @@ export const POST = async ({ locals, request }: RequestEvent) => {
 	if (rawItems.length === 0) {
 		throw error(400, 'No evaluation items provided.');
 	}
+	if (rawItems.length > 50) {
+		throw error(400, 'Batch size exceeds maximum limit of 50 items.');
+	}
 
 	const processedItems: LearnerPronunciationPayload[] = [];
+	const authUserId = String(locals.user.id);
 
 	for (const item of rawItems) {
-		const userId = String(item.user_id || (locals.user ? locals.user.id : 'usr_uuid_local'));
-		const wordId = normalizeWordId(String(item.word_id || ''));
-		const pinyin = String(item.pinyin || '');
-		const attemptNumber = Number(item.attempt_number || 1);
-		const audioDurationSec = Number(item.audio_duration_sec || 0);
+		const requestedUserId = item.user_id ? String(item.user_id).trim() : authUserId;
+		if (requestedUserId !== authUserId && !locals.user.isAdmin) {
+			throw error(403, 'Forbidden: Cannot record pronunciation evaluations for another user.');
+		}
+		const userId = locals.user.isAdmin ? requestedUserId : authUserId;
+		const wordId = normalizeWordId(String(item.word_id || '')).slice(0, 64);
+		const pinyin = String(item.pinyin || '').slice(0, 128);
+		const attemptNumber = Math.max(1, Math.min(1000, Math.round(Number(item.attempt_number || 1))));
+		const audioDurationSec = Math.max(0, Math.min(300, Number(item.audio_duration_sec || 0)));
 
 		if (!wordId || !pinyin) {
 			continue;
 		}
 
-		const phonemeDetails: PhonemeDetail[] = Array.isArray(item.scores?.phoneme_details)
-			? item.scores.phoneme_details.map((p: any) => ({
-					phoneme: String(p.phoneme || ''),
-					type: p.type === 'initial' ? 'initial' : (p.type === 'final' ? 'final' : 'final_tone'),
-					gop: Number(p.gop ?? 0),
-					target: String(p.target || p.phoneme || ''),
-					recognized: String(p.recognized || ''),
-					status: ['correct', 'substitution', 'omission', 'insertion'].includes(p.status)
-						? p.status
-						: (p.target === p.recognized ? 'correct' : 'substitution')
-				}))
+		const rawDetails = Array.isArray(item.scores?.phoneme_details)
+			? item.scores.phoneme_details.slice(0, 50)
 			: [];
+		const phonemeDetails: PhonemeDetail[] = rawDetails.map((p: any) => ({
+			phoneme: String(p.phoneme || '').slice(0, 32),
+			type: p.type === 'initial' ? 'initial' : (p.type === 'final' ? 'final' : 'final_tone'),
+			gop: Math.max(0, Math.min(100, Number(p.gop ?? 0) || 0)),
+			target: String(p.target || p.phoneme || '').slice(0, 32),
+			recognized: String(p.recognized || '').slice(0, 32),
+			status: ['correct', 'substitution', 'omission', 'insertion'].includes(p.status)
+				? p.status
+				: (p.target === p.recognized ? 'correct' : 'substitution')
+		}));
 
 		// Recalculate or sanitize metrics
 		const computed = calculatePronunciationMetrics(phonemeDetails);
-		const gopOverall = item.scores?.gop_overall !== undefined
-			? Number(item.scores.gop_overall)
-			: computed.gop_overall;
-		const perOverall = item.scores?.per_overall !== undefined
-			? Number(item.scores.per_overall)
-			: computed.per_overall;
-		const toneScore = Number(item.scores?.tone_score ?? 100);
+		const gopOverall = Math.max(
+			0,
+			Math.min(
+				100,
+				item.scores?.gop_overall !== undefined
+					? Number(item.scores.gop_overall) || 0
+					: computed.gop_overall
+			)
+		);
+		const perOverall = Math.max(
+			0,
+			Math.min(
+				100,
+				item.scores?.per_overall !== undefined
+					? Number(item.scores.per_overall) || 0
+					: computed.per_overall
+			)
+		);
+		const toneScore = Math.max(0, Math.min(100, Number(item.scores?.tone_score ?? 100) || 0));
 
 		const validPayload: LearnerPronunciationPayload = {
-			user_id: userId || 'anonymous',
+			user_id: userId,
 			word_id: wordId,
 			pinyin,
 			attempt_number: attemptNumber,

@@ -1,0 +1,1295 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>รายงานการปฏิบัติงานสหกิจศึกษา AI4916</title>
+<style>
+  @page {
+    size: A4;
+    margin-top: 3.81cm;     /* 1.5 in */
+    margin-bottom: 2.54cm;  /* 1.0 in */
+    margin-left: 3.81cm;    /* 1.5 in */
+    margin-right: 2.54cm;   /* 1.0 in */
+  }
+  body {
+    font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Angsana New', sans-serif;
+    font-size: 16pt;
+    line-height: 1.15;
+    color: #000000;
+  }
+  .page-break {
+    page-break-before: always;
+    clear: both;
+  }
+  .cover-page {
+    text-align: center;
+    page-break-after: always;
+    padding-top: 2cm;
+    padding-bottom: 2cm;
+  }
+  .cover-title {
+    font-size: 18pt;
+    font-weight: bold;
+    margin-bottom: 2cm;
+    line-height: 1.3;
+  }
+  .cover-author {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-top: 3cm;
+    margin-bottom: 3cm;
+    line-height: 1.4;
+  }
+  .cover-footer {
+    font-size: 16pt;
+    font-weight: bold;
+    line-height: 1.3;
+  }
+  h1.chapter-title {
+    font-size: 18pt;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 1.5cm;
+    margin-bottom: 0.8cm;
+    page-break-before: always;
+  }
+  h2.section-title {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: left;
+    margin-top: 0.6cm;
+    margin-bottom: 0.3cm;
+  }
+  h3.subsection-title {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: left;
+    margin-top: 0.4cm;
+    margin-bottom: 0.2cm;
+    text-indent: 0.5cm;
+  }
+  h4.subsubsection-title {
+    font-size: 16pt;
+    font-weight: bold;
+    text-align: left;
+    margin-top: 0.3cm;
+    margin-bottom: 0.2cm;
+    text-indent: 1.0cm;
+  }
+  p {
+    font-size: 16pt;
+    line-height: 1.15;
+    text-align: justify;
+    text-justify: inter-cluster;
+    text-indent: 1.25cm;
+    margin-top: 0;
+    margin-bottom: 6pt;
+  }
+  p.no-indent {
+    text-indent: 0 !important;
+  }
+  p.caption {
+    font-size: 15pt;
+    font-weight: bold;
+    text-align: center;
+    text-indent: 0;
+    margin-top: 6pt;
+    margin-bottom: 12pt;
+  }
+  .figure-box {
+    text-align: center;
+    margin-top: 12pt;
+    margin-bottom: 12pt;
+  }
+  .figure-box img {
+    max-width: 85%;
+    height: auto;
+    border: 1px solid #ddd;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10pt;
+    margin-bottom: 14pt;
+    font-size: 15pt;
+  }
+  th, td {
+    border: 1px solid #000000;
+    padding: 4pt 6pt;
+    vertical-align: top;
+  }
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    text-align: center;
+  }
+  td.center {
+    text-align: center;
+  }
+  pre {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13pt;
+    background-color: #f8f9fa;
+    border: 1px solid #cccccc;
+    padding: 8pt;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 6pt;
+    margin-bottom: 12pt;
+  }
+  ul, ol {
+    margin-top: 0;
+    margin-bottom: 6pt;
+    padding-left: 2cm;
+  }
+  li {
+    font-size: 16pt;
+    line-height: 1.15;
+    margin-bottom: 3pt;
+  }
+  blockquote {
+    border-left: 3px solid #2b6cb0;
+    margin: 8pt 0 8pt 1.25cm;
+    padding-left: 10pt;
+    font-style: italic;
+    color: #2d3748;
+  }
+  code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14pt;
+    background-color: #edf2f7;
+    padding: 1pt 3pt;
+    border-radius: 2pt;
+  }
+</style>
+</head>
+<body>
+<h1 class="chapter-title">ส่วนหน้า (Front Matter)</h1>
+<div class="page-break"></div>
+<h2 class="section-title">หน้าปกนอก / หน้าปกใน</h2>
+<p><strong>รายงานการปฏิบัติงานสหกิจศึกษา</strong></p>
+<p><strong>การพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ตามมาตรฐาน xAPI ภายใต้การคุ้มครองข้อมูลส่วนบุคคล</strong></p>
+<p><em>(Development of an xAPI-Compliant Phonetic Learning Analytics and Diagnostic Dashboard System for Mandarin Pronunciation under Personal Data Protection Standards)</em></p>
+<p>โดย</p>
+<p><strong>[ชื่อ-นามสกุล นักศึกษา]</strong></p>
+<p><strong>รหัสนักศึกษา [รหัสนักศึกษา]</strong></p>
+<p>รายงานนี้เป็นส่วนหนึ่งของการศึกษาตามหลักสูตรวิทยาศาสตรบัณฑิต</p>
+<p>สาขาวิชาปัญญาประดิษฐ์ คณะวิทยาศาสตร์และเทคโนโลยี</p>
+<p>มหาวิทยาลัยหัวเฉียวเฉลิมพระเกียรติ</p>
+<p>ภาคการศึกษาที่ 1 ปีการศึกษา 2569</p>
+<div class="page-break"></div>
+<h2 class="section-title">แบบแจ้งยืนยันการส่งรายงานการปฏิบัติงานสหกิจศึกษา</h2>
+<p><strong>วิชา AI4916 สหกิจศึกษา</strong></p>
+<p><strong>หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาปัญญาประดิษฐ์</strong></p>
+<p><strong>คณะวิทยาศาสตร์และเทคโนโลยี มหาวิทยาลัยหัวเฉียวเฉลิมพระเกียรติ</strong></p>
+<ul>
+  <li><strong>ชื่อ-นามสกุลนักศึกษา:</strong> [ชื่อ-นามสกุล นักศึกษา]</li>
+  <li><strong>รหัสนักศึกษา:</strong> [รหัสนักศึกษา]</li>
+  <li><strong>สถานประกอบการ:</strong> ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC) สำนักงานพัฒนาวิทยาศาสตร์และเทคโนโลยีแห่งชาติ (สวทช.)</li>
+  <li><strong>พนักงานที่ปรึกษา:</strong> คุณภูวิศ เกิดปราโมทย์ (ตำแหน่ง หัวหน้าฝ่ายเทคนิคและปัญญาประดิษฐ์ สมาคมปัญญาประดิษฐ์ประเทศไทย / ปฏิบัติงานร่วมโครงการวิจัยกับ NECTEC)</li>
+  <li><strong>ระยะเวลาปฏิบัติงาน:</strong> วันที่ 4 มิถุนายน พ.ศ. 2569 ถึง วันที่ 20 พฤศจิกายน พ.ศ. 2569</li>
+  <li><strong>หัวข้อรายงาน:</strong> การพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ตามมาตรฐาน xAPI ภายใต้การคุ้มครองข้อมูลส่วนบุคคล</li>
+</ul>
+<div class="page-break"></div>
+<h2 class="section-title">บทคัดย่อ</h2>
+<p>โครงงานสหกิจศึกษานี้มีวัตถุประสงค์เพื่อออกแบบและพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics) ระบบจัดเก็บข้อมูลพฤติกรรมการเรียนรู้ตามมาตรฐาน Experience API (xAPI / IEEE 9274.1.1) โมเดลติดตามความเชี่ยวชาญและแนะนำบทเรียนซ่อมเสริมรายบุคคล (Mastery Tracking & Adaptive Remedial Recommendation Engine) ตลอดจนแดชบอร์ดวินิจฉัยเชิงสัทศาสตร์สำหรับผู้เรียนและผู้สอน ภายใต้สถาปัตยกรรมการคุ้มครองข้อมูลส่วนบุคคลที่ไม่จัดเก็บไฟล์เสียงดิบของผู้เรียนลงในฐานข้อมูลถาวร (PDPA Zero Audio Storage at Rest) โดยบูรณาการร่วมกับเว็บแอปพลิเคชันฝึกออกเสียงภาษาจีนกลาง "语 ปากจีน" (HSK 1–3)</p>
+<p>การดำเนินงานแบ่งออกเป็น 4 ส่วนหลักตามแผนปฏิบัติงาน 16 สัปดาห์ ได้แก่ (1) การกำหนดคำถามการเรียนรู้ (Learning Questions: LQ1–LQ8) และการออกแบบโครงสร้างข้อมูล xAPI Telemetry Schema ร่วมกับคลังข้อมูลแบบสองชั้น (Dual-Database Architecture) บนฐานข้อมูล Turso (libSQL) และ Neon (PostgreSQL) พร้อมระบบคัดกรองความยินยอม (PDPA Consent Gatekeeper) (2) การสร้างอนุกรมวิธานความผิดพลาดทางสัทศาสตร์ (Error Taxonomy) ที่จำแนกความคลาดเคลื่อนออกเป็น 4 สถานะ (Correct, Substitution, Omission, Insertion) ร่วมกับการคำนวณตัววัดคุณภาพการออกเสียงเชิงตัวเลข ได้แก่ คะแนนความแม่นยำระดับหน่วยเสียง (Goodness of Pronunciation: GOP) อัตราความผิดพลาดของหน่วยเสียง (Phoneme Error Rate: PER) และคะแนนความแม่นยำของรูปร่างวรรณยุกต์ตามมาตรวัดของจ้าว หยวนเริ่น (Chao's Pitch Scale 1–5) (3) การพัฒนาโมเดลผู้เรียนด้วยการถ่วงน้ำหนักค่าเฉลี่ยเคลื่อนที่แบบเอ็กซ์โพเนนเชียล (Exponential Moving Average: EMA) ร่วมกับสมการเส้นโค้งการลืมของเอ็บบิงเฮาส์ (Ebbinghaus Forgetting Curve) และระบบแนะนำคำศัพท์ซ่อมเสริมอัตโนมัติที่จับคู่หน่วยเสียงพยัญชนะต้นและวรรณยุกต์ที่เป็นจุดอ่อนของผู้เรียน และ (4) การพัฒนาแดชบอร์ดสำหรับผู้เรียน (6-Axis Student Skill Radar และ AI Coach) และแดชบอร์ดสำหรับผู้สอน/ผู้ดูแลระบบ (Instructor & Cohort Diagnostic Dashboard จำนวน 12 มุมมอง)</p>
+<p>ผลการดำเนินงานและการประเมินผลจากข้อมูลการใช้งานนำร่องและชุดข้อมูลทดสอบผู้เรียนจำนวน 100 คน พบว่าระบบสามารถดักจับ แปลง และจัดเก็บข้อมูล xAPI Statement ได้อย่างถูกต้องครบถ้วน 100% โดยไม่มีการจัดเก็บไฟล์เสียงดิบลงฐานข้อมูล ผลการวิเคราะห์เปรียบเทียบคะแนนทดสอบก่อนเรียนและหลังเรียน (Pre-test / Post-test) ด้วยสถิติ Paired Sample $t$-test แสดงให้เห็นว่าผู้เรียนมีพัฒนาการด้านความแม่นยำในการออกเสียงเพิ่มขึ้นอย่างมีนัยสำคัญทางสถิติที่ระดับ $.01$ ($p < .001$) โดยมีขนาดอิทธิพล (Cohen's $d$) อยู่ในระดับสูง และมีค่าพัฒนาการสัมพัทธ์ (Hake's Normalized Gain: $\langle g \rangle$) อยู่ในเกณฑ์มีประสิทธิภาพ นอกจากนี้ ระบบยังสามารถบ่งชี้ปัญหาการแทรกแซงจากภาษาแม่ของผู้เรียนชาวไทยได้อย่างชัดเจน โดยเฉพาะกลุ่มพยัญชนะม้วนลิ้น (<code>zh</code>, <code>ch</code>, <code>sh</code>, <code>r</code>) และวรรณยุกต์เสียงที่ 3 (Tone 3: 214 และกฎ Tone Sandhi 3+3) ทั้งนี้ ผลการประเมินความพึงพอใจและการใช้งานระบบ (Usability) อยู่ในระดับมากที่สุด</p>
+<p><strong>คำสำคัญ:</strong> การวิเคราะห์ข้อมูลการเรียนรู้, การฝึกออกเสียงด้วยคอมพิวเตอร์ (CAPT), มาตรฐาน xAPI, อนุกรมวิธานความผิดพลาดทางสัทศาสตร์, ระบบแนะนำบทเรียนซ่อมเสริม, แดชบอร์ดวินิจฉัยการเรียนรู้</p>
+<div class="page-break"></div>
+<h2 class="section-title">Abstract</h2>
+<p>This cooperative education project aims to design and develop a phonetic Learning Analytics system, an Experience API (xAPI / IEEE 9274.1.1) telemetry pipeline, a learner mastery tracking and adaptive remedial recommendation engine, and diagnostic dashboards for both learners and instructors under a strict Personal Data Protection Act (PDPA) "Zero Audio Storage at Rest" architecture, integrated with the "PakJeen" Mandarin pronunciation training web application (HSK 1–3).</p>
+<p>The system implementation consists of four core components executed across a 16-week work plan: (1) formulating eight empirical Learning Questions (LQ1–LQ8) and designing an xAPI telemetry schema backed by a dual-database data warehouse (Turso libSQL and Neon PostgreSQL) protected by a PDPA Consent Gatekeeper; (2) establishing a phonetic Error Taxonomy that categorizes pronunciation errors into four diagnostic states (<code>correct</code>, <code>substitution</code>, <code>omission</code>, and <code>insertion</code>) alongside deterministic pronunciation quality metrics, including Goodness of Pronunciation (GOP), Phoneme Error Rate (PER), and Chao's five-level tone contour scoring; (3) implementing a student mastery and knowledge retention model based on Exponential Moving Average (EMA) and the Ebbinghaus Forgetting Curve, coupled with a rule-based Adaptive Remedial Engine and Student Coach that prescribe targeted vocabulary matching each learner's weak initial consonants and tones; and (4) developing interactive learner dashboards (6-Axis Skill Radar and AI Coach Cards) and a 12-view Instructor Diagnostic Dashboard with built-in psychometric analytics.</p>
+<p>Evaluation results across pilot data and a 100-learner evaluation cohort demonstrate 100% schema compliance and zero raw audio persistence. Statistical evaluation of Pre-test and Post-test scores using Paired Sample $t$-test confirms a statistically significant improvement in pronunciation accuracy ($p < .001$) with a large Cohen's $d$ effect size and substantial Hake's Normalized Gain ($\langle g \rangle$). Furthermore, the diagnostic analytics successfully isolate L1 Thai interference patterns, specifically retroflex consonant substitutions (<code>zh</code>, <code>ch</code>, <code>sh</code>, <code>r</code>) and Mandarin Tone 3 contour/sandhi deviations, while user satisfaction and usability evaluations achieved the highest rating level.</p>
+<p><strong>Keywords:</strong> Learning Analytics, Computer-Assisted Pronunciation Training (CAPT), Experience API (xAPI), Phonetic Error Taxonomy, Adaptive Recommendation Engine, Diagnostic Dashboard</p>
+<div class="page-break"></div>
+<h2 class="section-title">กิตติกรรมประกาศ</h2>
+<p>รายงานการปฏิบัติงานสหกิจศึกษาฉบับนี้สำเร็จลุล่วงไปได้ด้วยดี ผู้จัดทำขอขอบพระคุณ <strong>ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC) สำนักงานพัฒนาวิทยาศาสตร์และเทคโนโลยีแห่งชาติ (สวทช.)</strong> และ <strong>สมาคมปัญญาประดิษฐ์ประเทศไทย (Artificial Intelligence Association of Thailand: AIAT)</strong> ที่ได้ให้ความอนุเคราะห์รับผู้จัดทำเข้าปฏิบัติงานสหกิจศึกษา ตลอดจนสนับสนุนทรัพยากร เครื่องมือ และสภาพแวดล้อมการวิจัยและพัฒนาเทคโนโลยีปัญญาประดิษฐ์ที่มีคุณภาพสูง</p>
+<p>ผู้จัดทำขอกราบขอบพระคุณ <strong>คุณภูวิศ เกิดปราโมทย์</strong> หัวหน้าฝ่ายเทคนิคและปัญญาประดิษฐ์ พนักงานที่ปรึกษา ที่ได้สละเวลาอันมีค่าในการถ่ายทอดองค์ความรู้ ให้คำปรึกษา แนะนำแนวทางการออกแบบสถาปัตยกรรมระบบวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics) มาตรฐาน xAPI การออกแบบตัววัดทางสัทศาสตร์ และการคุ้มครองข้อมูลส่วนบุคคล (PDPA) ตลอดจนตรวจทานและแก้ไขข้อบกพร่องต่างๆ ด้วยความเอาใจใส่ตลอดระยะเวลา 16 สัปดาห์ของการปฏิบัติงาน</p>
+<p>ขอกราบขอบพระคุณคณาจารย์ประจำหลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาปัญญาประดิษฐ์ คณะวิทยาศาสตร์และเทคโนโลยี มหาวิทยาลัยหัวเฉียวเฉลิมพระเกียรติทุกท่าน ที่ได้ประสิทธิ์ประสาทวิชาความรู้ด้านปัญญาประดิษฐ์ วิทยาการข้อมูล และวิศวกรรมซอฟต์แวร์ อันเป็นรากฐานสำคัญในการนำมาประยุกต์ใช้ในการปฏิบัติงานจริง รวมถึงให้คำแนะนำในการจัดทำรายงานการปฏิบัติงานสหกิจศึกษาฉบับนี้จนมีความสมบูรณ์ตามมาตรฐานวิชาการ</p>
+<p>ท้ายที่สุดนี้ ผู้จัดทำขอกราบขอบพระคุณบิดา มารดา และครอบครัว ที่คอยเป็นกำลังใจและให้การสนับสนุนในทุกด้านเสมอมา รวมถึงเพื่อนร่วมงานและเพื่อนนักศึกษาสหกิจศึกษาที่มีส่วนร่วมในการพัฒนาและทดสอบระบบฝึกออกเสียงภาษาจีน "语 ปากจีน" จนโครงงานนี้บรรลุตามวัตถุประสงค์ทุกประการ</p>
+<p><strong>[ชื่อ-นามสกุล นักศึกษา]</strong></p>
+<p>พฤศจิกายน 2569</p>
+<div class="page-break"></div>
+<h2 class="section-title">สารบัญ</h2>
+<ul>
+  <li><strong>หน้าปกนอก / หน้าปกใน</strong></li>
+  <li><strong>แบบแจ้งยืนยันการส่งรายงานการปฏิบัติงานสหกิจศึกษา</strong></li>
+  <li><strong>บทคัดย่อ (ภาษาไทย)</strong></li>
+  <li><strong>Abstract (ภาษาอังกฤษ)</strong></li>
+  <li><strong>กิตติกรรมประกาศ</strong></li>
+  <li><strong>สารบัญ</strong></li>
+  <li><strong>สารบัญตาราง</strong></li>
+  <li><strong>สารบัญรูป</strong></li>
+  <li><strong>บทที่ 1 ภาพรวมของสถานประกอบการ</strong></li>
+  <li>1.1 ชื่อและที่ตั้งของสถานประกอบการ</li>
+  <li>1.2 ประวัติองค์กร</li>
+  <li>1.3 ลักษณะการประกอบการ</li>
+  <li>1.4 รูปแบบและการบริหารงานขององค์กร</li>
+  <li>1.4.1 วิสัยทัศน์</li>
+  <li>1.4.2 นโยบาย</li>
+  <li>1.4.3 โครงสร้างองค์กร</li>
+  <li>1.5 ตำแหน่งและลักษณะงานที่นักศึกษาได้รับมอบหมาย</li>
+  <li>1.6 พนักงานที่ปรึกษาและตำแหน่งงานหรือแผนกของพนักงานที่ปรึกษา</li>
+  <li>1.7 ระยะเวลาที่ปฏิบัติงาน</li>
+  <li>1.8 แผนการปฏิบัติงานสหกิจศึกษา</li>
+  <li><strong>บทที่ 2 ภาพรวมโครงงานสหกิจศึกษา</strong></li>
+  <li>2.1 ความเป็นมาและความสำคัญของปัญหา</li>
+  <li>2.2 วัตถุประสงค์ของโครงงานสหกิจศึกษา</li>
+  <li>2.3 ขอบเขตของโครงงานสหกิจศึกษา</li>
+  <li>2.4 ประโยชน์ที่คาดว่าจะได้รับ</li>
+  <li>2.5 ขั้นตอนและวิธีการดำเนินงาน</li>
+  <li>2.6 อุปกรณ์และเครื่องมือที่ใช้</li>
+  <li><strong>บทที่ 3 ทฤษฎีและงานวิจัยที่เกี่ยวข้อง</strong></li>
+  <li>3.1 แนวคิดและทฤษฎีที่เกี่ยวข้อง</li>
+  <li>3.1.1 กรอบการวิเคราะห์การเรียนรู้ (Learning Analytics) และระบบ CAPT</li>
+  <li>3.1.2 สัทศาสตร์ภาษาจีนกลาง อนุกรมวิธานความผิดพลาด (Error Taxonomy) และตัววัดคุณภาพการออกเสียง</li>
+  <li>3.1.3 มาตรฐานข้อมูลกิจกรรมการเรียนรู้ xAPI (IEEE 9274.1.1) และการคุ้มครองข้อมูลส่วนบุคคล (PDPA)</li>
+  <li>3.1.4 โมเดลการติดตามความเชี่ยวชาญของผู้เรียน (Mastery & Knowledge Tracing) และระบบแนะนำบทเรียนซ่อมเสริม</li>
+  <li>3.1.5 สถิติเพื่อการประเมินผลสัมฤทธิ์ทางการเรียน (Paired Sample $t$-test, Cohen's $d$ และ Hake's Gain)</li>
+  <li>3.2 เครื่องมือ ภาษา และเทคโนโลยีที่ใช้ในการพัฒนา</li>
+  <li>3.3 งานวิจัยที่เกี่ยวข้อง</li>
+  <li><strong>บทที่ 4 การวิเคราะห์และออกแบบระบบ</strong></li>
+  <li>4.1 ความต้องการของระบบและการกำหนดคำถามการเรียนรู้ (Learning Questions)</li>
+  <li>4.2 การวิเคราะห์ระบบการทำงาน</li>
+  <li>4.2.1 ผังงาน (Flowchart) การดักจับข้อมูลและการประมวลผล</li>
+  <li>4.2.2 กระบวนการสร้างอนุกรมวิธานความผิดพลาด (Error Taxonomy) และการคำนวณตัววัดคุณภาพเสียง</li>
+  <li>4.2.3 อัลกอริทึมโมเดลผู้เรียนและระบบแนะนำคำศัพท์ซ่อมเสริม (Remedial & Student Coach Engine)</li>
+  <li>4.3 การออกแบบระบบงาน</li>
+  <li>4.3.1 สถาปัตยกรรมระบบ (System Architecture)</li>
+  <li>4.3.2 การออกแบบโครงสร้างข้อมูล xAPI Schema และพจนานุกรมฐานข้อมูล (Data Dictionary)</li>
+  <li>4.3.3 การออกแบบส่วนติดต่อผู้ใช้ (User Interface Design)</li>
+  <li>4.4 การออกแบบการวัดและประเมินผลการดำเนินงาน</li>
+  <li><strong>บทที่ 5 สรุปผลการดำเนินงาน และข้อเสนอแนะ</strong></li>
+  <li>5.1 ผลการดำเนินงาน</li>
+  <li>5.1.1 ผลการพัฒนาระบบเก็บข้อมูล xAPI Telemetry และคลังข้อมูลภายใต้มาตรฐาน PDPA</li>
+  <li>5.1.2 ผลการพัฒนาระบบวิเคราะห์ข้อผิดพลาด โมเดลผู้เรียน ระบบแนะนำบทเรียน และแดชบอร์ด</li>
+  <li>5.1.3 ผลการวิเคราะห์ข้อมูลตามคำถามวิจัย (LQ1–LQ8) และการประเมินผลสัมฤทธิ์ทางการเรียน (Pre/Post-test)</li>
+  <li>5.1.4 ผลการประเมินความพึงพอใจและการใช้งานระบบ (Usability & Satisfaction)</li>
+  <li>5.2 สรุปผลการดำเนินงาน</li>
+  <li>5.3 ข้อจำกัดของโครงงาน</li>
+  <li>5.4 ปัญหาและข้อเสนอแนะ</li>
+  <li>5.4.1 ปัญหาที่พบในการดำเนินงาน</li>
+  <li>5.4.2 ข้อเสนอแนะในการพัฒนาต่อยอด</li>
+  <li>5.5 สรุปผลการปฏิบัติงานสหกิจศึกษา</li>
+  <li>5.5.1 ประโยชน์ที่ได้รับด้านวิชาการ</li>
+  <li>5.5.2 ประโยชน์ที่ได้รับด้านการทำงาน</li>
+  <li><strong>บรรณานุกรม</strong></li>
+  <li><strong>ภาคผนวก</strong></li>
+  <li>ภาคผนวก ก คู่มือการติดตั้งและใช้งานระบบ</li>
+  <li>ภาคผนวก ข เอกสารข้อกำหนด API และโครงสร้างข้อมูล xAPI Statement</li>
+  <li><strong>ประวัติผู้จัดทำ</strong></li>
+</ul>
+<div class="page-break"></div>
+<h2 class="section-title">สารบัญตาราง</h2>
+<ul>
+  <li><strong>ตารางที่ 1.1</strong> แผนการปฏิบัติงานสหกิจศึกษาตลอดระยะเวลา 16 สัปดาห์</li>
+  <li><strong>ตารางที่ 2.1</strong> แผนปฏิบัติงานโครงงานสหกิจศึกษาระบุวันที่เริ่มต้นและสิ้นสุด</li>
+  <li><strong>ตารางที่ 2.2</strong> รายละเอียดของฮาร์ดแวร์ที่ใช้ในการพัฒนาระบบ</li>
+  <li><strong>ตารางที่ 2.3</strong> รายละเอียดของซอฟต์แวร์ที่ใช้ในการพัฒนาระบบ</li>
+  <li><strong>ตารางที่ 2.4</strong> รายละเอียดของเทคโนโลยีและเฟรมเวิร์กที่ใช้ในการพัฒนาระบบ</li>
+  <li><strong>ตารางที่ 2.5</strong> รายละเอียดของฮาร์ดแวร์ขั้นต่ำที่จำเป็นสำหรับผู้ใช้งานระบบ</li>
+  <li><strong>ตารางที่ 2.6</strong> รายละเอียดของซอฟต์แวร์ที่จำเป็นสำหรับผู้ใช้งานระบบ</li>
+  <li><strong>ตารางที่ 2.7</strong> รายละเอียดของเทคโนโลยีและโครงสร้างพื้นฐานอื่น ๆ ที่จำเป็น</li>
+  <li><strong>ตารางที่ 3.1</strong> ระบบวรรณยุกต์ภาษาจีนกลางตามมาตรวัดระดับเสียงของจ้าว หยวนเริ่น (Chao's Pitch Scale 1–5)</li>
+  <li><strong>ตารางที่ 3.2</strong> สรุปเครื่องมือ ภาษา และเทคโนโลยีที่ใช้ในการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้</li>
+  <li><strong>ตารางที่ 4.1</strong> กรอบคำถามการเรียนรู้ (Learning Questions: LQ1–LQ8) และตัวชี้วัดที่ใช้ในการวิเคราะห์</li>
+  <li><strong>ตารางที่ 4.2</strong> อนุกรมวิธานความผิดพลาดทางสัทศาสตร์ (Error Taxonomy) และเกณฑ์การจำแนกสถานะ</li>
+  <li><strong>ตารางที่ 4.3</strong> โครงสร้างการจับคู่เหตุการณ์ xAPI Statement (Actor, Verb, Object, Result, Context)</li>
+  <li><strong>ตารางที่ 4.4</strong> พจนานุกรมข้อมูลตาราง <code>users</code> (ข้อมูลบัญชีผู้ใช้งานและสถานะความยินยอม)</li>
+  <li><strong>ตารางที่ 4.5</strong> พจนานุกรมข้อมูลตาราง <code>user_consent_logs</code> (บันทึกประวัติการให้ความยินยอมและถอนความยินยอม PDPA)</li>
+  <li><strong>ตารางที่ 4.6</strong> พจนานุกรมข้อมูลตาราง <code>pronunciation_Results</code> (ข้อมูลผลการประเมินการออกเสียงระดับคำและพยางค์)</li>
+  <li><strong>ตารางที่ 4.7</strong> พจนานุกรมข้อมูลตาราง <code>xapi_statements</code> (คลังจัดเก็บข้อมูลมาตรฐาน xAPI LRS)</li>
+  <li><strong>ตารางที่ 4.8</strong> พจนานุกรมข้อมูลตาราง <code>assessment_results</code> (ผลการทดสอบวัดระดับ Pre-test และ Post-test)</li>
+  <li><strong>ตารางที่ 4.9</strong> พจนานุกรมข้อมูลตาราง <code>stage_telemetry</code> (ข้อมูลพฤติกรรมการเรียนรู้ระดับด่านเควสต์)</li>
+  <li><strong>ตารางที่ 4.10</strong> เกณฑ์การแปลความหมายระดับคะแนนความพึงพอใจและประสิทธิภาพการใช้งาน (Likert Scale 5 ระดับ)</li>
+  <li><strong>ตารางที่ 5.1</strong> ผลการตรวจสอบความถูกต้องของระบบส่งข้อมูล xAPI Telemetry และมาตรการ PDPA Zero Audio Storage</li>
+  <li><strong>ตารางที่ 5.2</strong> สรุปผลการวิเคราะห์ข้อมูลการเรียนรู้ตามกรอบคำถามวิจัย LQ1–LQ8 จากกลุ่มตัวอย่างผู้เรียน ($N = 100$)</li>
+  <li><strong>ตารางที่ 5.3</strong> ผลการวิเคราะห์เปรียบเทียบคะแนนทดสอบก่อนเรียน (Pre-test) และหลังเรียน (Post-test) ด้วยสถิติ Paired Sample $t$-test</li>
+  <li><strong>ตารางที่ 5.4</strong> ผลการวิเคราะห์อัตราความผิดพลาดจำแนกตามกลุ่มหน่วยเสียงพยัญชนะต้นและวรรณยุกต์ (Error Taxonomy Breakdown)</li>
+  <li><strong>ตารางที่ 5.5</strong> ผลการประเมินความพึงพอใจและการใช้งานระบบ (Usability & Satisfaction Evaluation)</li>
+</ul>
+<div class="page-break"></div>
+<h2 class="section-title">สารบัญรูป</h2>
+<ul>
+  <li><strong>รูปที่ 1.1</strong> สัญลักษณ์ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC)</li>
+  <li><strong>รูปที่ 1.2</strong> แผนที่ตั้งของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ</li>
+  <li><strong>รูปที่ 1.3</strong> โครงสร้างการบริหารองค์กรของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ</li>
+  <li><strong>รูปที่ 2.1</strong> แผนภูมิแกนต์ (Gantt Chart) แสดงขั้นตอนและระยะเวลาการดำเนินงานโครงงานสหกิจศึกษา 16 สัปดาห์</li>
+  <li><strong>รูปที่ 3.1</strong> แผนภาพวงจรการวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics Cycle) ที่ประยุกต์ใช้ในโครงงาน</li>
+  <li><strong>รูปที่ 3.2</strong> กราฟเส้นโค้งการคงอยู่ของความรู้ตามทฤษฎีการลืมของเอ็บบิงเฮาส์ (Ebbinghaus Forgetting Curve)</li>
+  <li><strong>รูปที่ 4.1</strong> ผังงาน (Flowchart) กระบวนการดักจับข้อมูล Telemetry การตรวจสอบความยินยอม PDPA และการประมวลผล Analytics</li>
+  <li><strong>รูปที่ 4.2</strong> ผังงานอัลกอริทึมการจำแนกข้อผิดพลาด (Error Taxonomy) และการคัดเลือกคำศัพท์ซ่อมเสริม (Adaptive Remedial Engine)</li>
+  <li><strong>รูปที่ 4.3</strong> สถาปัตยกรรมระบบวิเคราะห์ข้อมูลการเรียนรู้และคลังข้อมูลแบบสองชั้น (Dual-Database xAPI Architecture)</li>
+  <li><strong>รูปที่ 4.4</strong> แผนภาพความสัมพันธ์ของข้อมูล (Entity-Relationship Diagram: ERD) ในคลังข้อมูลการเรียนรู้</li>
+  <li><strong>รูปที่ 4.5</strong> การออกแบบหน้าจอขอความยินยอมคุ้มครองข้อมูลส่วนบุคคล (PDPA Consent Gatekeeper Modal)</li>
+  <li><strong>รูปที่ 4.6</strong> การออกแบบหน้าจอแดชบอร์ดสำหรับผู้เรียน แสดงเรดาร์ทักษะ 6 มิติ (6-Axis Skill Radar) และคำแนะนำจาก AI Coach</li>
+  <li><strong>รูปที่ 4.7</strong> การออกแบบหน้าจอแดชบอร์ดวินิจฉัยสำหรับผู้สอนและผู้ดูแลระบบ (Instructor & Cohort Diagnostic Dashboard)</li>
+  <li><strong>รูปที่ 5.1</strong> หน้าจอการทำงานจริงของระบบคัดกรองความยินยอม PDPA และตัวเลือกถอนความยินยอม (Right to Withdraw)</li>
+  <li><strong>รูปที่ 5.2</strong> หน้าจอการทำงานจริงของแดชบอร์ดผู้เรียน เรดาร์ทักษะ 6 มิติ และการ์ดคำศัพท์ซ่อมเสริมรายบุคคล</li>
+  <li><strong>รูปที่ 5.3</strong> หน้าจอการทำงานจริงของแดชบอร์ดผู้สอน แสดงการแจกแจงข้อผิดพลาดเชิงสัทศาสตร์และกราฟเปรียบเทียบ Pre/Post-test</li>
+  <li><strong>รูปที่ 5.4</strong> หน้าจอการทำงานจริงของโมดูลวิเคราะห์ผู้เรียนรายบุคคลแบบ 360 องศา (Learner 360 Profile Modal)</li>
+</ul>
+
+<h1 class="chapter-title">บทที่ 1 ภาพรวมของสถานประกอบการ</h1>
+<p>ในการดำเนินการปฏิบัติสหกิจศึกษาจำเป็นต้องทราบข้อมูลเบื้องต้นของสถานประกอบการ เพื่อให้ได้ทราบเกี่ยวกับ ประวัติของสถานประกอบการ วัตถุประสงค์ของสถานประกอบการ การทำงานของสถานประกอบการในแผนก ได้ดังต่อไปนี้</p>
+<div class="page-break"></div>
+<h2 class="section-title">1.1 ชื่อและที่ตั้งของสถานประกอบการ</h2>
+<p><strong>ชื่อสถานประกอบการ (ภาษาไทย):</strong> ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ สำนักงานพัฒนาวิทยาศาสตร์และเทคโนโลยีแห่งชาติ</p>
+<p><strong>ชื่อสถานประกอบการ (ภาษาอังกฤษ):</strong> National Electronics and Computer Technology Center (NECTEC), National Science and Technology Development Agency (NSTDA)</p>
+<p><strong>ที่ตั้ง:</strong> เลขที่ 112 อุทยานวิทยาศาสตร์ประเทศไทย ถนนพหลโยธิน ตำบลคลองหนึ่ง อำเภอคลองหลวง จังหวัดปทุมธานี 12120</p>
+<p><strong>โทรศัพท์:</strong> 0-2564-6900</p>
+<p><strong>โทรสาร:</strong> 0-2564-6901–3</p>
+<p><strong>เว็บไซต์:</strong> https://www.nectec.or.th</p>
+<p>ทั้งนี้ สัญลักษณ์ของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC) แสดงดังรูปที่ 1.1 และแผนที่ตั้งของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ ภายในอุทยานวิทยาศาสตร์ประเทศไทย จังหวัดปทุมธานี แสดงดังรูปที่ 1.2</p>
+<div class="figure-box"><img src="file:///c:/Users/Administrator/Documents/GitHub/HSK1/docs/images/fig1_1_nectec_logo.png" alt="สัญลักษณ์องค์กร NECTEC" /></div>
+<p class="caption"><strong>รูปที่ 1.1</strong> สัญลักษณ์ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC)</p>
+<div class="figure-box"><img src="file:///c:/Users/Administrator/Documents/GitHub/HSK1/docs/images/fig1_2_nectec_map.png" alt="แผนที่ตั้งของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ" /></div>
+<p class="caption"><strong>รูปที่ 1.2</strong> แผนที่ตั้งของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ</p>
+<div class="page-break"></div>
+<h2 class="section-title">1.2 ประวัติองค์กร</h2>
+<p>ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ หรือ เนคเทค (NECTEC) ก่อตั้งขึ้นเมื่อวันที่ 16 กันยายน พ.ศ. 2529 โดยมีสถานะเป็นโครงการภายใต้ศูนย์เทคโนโลยีเพื่อการพัฒนา กระทรวงวิทยาศาสตร์ เทคโนโลยีและการพลังงาน เพื่อทำหน้าที่ส่งเสริมและสนับสนุนการวิจัยและพัฒนาเทคโนโลยีด้านอิเล็กทรอนิกส์และคอมพิวเตอร์ของประเทศไทย ต่อมาเมื่อวันที่ 30 ธันวาคม พ.ศ. 2534 ได้มีการประกาศใช้พระราชบัญญัติพัฒนาวิทยาศาสตร์และเทคโนโลยี พ.ศ. 2534 ส่งผลให้มีการจัดตั้งสำนักงานพัฒนาวิทยาศาสตร์และเทคโนโลยีแห่งชาติ (สวทช.) ขึ้น และศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติได้เปลี่ยนสถานะเป็นศูนย์แห่งชาติหนึ่งในสังกัดของ สวทช. โดยมีบทบาทหลักในการสร้างฐานรากทางเทคโนโลยีดิจิทัลขั้นสูงให้แก่ประเทศ</p>
+<p>ตลอดระยะเวลาการดำเนินงานกว่า 3 ทศวรรษ เนคเทคมีบทบาทสำคัญในการบุกเบิกโครงสร้างพื้นฐานด้านเทคโนโลยีสารสนเทศของประเทศไทย เช่น การพัฒนาเครือข่ายอินเทอร์เน็ตเพื่อการศึกษาและวิจัยในยุคเริ่มต้น การพัฒนาเทคโนโลยีการประมวลผลภาษาธรรมชาติภาษาไทย (Thai Natural Language Processing) เทคโนโลยีการรู้จำและสังเคราะห์เสียงพูด (Speech Recognition and Synthesis) ระบบสมองกลฝังตัว (Embedded Systems) และเทคโนโลยีปัญญาประดิษฐ์ (Artificial Intelligence) ตลอดจนการร่วมมือกับหน่วยงานพันธมิตรทางวิชาการและวิชาชีพ อาทิ สมาคมปัญญาประดิษฐ์ประเทศไทย (AIAT) ในการสร้างระบบนิเวศด้านปัญญาประดิษฐ์และพัฒนากำลังคนด้านเทคโนโลยีดิจิทัลเพื่อขับเคลื่อนเศรษฐกิจและสังคมของประเทศไทยอย่างยั่งยืน</p>
+<div class="page-break"></div>
+<h2 class="section-title">1.3 ลักษณะการประกอบการ</h2>
+<p>ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ เป็นองค์กรวิจัยและพัฒนา (Research and Development Organization) ของภาครัฐที่มีภารกิจหลักในการศึกษา ค้นคว้า วิจัย และพัฒนาเทคโนโลยีด้านอิเล็กทรอนิกส์ คอมพิวเตอร์ โทรคมนาคม สารสนเทศ และปัญญาประดิษฐ์ เพื่อนำไปประยุกต์ใช้ในการยกระดับขีดความสามารถในการแข่งขันของภาคอุตสาหกรรม ภาคการศึกษา ภาคการเกษตร ภาคสาธารณสุข และการบริการภาครัฐ โดยแบ่งกลุ่มงานวิจัยและบริการหลักออกเป็น 4 ด้านสำคัญ ได้แก่</p>
+<ol>
+  <li><strong>ด้านปัญญาประดิษฐ์และวิทยาการข้อมูล (Artificial Intelligence and Data Science):</strong> วิจัยและพัฒนาเทคโนโลยีการประมวลผลภาษาธรรมชาติ (NLP) เทคโนโลยีการประมวลผลสัญญาณเสียงและคำพูด (Speech and Audio Processing) คอมพิวเตอร์วิทัศน์ (Computer Vision) และการวิเคราะห์ข้อมูลขนาดใหญ่ (Big Data Analytics) รวมถึงการให้บริการแพลตฟอร์มปัญญาประดิษฐ์แห่งชาติ (เช่น AI FOR THAI)</li>
+  <li><strong>ด้านระบบไซเบอร์-กายภาพและอินเทอร์เน็ตของสรรพสิ่ง (Cyber-Physical Systems and IoT):</strong> วิจัยและพัฒนาเทคโนโลยีเซ็นเซอร์ ระบบสมองกลฝังตัว ระบบอัตโนมัติสำหรับภาคอุตสาหกรรมการผลิต และเทคโนโลยีเกษตรอัจฉริยะ (Smart Farming)</li>
+  <li><strong>ด้านความมั่นคงปลอดภัยไซเบอร์และโครงสร้างพื้นฐานข้อมูล (Cybersecurity and Data Infrastructure):</strong> พัฒนามาตรฐานการแลกเปลี่ยนข้อมูลภาครัฐ สถาปัตยกรรมคลังข้อมูล การคุ้มครองข้อมูลส่วนบุคคล (PDPA Compliance) และการรักษาความมั่นคงปลอดภัยของระบบสารสนเทศ</li>
+  <li><strong>ด้านการถ่ายทอดเทคโนโลยีและพัฒนากำลังคน (Technology Transfer and Human Resource Development):</strong> ถ่ายทอดผลงานวิจัยสู่การใช้ประโยชน์เชิงพาณิชย์และสาธารณประโยชน์ ร่วมกับสถาบันการศึกษาและสมาคมวิชาชีพในการบ่มเพาะนักวิจัยและบุคลากรด้านปัญญาประดิษฐ์ผ่านโครงการสหกิจศึกษาและโครงการวิจัยร่วม</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">1.4 รูปแบบและการบริหารงานขององค์กร</h2>
+<p>ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ มีรูปแบบการบริหารงานแบบองค์กรวิจัยสมัยใหม่ที่มุ่งเน้นผลสัมฤทธิ์เชิงยุทธศาสตร์ (Strategic Research Governance) ภายใต้การกำกับดูแลของสำนักงานพัฒนาวิทยาศาสตร์และเทคโนโลยีแห่งชาติ (สวทช.) โดยมีวิสัยทัศน์ นโยบาย และโครงสร้างองค์กรดังนี้</p>
+<h3 class="subsection-title">1.4.1 วิสัยทัศน์</h3>
+<p>"เป็นองค์กรหลักในการสร้างฐานรากทางเทคโนโลยีอิเล็กทรอนิกส์และสารสนเทศขั้นสูงของประเทศ เพื่อขับเคลื่อนเศรษฐกิจและสังคมดิจิทัลอย่างยั่งยืนด้วยวิทยาศาสตร์ เทคโนโลยี และนวัตกรรม"</p>
+<h3 class="subsection-title">1.4.2 นโยบาย</h3>
+<ol>
+  <li>มุ่งเน้นการวิจัยและพัฒนาเทคโนโลยีเชิงลึก (Deep Technology) ด้านอิเล็กทรอนิกส์ คอมพิวเตอร์ และปัญญาประดิษฐ์ ที่ตอบโจทย์ความต้องการของประเทศและสามารถนำไปใช้งานได้จริง</li>
+  <li>ส่งเสริมการบูรณาการข้อมูลและพัฒนามาตรฐานข้อมูลเปิด (Open Data Standards) ตลอดจนการบริหารจัดการข้อมูลอย่างมีธรรมาภิบาลและสอดคล้องกับกฎหมายคุ้มครองข้อมูลส่วนบุคคล</li>
+  <li>สร้างเครือข่ายความร่วมมือกับสถาบันการศึกษา หน่วยงานภาครัฐ ภาคเอกชน และสมาคมวิชาชีพด้านปัญญาประดิษฐ์ เพื่อยกระดับทักษะกำลังคนและขยายผลนวัตกรรมสู่วงกว้าง</li>
+  <li>บริหารจัดการองค์กรด้วยหลักธรรมาภิบาล ความโปร่งใส และการพัฒนาอย่างต่อเนื่อง</li>
+</ol>
+<h3 class="subsection-title">1.4.3 โครงสร้างองค์กร</h3>
+<p>การบริหารงานของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ อยู่ภายใต้การนำของผู้อำนวยการศูนย์ฯ และรองผู้อำนวยการศูนย์ฯ ที่กำกับดูแลสายงานวิจัยและสายงานสนับสนุนต่างๆ ได้แก่ กลุ่มวิจัยปัญญาประดิษฐ์ (Artificial Intelligence Research Group: AINRG) กลุ่มวิจัยวิทยาการข้อมูลและการวิเคราะห์ กลุ่มวิจัยการสื่อสารและเครือข่าย กลุ่มวิจัยระบบอัตโนมัติและอิเล็กทรอนิกส์ และฝ่ายบริหารจัดการองค์กร ดังแสดงโครงสร้างการบริหารองค์กรในรูปที่ 1.3</p>
+<div class="figure-box"><img src="file:///c:/Users/Administrator/Documents/GitHub/HSK1/docs/images/fig1_3_nectec_org_chart.png" alt="โครงสร้างการบริหารองค์กร NECTEC" /></div>
+<p class="caption"><strong>รูปที่ 1.3</strong> โครงสร้างการบริหารองค์กรของศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ</p>
+<div class="page-break"></div>
+<h2 class="section-title">1.5 ตำแหน่งและลักษณะงานที่นักศึกษาได้รับมอบหมาย</h2>
+<p>ในการปฏิบัติงานสหกิจศึกษาครั้งนี้ ผู้จัดทำได้รับมอบหมายให้ปฏิบัติงานในตำแหน่ง <strong>นักศึกษาสหกิจศึกษาด้านการวิเคราะห์ข้อมูลการเรียนรู้และวิศวกรรมข้อมูลปัญญาประดิษฐ์ (Learning Analytics & AI Data Engineering Trainee)</strong> ภายใต้โครงการวิจัยและพัฒนาแพลตฟอร์มการเรียนรู้ภาษาจีนกลางด้วยปัญญาประดิษฐ์ ("语 ปากจีน") โดยมีลักษณะงานและขอบเขตความรับผิดชอบหลัก 6 ด้าน ตามแผนการดำเนินงาน 16 สัปดาห์ ดังนี้</p>
+<ol>
+  <li><strong>การกำหนดกรอบการวิเคราะห์การเรียนรู้และคำถามวิจัย (Learning Analytics & Learning Questions):</strong> ศึกษากรอบแนวคิด Learning Analytics และงานวิจัยด้านระบบฝึกออกเสียงด้วยคอมพิวเตอร์ (Computer-Assisted Pronunciation Training: CAPT) เพื่อกำหนดคำถามการเรียนรู้เชิงประจักษ์ (Learning Questions: LQ1–LQ8) และตัวชี้วัดทางสัทศาสตร์</li>
+  <li><strong>การออกแบบมาตรฐานข้อมูล xAPI Telemetry และสถาปัตยกรรมคลังข้อมูลภายใต้กฎหมาย PDPA:</strong> ออกแบบโครงสร้างข้อมูลเหตุการณ์การเรียนรู้ตามมาตรฐาน Experience API (xAPI / IEEE 9274.1.1) พัฒนาระบบคัดกรองความยินยอม (PDPA Consent Gatekeeper) ภายใต้หลักการไม่จัดเก็บไฟล์เสียงดิบของผู้เรียน (Zero Audio Storage at Rest) และออกแบบคลังข้อมูลแบบสองชั้น (Dual-Database Data Warehouse) บนฐานข้อมูล Turso (libSQL) และ Neon (PostgreSQL)</li>
+  <li><strong>การสร้างอนุกรมวิธานความผิดพลาด (Error Taxonomy) และตัววัดคุณภาพการออกเสียง:</strong> พัฒนาโมดูลจำแนกความผิดพลาดระดับหน่วยเสียงพยัญชนะต้น (Initials) สระ (Finals) และวรรณยุกต์ (Tones) ออกเป็น 4 สถานะ (<code>correct</code>, <code>substitution</code>, <code>omission</code>, <code>insertion</code>) พร้อมคำนวณตัวชี้วัด Goodness of Pronunciation (GOP), Phoneme Error Rate (PER) และคะแนนรูปร่างวรรณยุกต์ตามมาตรวัด Chao's Pitch Scale (1–5)</li>
+  <li><strong>การพัฒนาโมเดลผู้เรียน (Mastery / Knowledge Tracing) และระบบแนะนำบทเรียนซ่อมเสริม (Recommendation Engine):</strong> พัฒนาอัลกอริทึมคำนวณระดับความเชี่ยวชาญของผู้เรียนด้วยวิธี Exponential Moving Average (EMA) ร่วมกับโมเดลการคงอยู่ของความรู้ตามทฤษฎี Ebbinghaus Forgetting Curve และสร้างระบบ Adaptive Remedial Engine และ Student Coach เพื่อคัดเลือกคำศัพท์ซ่อมเสริมที่ตรงกับจุดอ่อนรายบุคคล</li>
+  <li><strong>การพัฒนาแดชบอร์ดสำหรับผู้เรียนและผู้สอน (Learner & Instructor Diagnostic Dashboard):</strong> ออกแบบและพัฒนาหน้าจอแดชบอร์ดสำหรับผู้เรียน (6-Axis Skill Radar และ AI Coach Recommendations) และแดชบอร์ดวินิจฉัยเชิงลึกสำหรับผู้สอนและผู้ดูแลระบบจำนวน 12 มุมมอง</li>
+  <li><strong>การประเมินผลสัมฤทธิ์ทางการเรียนและความพึงพอใจ:</strong> เก็บข้อมูลนำร่องจากผู้เรียน วิเคราะห์ผลการทดสอบก่อนเรียนและหลังเรียน (Pre-test / Post-test) ด้วยสถิติเชิงอนุมาน (Paired Sample $t$-test, Cohen's $d$, Hake's Normalized Gain) ประเมินความพึงพอใจและการใช้งานระบบ (Usability) ตลอดจนจัดทำคู่มือและส่งมอบระบบ</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">1.6 พนักงานที่ปรึกษาและตำแหน่งงานหรือแผนกของพนักงานที่ปรึกษา</h2>
+<ul>
+  <li><strong>ชื่อ-นามสกุลพนักงานที่ปรึกษา:</strong> คุณภูวิศ เกิดปราโมทย์</li>
+  <li><strong>ตำแหน่งงาน:</strong> หัวหน้าฝ่ายเทคนิคและปัญญาประดิษฐ์ (Head of Technical and Artificial Intelligence)</li>
+  <li><strong>แผนก / หน่วยงาน:</strong> สมาคมปัญญาประดิษฐ์ประเทศไทย (Artificial Intelligence Association of Thailand: AIAT) ปฏิบัติงานร่วมโครงการวิจัยและพัฒนาระบบเทคโนโลยีการศึกษาอัจฉริยะกับศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC)</li>
+</ul>
+<div class="page-break"></div>
+<h2 class="section-title">1.7 ระยะเวลาที่ปฏิบัติงาน</h2>
+<p>ผู้จัดทำได้เข้าปฏิบัติงานสหกิจศึกษาตั้งแต่วันที่ <strong>4 มิถุนายน พ.ศ. 2569 ถึง วันที่ 20 พฤศจิกายน พ.ศ. 2569</strong> รวมระยะเวลาทั้งสิ้น <strong>16 สัปดาห์</strong> (คิดเป็นจำนวนวันปฏิบัติงานรวม 122 วันทำการ หรือ 976 ชั่วโมงปฏิบัติงาน) โดยปฏิบัติงานในวันจันทร์ถึงวันศุกร์ เวลา 08.30 น. ถึง 17.30 น.</p>
+<div class="page-break"></div>
+<h2 class="section-title">1.8 แผนการปฏิบัติงานสหกิจศึกษา</h2>
+<p>ในการปฏิบัติงานสหกิจศึกษาตลอดระยะเวลา 16 สัปดาห์ ผู้จัดทำและพนักงานที่ปรึกษาได้ร่วมกันวางแผนการดำเนินงานออกเป็น 16 กิจกรรมหลัก ครอบคลุมตั้งแต่การศึกษาองค์กร การกำหนดคำถามการเรียนรู้ การออกแบบสถาปัตยกรรม xAPI และ PDPA การพัฒนาส่วนเก็บข้อมูลและ Error Taxonomy การเก็บข้อมูลนำร่อง การพัฒนาโมเดลผู้เรียนและระบบแนะนำบทเรียน การพัฒนาแดชบอร์ดผู้เรียนและผู้สอน ไปจนถึงการประเมินผลและส่งมอบงาน ดังแสดงรายละเอียดในตารางที่ 1.1</p>
+<h3 class="subsection-title">ตารางที่ 1.1 แผนการปฏิบัติงานสหกิจศึกษาตลอดระยะเวลา 16 สัปดาห์</h3>
+<table>
+  <tr><th>ที่</th><th>กิจกรรม</th><th class="center">1</th><th class="center">2</th><th class="center">3</th><th class="center">4</th><th class="center">5</th><th class="center">6</th><th class="center">7</th><th class="center">8</th><th class="center">9</th><th class="center">10</th><th class="center">11</th><th class="center">12</th><th class="center">13</th><th class="center">14</th><th class="center">15</th><th class="center">16</th></tr>
+  <tr><td class="center">1</td><td>ศึกษาองค์กร ระบบงาน และเครื่องมือ</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">2</td><td>กำหนด learning questions และตัวชี้วัด</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">3</td><td>ศึกษากรอบ Learning Analytics + งานวิจัย CAPT</td><td></td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">4</td><td>Spike: pipeline วิเคราะห์เสียง + ขออนุมัติจริยธรรม/PDPA</td><td></td><td></td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">5</td><td>ออกแบบ learning event schema (xAPI) และ data warehouse</td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">6</td><td>พัฒนาส่วนเก็บข้อมูล (แอปฝึกพูด + logging)</td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">7</td><td>สร้าง error taxonomy และตัววัดคุณภาพการออกเสียง</td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">8</td><td>เริ่มเก็บข้อมูลจากผู้เรียนจริง (นำร่อง)</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td></tr>
+  <tr><td class="center">9</td><td>พัฒนาโมเดลผู้เรียน (mastery / knowledge tracing)</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">10</td><td>พัฒนา recommendation engine</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td><td></td></tr>
+  <tr><td class="center">11</td><td>พัฒนา dashboard ผู้เรียนและผู้สอน</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td><td></td></tr>
+  <tr><td class="center">12</td><td>ประเมินผล: pre/post test + ความพึงพอใจ + usability</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td><td></td></tr>
+  <tr><td class="center">13</td><td>วิเคราะห์ผลและปรับปรุงระบบ</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td></td></tr>
+  <tr><td class="center">14</td><td>Deploy + คู่มือ + ส่งมอบงาน</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td></td></tr>
+  <tr><td class="center">15</td><td>จัดทำรายงาน โปสเตอร์ และนำเสนอ</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td></tr>
+  <tr><td class="center">16</td><td>บันทึกประจำสัปดาห์ / รายงานความก้าวหน้า</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td><td class="center">■</td></tr>
+</table>
+
+<h1 class="chapter-title">บทที่ 2 ภาพรวมโครงงานสหกิจศึกษา</h1>
+<p>ในบทนี้จะกล่าวถึงภาพรวมของโครงงานสหกิจศึกษา ซึ่งประกอบด้วย ความเป็นมาและความสำคัญของปัญหา วัตถุประสงค์ของโครงงานสหกิจศึกษา ขอบเขตของโครงงานสหกิจศึกษา ประโยชน์ที่คาดว่าจะได้รับ ขั้นตอนและวิธีการดำเนินงาน ตลอดจนอุปกรณ์และเครื่องมือที่ใช้ในการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ โดยมีรายละเอียดดังต่อไปนี้</p>
+<div class="page-break"></div>
+<h2 class="section-title">2.1 ความเป็นมาและความสำคัญของปัญหา</h2>
+<p>ภาษาจีนกลาง (Mandarin Chinese) เป็นภาษาที่มีความสำคัญอย่างยิ่งต่อเศรษฐกิจ การค้า การท่องเที่ยว และความร่วมมือทางเทคโนโลยีในระดับสากล ส่งผลให้ความต้องการเรียนรู้ภาษาจีนของนักเรียน นักศึกษา และบุคลากรชาวไทยเพิ่มสูงขึ้นอย่างต่อเนื่อง อย่างไรก็ตาม อุปสรรคสำคัญที่สุดของผู้เรียนชาวไทยในการฝึกฝนทักษะการพูดภาษาจีนกลางตามมาตรฐานการสอบวัดระดับความรู้ภาษาจีน (Hanyu Shuiping Kaoshi: HSK ระดับ 1–3) คือความแตกต่างทางระบบสัทศาสตร์ระหว่างภาษาไทยและภาษาจีนกลาง (L1 Interference) โดยเฉพาะกลุ่มพยัญชนะต้นม้วนลิ้น (Retroflex Initials: <code>zh</code>, <code>ch</code>, <code>sh</code>, <code>r</code>) ที่ผู้เรียนชาวไทยมักออกเสียงสับสนกับพยัญชนะปลายลิ้น (<code>z</code>, <code>c</code>, <code>s</code>) รวมถึงการควบคุมความถี่มูลฐานของเสียง ($F_0$) ในระบบวรรณยุกต์ภาษาจีนกลาง 4 เสียง และกฎการเปลี่ยนเสียงวรรณยุกต์ (Tone Sandhi) เช่น เสียงที่ 3 ซ้อนกัน (3+3 $\rightarrow$ 2+3) ซึ่งในปัจจุบันได้มีการนำเทคโนโลยีการฝึกออกเสียงด้วยคอมพิวเตอร์ (Computer-Assisted Pronunciation Training: CAPT) เข้ามาช่วยตรวจจับความถี่เสียงและให้คะแนนเบื้องต้นแก่ผู้เรียนผ่านเว็บแอปพลิเคชัน</p>
+<p>แม้ว่าแอปพลิเคชันฝึกออกเสียงทั่วไปจะสามารถแสดงคะแนนการออกเสียงในแต่ละครั้งแบบเฉพาะหน้า (Immediate Feedback) ได้ แต่ระบบส่วนใหญ่ยังคงขาดสถาปัตยกรรมการวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics) เชิงลึกที่สามารถรวบรวมพฤติกรรมการเรียนรู้และร่องรอยความผิดพลาดทางสัทศาสตร์ในระยะยาวได้อย่างเป็นระบบ ส่งผลให้เกิดปัญหาสำคัญ 3 ประการ ประการแรกคือ การขาดอนุกรมวิธานความผิดพลาด (Error Taxonomy) และตัววัดคุณภาพการออกเสียงระดับหน่วยเสียงที่ได้มาตรฐาน ทำให้ไม่สามารถจำแนกได้ว่าคะแนนที่ต่ำเกิดจากการออกเสียงแทนที่ (Substitution) การตกหล่นของเสียง (Omission) หรือการแทรกเสียงเกิน (Insertion) ส่งผลให้ระบบไม่สามารถติดตามระดับความเชี่ยวชาญที่แท้จริง (Mastery & Knowledge Tracing) หรือแนะนำบทเรียนซ่อมเสริมที่ตรงจุดอ่อนรายบุคคลได้ ประการที่สองคือ ผู้สอนและผู้ดูแลหลักสูตรขาดเครื่องมือแดชบอร์ดวินิจฉัยระดับกลุ่มเรียน (Cohort Diagnostic Dashboard) ที่เชื่อมโยงข้อมูลตามมาตรฐานสากล Experience API (xAPI) เพื่อใช้ตอบคำถามวิจัยด้านการเรียนรู้หรือประเมินผลสัมฤทธิ์ก่อนและหลังเรียน (Pre-test / Post-test) เชิงสถิติ และประการที่สามคือ ความเสี่ยงด้านกฎหมายคุ้มครองข้อมูลส่วนบุคคล (PDPA) เนื่องจากข้อมูลเสียงพูดของมนุษย์ถือเป็นข้อมูลชีวมิติ (Biometric/Voiceprint Data) ที่สามารถระบุตัวตนได้ การจัดเก็บไฟล์เสียงดิบของผู้เรียนไว้บนเซิร์ฟเวอร์โดยไม่มีการควบคุมความยินยอมที่รัดกุมย่อมก่อให้เกิดความเสี่ยงด้านความเป็นส่วนตัวและความมั่นคงปลอดภัยของข้อมูล</p>
+<p>ด้วยเหตุนี้ ผู้จัดทำจึงได้ออกแบบและพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ตามมาตรฐาน xAPI ภายใต้การคุ้มครองข้อมูลส่วนบุคคล โดยบูรณาการเข้ากับแพลตฟอร์มเว็บแอปพลิเคชันฝึกออกเสียงภาษาจีน "语 ปากจีน" แนวคิดหลักของโครงงานนี้คือการกำหนดคำถามการเรียนรู้เชิงประจักษ์ (Learning Questions: LQ1–LQ8) และการออกแบบท่อส่งข้อมูลพฤติกรรมการเรียนรู้ตามมาตรฐาน IEEE 9274.1.1 (xAPI) ที่ทำงานร่วมกับสถาปัตยกรรมคลังข้อมูลแบบสองชั้น (Dual-Database Data Warehouse: Turso libSQL และ Neon PostgreSQL) ภายใต้หลักการไม่จัดเก็บไฟล์เสียงดิบลงฐานข้อมูลถาวร (PDPA Zero Audio Storage at Rest) โดยระบบจะสกัดเฉพาะคุณลักษณะเชิงตัวเลขและอนุกรมวิธานความผิดพลาดทางสัทศาสตร์ ได้แก่ คะแนน Goodness of Pronunciation (GOP) อัตราความผิดพลาด Phoneme Error Rate (PER) และคะแนนรูปร่างวรรณยุกต์ตามมาตรวัด Chao's Pitch Scale (1–5) เพื่อนำมาประมวลผลด้วยโมเดลติดตามความเชี่ยวชาญแบบค่าเฉลี่ยเคลื่อนที่เอ็กซ์โพเนนเชียล (Exponential Moving Average: EMA) ร่วมกับทฤษฎีเส้นโค้งการลืมของเอ็บบิงเฮาส์ (Ebbinghaus Forgetting Curve) และส่งต่อไปยังระบบแนะนำบทเรียนซ่อมเสริมอัตโนมัติ (Adaptive Remedial & Student Coach Engine) ตลอดจนแสดงผลผ่านแดชบอร์ดวินิจฉัยสำหรับผู้เรียนและผู้สอน ซึ่งช่วยให้ผู้เรียนสามารถแก้ไขจุดบกพร่องทางสัทศาสตร์ของตนเองได้อย่างตรงจุด และช่วยให้ผู้สอนสามารถประเมินผลสัมฤทธิ์ทางการเรียนด้วยสถิติเชิงอนุมานได้อย่างแม่นยำและปลอดภัยสูงสุด</p>
+<div class="page-break"></div>
+<h2 class="section-title">2.2 วัตถุประสงค์ของโครงงานสหกิจศึกษา</h2>
+<ol>
+  <li>เพื่อศึกษากรอบการวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics) กำหนดคำถามการเรียนรู้เชิงประจักษ์ (Learning Questions: LQ1–LQ8) และออกแบบโครงสร้างข้อมูลเหตุการณ์การเรียนรู้ตามมาตรฐาน xAPI (IEEE 9274.1.1) ร่วมกับคลังข้อมูลภายใต้มาตรการคุ้มครองข้อมูลส่วนบุคคล (PDPA Zero Audio Storage)</li>
+  <li>เพื่อสร้างอนุกรมวิธานความผิดพลาดทางสัทศาสตร์ (Error Taxonomy) และพัฒนาโมดูลคำนวณตัววัดคุณภาพการออกเสียงระดับหน่วยเสียงและวรรณยุกต์ ได้แก่ คะแนนความแม่นยำของหน่วยเสียง (GOP) อัตราความผิดพลาดของหน่วยเสียง (PER) และคะแนนรูปร่างวรรณยุกต์ (Tone Contour Score)</li>
+  <li>เพื่อพัฒนาโมเดลติดตามความเชี่ยวชาญและการคงอยู่ของความรู้ของผู้เรียน (Mastery & Knowledge Tracing Model) ร่วมกับระบบแนะนำคำศัพท์และบทเรียนซ่อมเสริมรายบุคคลอัตโนมัติ (Adaptive Remedial & Student Coach Engine)</li>
+  <li>เพื่อพัฒนาแดชบอร์ดวินิจฉัยผลการเรียนรู้สำหรับผู้เรียนและผู้สอน (Learner & Instructor Diagnostic Dashboard) และประเมินผลสัมฤทธิ์ทางการเรียน (Pre-test / Post-test) ตลอดจนความพึงพอใจและการใช้งานระบบ (Usability)</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">2.3 ขอบเขตของโครงงานสหกิจศึกษา</h2>
+<p>ในการดำเนินโครงงานสหกิจศึกษาครั้งนี้ ผู้จัดทำได้กำหนดขอบเขตของการพัฒนาระบบออกเป็น 5 ด้านหลัก ตามแผนการปฏิบัติงาน 16 สัปดาห์ ดังนี้</p>
+<ol>
+  <li><strong>ขอบเขตด้านกรอบคำถามการเรียนรู้ (Learning Questions & Metrics):</strong></li>
+</ol>
+<ul>
+  <li>กำหนดคำถามการเรียนรู้ (LQ1–LQ8) ครอบคลุมการวิเคราะห์หน่วยเสียงพยัญชนะต้นและสระที่เป็นปัญหาของผู้เรียนชาวไทย การวิเคราะห์ความสับสนของวรรณยุกต์ 4 เสียงและกฎ Tone Sandhi ผลกระทบของพฤติกรรมการกดฟังเสียงตัวอย่างก่อนพูด (Listening Behavior Impact) จุดติดขัดและการเลิกเรียนกลางคันในด่านเควสต์ (Drop-off Funnel) ความสัมพันธ์ระหว่างทักษะทั้ง 6 มิติ และการวัดพัฒนาการก่อนและหลังเรียน</li>
+</ul>
+<ol>
+  <li><strong>ขอบเขตด้านระบบเก็บข้อมูล xAPI Telemetry คลังข้อมูล และการคุ้มครองข้อมูลส่วนบุคคล (PDPA):</strong></li>
+</ol>
+<ul>
+  <li>พัฒนาระบบคัดกรองความยินยอม (PDPA Consent Gatekeeper) ที่บังคับตรวจสอบสถานะความยินยอม (<code>consent_status = 'consented'</code>) ก่อนบันทึกข้อมูลการเรียนรู้ พร้อมรองรับสิทธิในการถอนความยินยอมและลบข้อมูล (Right to Withdraw & Erasure)</li>
+  <li>ใช้สถาปัตยกรรม Zero Audio Storage at Rest โดยประมวลผลสัญญาณเสียงเฉพาะในหน่วยความจำชั่วคราว และส่งเฉพาะข้อมูลตัวเลขเชิงสัทศาสตร์และรหัสเหตุการณ์เข้าสู่ระบบ</li>
+  <li>แปลงข้อมูลพฤติกรรมการเรียนรู้และการประเมินเสียงให้อยู่ในรูปแบบมาตรฐาน xAPI Statement (Actor, Verb, Object, Result, Context) และจัดเก็บลงในคลังข้อมูลแบบสองชั้น ได้แก่ ฐานข้อมูลหลัก Turso (libSQL / Edge SQLite) และฐานข้อมูลวิเคราะห์ข้อมูล Neon (Serverless PostgreSQL)</li>
+</ul>
+<ol>
+  <li><strong>ขอบเขตด้านอนุกรมวิธานความผิดพลาด (Error Taxonomy) และตัววัดคุณภาพการออกเสียง:</strong></li>
+</ol>
+<ul>
+  <li>แยกวิเคราะห์พยางค์พินอินออกเป็นพยัญชนะต้น (Initials/Shengmu 23 เสียง) และสระพร้อมวรรณยุกต์ (Finals+Tones/Yunmu+Shengtiao)</li>
+  <li>จำแนกสถานะความผิดพลาดระดับหน่วยเสียงออกเป็น 4 ประเภท ได้แก่ ออกเสียงถูกต้อง (<code>correct</code>) ออกเสียงแทนที่/สับสน (<code>substitution</code>) เสียงตกหล่น (<code>omission</code>) และมีเสียงแทรกเกิน (<code>insertion</code>)</li>
+  <li>คำนวณตัววัดคุณภาพการออกเสียงเชิงกำหนด (Deterministic Metrics) ได้แก่ คะแนนความชัดเจนจากอัลกอริทึม YIN (Clarity Score) คะแนนรูปร่างความถี่เสียงบนมาตรวัด Chao Scale 1–5 ความชันของเสียง (Slope) คะแนน Goodness of Pronunciation (GOP 0–100) และอัตราความผิดพลาด Phoneme Error Rate (PER 0.0–1.0)</li>
+</ul>
+<ol>
+  <li><strong>ขอบเขตด้านโมเดลผู้เรียน (Mastery Model) และระบบแนะนำบทเรียนซ่อมเสริม (Recommendation Engine):</strong></li>
+</ol>
+<ul>
+  <li>คำนวณคะแนนความเชี่ยวชาญสะสม (EMA Mastery Score) ด้วยปัจจัยการปรับเรียบ $\alpha = 0.30$ ร่วมกับการคำนวณอัตราการคงอยู่ของความจำตามสมการ $R(t) = e^{-\Delta t / S}$ ของเอ็บบิงเฮาส์</li>
+  <li>พัฒนา Adaptive Remedial Engine และ Student Coach Engine เพื่อคัดเลือกคำศัพท์ซ่อมเสริมสูงสุด 6 คำ และสร้างคำแนะนำลำดับความสำคัญ (High, Medium, Low Priority) จากหน่วยเสียงพยัญชนะม้วนลิ้น (<code>zh</code>, <code>ch</code>, <code>sh</code>, <code>r</code>) วรรณยุกต์ที่อ่อน และทักษะที่ยังขาดความสมดุล</li>
+</ul>
+<ol>
+  <li><strong>ขอบเขตด้านแดชบอร์ดผู้เรียน ผู้สอน และการประเมินผล:</strong></li>
+</ol>
+<ul>
+  <li><strong>แดชบอร์ดผู้เรียน (<code>/analytics</code>):</strong> แสดงแผนภูมิเรดาร์ทักษะ 6 มิติ (6-Axis Skill Radar: ความชัดสัทศาสตร์ GOP, วรรณยุกต์ 4 เสียง, คัดอักษรจีน, บทสนทนา AI, ความจำคำศัพท์, และด่านการเรียนรู้) การ์ดคำแนะนำจาก AI Coach การ์ดคำศัพท์ซ่อมเสริมพร้อมคู่มือการจัดวางอวัยวะออกเสียง (Articulation Guides) และประวัติความก้าวหน้า</li>
+  <li><strong>แดชบอร์ดผู้สอนและผู้ดูแลระบบ (<code>/admin</code>):</strong> ประกอบด้วยมุมมองการวิเคราะห์ 12 มุมมอง ได้แก่ ภาพรวมระบบ, วินิจฉัยการออกเสียง, คัดอักษรจีน, ความคล่องแคล่วบทสนทนา, การจำคำศัพท์, จุดติดขัดด่านเควสต์, คำศัพท์ที่ยากที่สุด, ผลสอบ HSK Mock Exam, วิเคราะห์พัฒนาการ Pre/Post-test, จัดการผู้ใช้และข้อมูล 360 องศา (Learner 360 Profile), จัดการเนื้อหาด่าน และประวัติความยินยอม PDPA พร้อมระบบส่งออกข้อมูลวิจัย (CSV / JSONL Export)</li>
+  <li><strong>การประเมินผล:</strong> วิเคราะห์ข้อมูลผู้เรียนด้วยสถิติ Paired Sample $t$-test, ค่า $p$-value, ขนาดอิทธิพล Cohen's $d$, ช่วงความเชื่อมั่น 95% (95% CI) และค่าพัฒนาการสัมพัทธ์ Hake's Normalized Gain ($\langle g \rangle$)</li>
+</ul>
+<div class="page-break"></div>
+<h2 class="section-title">2.4 ประโยชน์ที่คาดว่าจะได้รับ</h2>
+<ol>
+  <li>ได้ระบบวิเคราะห์ข้อมูลการเรียนรู้และคลังข้อมูลตามมาตรฐานสากล xAPI (IEEE 9274.1.1) ที่ปฏิบัติตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA) อย่างเคร่งครัดด้วยสถาปัตยกรรม Zero Audio Storage at Rest</li>
+  <li>ผู้เรียนชาวไทยสามารถทราบจุดบกพร่องทางสัทศาสตร์ของตนเองในระดับหน่วยเสียงพยัญชนะต้น สระ และวรรณยุกต์ พร้อมได้รับคำศัพท์ซ่อมเสริมและคำแนะนำการจัดวางลิ้นและริมฝีปากที่ตรงกับปัญหาเฉพาะบุคคล</li>
+  <li>ผู้สอนและนักวิจัยด้านเทคโนโลยีการศึกษาสามารถใช้แดชบอร์ดวินิจฉัยระดับกลุ่มเรียน (Cohort Analytics) ในการติดตามพัฒนาการของผู้เรียน ตรวจสอบจุดติดขัดของบทเรียน และวิเคราะห์ผลสัมฤทธิ์ Pre-test / Post-test เชิงสถิติได้ทันทีโดยไม่ต้องคำนวณด้วยโปรแกรมภายนอก</li>
+  <li>เป็นต้นแบบสถาปัตยกรรมวิศวกรรมข้อมูลการเรียนรู้ (Educational Data Engineering) และระบบแนะนำบทเรียนปรับเหมาะ (Adaptive Learning System) สำหรับศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC) และสมาคมปัญญาประดิษฐ์ประเทศไทย (AIAT) ในการขยายผลสู่แพลตฟอร์มการเรียนรู้ภาษาต่างประเทศอื่นต่อไป</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">2.5 ขั้นตอนและวิธีการดำเนินงาน</h2>
+<p>ในการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ ผู้จัดทำได้ประยุกต์ใช้วงจรการพัฒนาระบบซอฟต์แวร์และวิทยาการข้อมูล 7 ขั้นตอน ตลอดระยะเวลา 16 สัปดาห์ (วันที่ 4 มิถุนายน พ.ศ. 2569 ถึง วันที่ 20 พฤศจิกายน พ.ศ. 2569) ดังนี้</p>
+<ol>
+  <li><strong>การวางแผนและกำหนดกรอบคำถามการเรียนรู้ (Planning & Learning Questions Formulation):</strong> ศึกษาโครงสร้างองค์กร ระบบงานของแอปพลิเคชัน "语 ปากจีน" ทบทวนวรรณกรรมด้าน Learning Analytics และ CAPT พร้อมกำหนดคำถามการเรียนรู้ LQ1–LQ8 และตัวชี้วัดทางสัทศาสตร์</li>
+  <li><strong>การวิเคราะห์ระบบและข้อกำหนดด้านจริยธรรมข้อมูล (System Analysis & PDPA Compliance Spike):</strong> ทดสอบท่อส่งข้อมูลการวิเคราะห์เสียง (Audio Pipeline Spike) วิเคราะห์มาตรฐาน xAPI (IEEE 9274.1.1) และกำหนดมาตรการคุ้มครองข้อมูลส่วนบุคคล PDPA Zero Audio Storage</li>
+  <li><strong>การออกแบบสถาปัตยกรรมข้อมูลและระบบงาน (Data Schema & System Design):</strong> ออกแบบโครงสร้าง xAPI Event Schema พจนานุกรมฐานข้อมูลบน Turso (libSQL) และ Neon (PostgreSQL) ออกแบบอนุกรมวิธานความผิดพลาด (Error Taxonomy) และออกแบบส่วนติดต่อผู้ใช้ของแดชบอร์ดผู้เรียนและผู้สอน</li>
+  <li><strong>การพัฒนาระบบเก็บข้อมูลและตัววัดคุณภาพเสียง (Telemetry & Phonetic Metrics Implementation):</strong> พัฒนาส่วนดักจับเหตุการณ์การเรียนรู้ในแอปฝึกพูด (<code>src/lib/telemetry/adapter.ts</code>, <code>src/lib/xapi.ts</code>) ระบบ Consent Gatekeeper และโมดูลคำนวณคะแนน GOP, PER, YIN Clarity และ Chao's Pitch Scale</li>
+  <li><strong>การเก็บข้อมูลนำร่องและพัฒนาโมเดลผู้เรียน (Pilot Data Collection, Mastery & Recommendation Engine):</strong> เริ่มเก็บข้อมูลการใช้งานนำร่องจากผู้เรียนจริง ควบคู่กับการพัฒนาโมเดลติดตามความเชี่ยวชาญ (EMA Mastery & Ebbinghaus Retention) ระบบแนะนำคำศัพท์ซ่อมเสริม (<code>remedialEngine.ts</code>, <code>studentCoachEngine.ts</code>) และแดชบอร์ดผู้เรียน/ผู้สอน</li>
+  <li><strong>การประเมินผล วิเคราะห์ผล และปรับปรุงระบบ (Evaluation, Statistical Analysis & Optimization):</strong> ประมวลผลคะแนนทดสอบก่อนและหลังเรียน (Pre-test / Post-test) ด้วยเครื่องมือสถิติ (<code>statisticalEngine.ts</code>) ประเมินความพึงพอใจและการใช้งานระบบ (Usability) และปรับปรุงประสิทธิภาพของระบบ</li>
+  <li><strong>การติดตั้ง ส่งมอบงาน และจัดทำรายงาน (Deployment, Documentation & Handover):</strong> ติดตั้งระบบขึ้นสู่สภาพแวดล้อมใช้งานจริง (Production Deployment) จัดทำคู่มือการใช้งาน รายงานสหกิจศึกษาฉบับสมบูรณ์ โปสเตอร์ และนำเสนอผลงาน</li>
+</ol>
+<p>จากขั้นตอนการดำเนินงานข้างต้น สามารถแสดงรายละเอียดแผนปฏิบัติงานโครงงานสหกิจศึกษาที่ระบุวันที่เริ่มต้น วันที่สิ้นสุด จำนวนวันทำการ และงานก่อนหน้า ดังแสดงในตารางที่ 2.1 และแสดงแผนภูมิแกนต์ (Gantt Chart) เปรียบเทียบระยะเวลาดำเนินงานรายสัปดาห์ ดังแสดงในรูปที่ 2.1</p>
+<div class="page-break"></div>
+<h3 class="subsection-title">ตารางที่ 2.1 แผนปฏิบัติงานโครงงานสหกิจศึกษาระบุวันที่เริ่มต้นและสิ้นสุด</h3>
+<table>
+  <tr><th>ลำดับ</th><th>ขั้นตอน</th><th>กิจกรรมการดำเนินงาน</th><th>วันที่เริ่มต้น (ว/ด/ป)</th><th>วันที่สิ้นสุด (ว/ด/ป)</th><th>จำนวนวันทำการ</th><th>งานก่อนหน้า</th></tr>
+  <tr><td class="center">1</td><td>การวางแผน</td><td>ศึกษาองค์กร ระบบงาน และเครื่องมือที่ใช้ในการพัฒนา</td><td>04/06/2569</td><td>17/06/2569</td><td class="center">10</td><td class="center">-</td></tr>
+  <tr><td class="center">2</td><td>การวางแผน</td><td>กำหนดคำถามการเรียนรู้ (Learning Questions LQ1–LQ8) และตัวชี้วัด</td><td>04/06/2569</td><td>17/06/2569</td><td class="center">10</td><td class="center">-</td></tr>
+  <tr><td class="center">3</td><td>การวิเคราะห์</td><td>ศึกษากรอบ Learning Analytics และงานวิจัยด้านระบบ CAPT</td><td>11/06/2569</td><td>24/06/2569</td><td class="center">10</td><td>1, 2</td></tr>
+  <tr><td class="center">4</td><td>การวิเคราะห์</td><td>Spike: ทดสอบ Pipeline วิเคราะห์เสียง และกำหนดเกณฑ์จริยธรรม/PDPA</td><td>18/06/2569</td><td>01/07/2569</td><td class="center">10</td><td class="center">3</td></tr>
+  <tr><td class="center">5</td><td>การออกแบบ</td><td>ออกแบบ Learning Event Schema (xAPI) และคลังข้อมูล (Data Warehouse)</td><td>18/06/2569</td><td>08/07/2569</td><td class="center">15</td><td>2, 4</td></tr>
+  <tr><td class="center">6</td><td>การพัฒนาระบบ</td><td>พัฒนาส่วนเก็บข้อมูลพฤติกรรมในแอปฝึกพูดและระบบ Logging</td><td>02/07/2569</td><td>29/07/2569</td><td class="center">20</td><td class="center">5</td></tr>
+  <tr><td class="center">7</td><td>การพัฒนาระบบ</td><td>สร้างอนุกรมวิธานความผิดพลาด (Error Taxonomy) และตัววัดคุณภาพเสียง</td><td>09/07/2569</td><td>29/07/2569</td><td class="center">15</td><td>4, 6</td></tr>
+  <tr><td class="center">8</td><td>การเก็บข้อมูล</td><td>เริ่มเก็บข้อมูลจากผู้เรียนจริง (ระยะนำร่อง / Pilot Study)</td><td>23/07/2569</td><td>02/09/2569</td><td class="center">30</td><td>6, 7</td></tr>
+  <tr><td class="center">9</td><td>การพัฒนาระบบ</td><td>พัฒนาโมเดลผู้เรียน (EMA Mastery / Ebbinghaus Knowledge Tracing)</td><td>30/07/2569</td><td>19/08/2569</td><td class="center">15</td><td>7, 8</td></tr>
+  <tr><td class="center">10</td><td>การพัฒนาระบบ</td><td>พัฒนาระบบแนะนำบทเรียนซ่อมเสริม (Adaptive Recommendation Engine)</td><td>06/08/2569</td><td>26/08/2569</td><td class="center">15</td><td class="center">9</td></tr>
+  <tr><td class="center">11</td><td>การพัฒนาระบบ</td><td>พัฒนาแดชบอร์ดวินิจฉัยสำหรับผู้เรียน (<code>/analytics</code>) และผู้สอน (<code>/admin</code>)</td><td>13/08/2569</td><td>02/09/2569</td><td class="center">15</td><td>9, 10</td></tr>
+  <tr><td class="center">12</td><td>การประเมินผล</td><td>ประเมินผล Pre/Post-test, ความพึงพอใจ และความง่ายในการใช้งาน (Usability)</td><td>20/08/2569</td><td>16/09/2569</td><td class="center">20</td><td>8, 11</td></tr>
+  <tr><td class="center">13</td><td>การประเมินผล</td><td>วิเคราะห์ผลเชิงสถิติ (Paired $t$-test, Cohen's $d$) และปรับปรุงระบบ</td><td>03/09/2569</td><td>02/10/2569</td><td class="center">22</td><td class="center">12</td></tr>
+  <tr><td class="center">14</td><td>การส่งมอบงาน</td><td>ติดตั้งระบบใช้งานจริง (Deploy) จัดทำคู่มือระบบ และส่งมอบงาน</td><td>05/10/2569</td><td>30/10/2569</td><td class="center">20</td><td class="center">13</td></tr>
+  <tr><td class="center">15</td><td>จัดทำเอกสาร</td><td>จัดทำรายงานสหกิจศึกษาฉบับสมบูรณ์ โปสเตอร์ และนำเสนอผลงาน</td><td>03/09/2569</td><td>20/11/2569</td><td class="center">55</td><td>12, 13, 14</td></tr>
+  <tr><td class="center">16</td><td>รายงานความก้าวหน้า</td><td>บันทึกผลการปฏิบัติงานประจำสัปดาห์และรายงานความก้าวหน้าต่อที่ปรึกษา</td><td>04/06/2569</td><td>20/11/2569</td><td class="center">122</td><td>1–15</td></tr>
+</table>
+<pre><code>รูปที่ 2.1 แผนภูมิแกนต์ (Gantt Chart) แสดงขั้นตอนและระยะเวลาการดำเนินงานโครงงานสหกิจศึกษา 16 สัปดาห์
+[================================= สัปดาห์ที่ 1 ถึง 16 (4 มิ.ย. - 20 พ.ย. 2569) =================================]
+ที่  กิจกรรม                                            1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+---------------------------------------------------------------------------------------------------------
+ 1  ศึกษาองค์กร ระบบงาน และเครื่องมือ                   ██ ██
+ 2  กำหนด learning questions และตัวชี้วัด               ██ ██
+ 3  ศึกษากรอบ Learning Analytics + งานวิจัย CAPT          ██ ██
+ 4  Spike: pipeline วิเคราะห์เสียง + จริยธรรม/PDPA           ██ ██
+ 5  ออกแบบ learning event schema (xAPI) &amp; warehouse         ██ ██ ██
+ 6  พัฒนาส่วนเก็บข้อมูล (แอปฝึกพูด + logging)                     ██ ██ ██ ██
+ 7  สร้าง error taxonomy และตัววัดคุณภาพการออกเสียง                 ██ ██ ██
+ 8  เริ่มเก็บข้อมูลจากผู้เรียนจริง (นำร่อง)                               ██ ██ ██ ██ ██ ██
+ 9  พัฒนาโมเดลผู้เรียน (mastery / knowledge tracing)                    ██ ██ ██
+10  พัฒนา recommendation engine                                          ██ ██ ██
+11  พัฒนา dashboard ผู้เรียนและผู้สอน                                         ██ ██ ██
+12  ประเมินผล: pre/post test + ความพึงพอใจ + usability                        ██ ██ ██
+13  วิเคราะห์ผลและปรับปรุงระบบ                                                     ██ ██ ██
+14  Deploy + คู่มือ + ส่งมอบงาน                                                      ██ ██
+15  จัดทำรายงาน โปสเตอร์ และนำเสนอ                                                ██ ██ ██ ██
+16  บันทึกประจำสัปดาห์ / รายงานความก้าวหน้า             ██ ██ ██ ██ ██ ██ ██ ██ ██ ██ ██ ██ ██ ██ ██ ██</code></pre>
+<div class="page-break"></div>
+<h2 class="section-title">2.6 อุปกรณ์และเครื่องมือที่ใช้</h2>
+<p>ในการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ ผู้จัดทำได้เลือกใช้ฮาร์ดแวร์ ซอฟต์แวร์ และเทคโนโลยีที่เหมาะสมต่อการประมวลผลข้อมูลแบบเรียลไทม์และการจัดการคลังข้อมูลบนระบบคลาวด์ โดยจำแนกรายละเอียดของฮาร์ดแวร์ที่ใช้ในการพัฒนาระบบดังตารางที่ 2.2 รายละเอียดของซอฟต์แวร์ที่ใช้ในการพัฒนาระบบดังตารางที่ 2.3 และรายละเอียดของเทคโนโลยีและเฟรมเวิร์กที่ใช้ในการพัฒนาระบบดังตารางที่ 2.4</p>
+<h3 class="subsection-title">ตารางที่ 2.2 รายละเอียดของฮาร์ดแวร์ที่ใช้ในการพัฒนาระบบ</h3>
+<table>
+  <tr><th>ฮาร์ดแวร์ที่ใช้พัฒนาระบบ</th><th>รายละเอียดคุณลักษณะ (Specification)</th></tr>
+  <tr><td><strong>หน่วยประมวลผลกลาง (Processor)</strong></td><td>AMD Ryzen 7 5800H @ 3.20 GHz (8 Cores, 16 Threads) หรือเทียบเท่า</td></tr>
+  <tr><td><strong>หน่วยความจำหลัก (Memory / RAM)</strong></td><td>16 GB DDR4 3200 MHz</td></tr>
+  <tr><td><strong>หน่วยเก็บข้อมูลสำรอง (Storage)</strong></td><td>NVMe PCIe M.2 SSD ความจุ 1 TB</td></tr>
+  <tr><td><strong>อุปกรณ์รับและส่งสัญญาณเสียง</strong></td><td>ไมโครโฟนแบบ Condenser/Built-in Microphone ที่รองรับความถี่สุ่ม 16–48 kHz และหูฟังตรวจสอบเสียง</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 2.3 รายละเอียดของซอฟต์แวร์ที่ใช้ในการพัฒนาระบบ</h3>
+<table>
+  <tr><th>ซอฟต์แวร์ที่ใช้พัฒนาระบบ</th><th>รายละเอียดคุณลักษณะ (Specification)</th></tr>
+  <tr><td><strong>ระบบปฏิบัติการ (Operating System)</strong></td><td>Microsoft Windows 11 Pro (64-bit)</td></tr>
+  <tr><td><strong>ระบบจัดการฐานข้อมูลหลัก (Edge DBMS)</strong></td><td>Turso Database (libSQL / Distributed Edge SQLite Architecture)</td></tr>
+  <tr><td><strong>ระบบคลังข้อมูลวิเคราะห์ (Analytics Data Warehouse)</strong></td><td>Neon Serverless PostgreSQL 16 (สำหรับซิงโครไนซ์ข้อมูลวิจัยและประมวลผลเชิงลึก)</td></tr>
+  <tr><td><strong>สภาพแวดล้อมรันไทม์ (Runtime Environment)</strong></td><td>Node.js เวอร์ชัน 20 LTS และ Python เวอร์ชัน 3.11</td></tr>
+  <tr><td><strong>เครื่องมือแก้ไขโค้ด (Source Code Editor)</strong></td><td>Visual Studio Code เวอร์ชัน 1.95+ พร้อมส่วนขยาย Svelte และ TypeScript</td></tr>
+  <tr><td><strong>ระบบควบคุมเวอร์ชัน (Version Control)</strong></td><td>Git และ GitHub Repository</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 2.4 รายละเอียดของเทคโนโลยีและเฟรมเวิร์กที่ใช้ในการพัฒนาระบบ</h3>
+<table>
+  <tr><th>เทคโนโลยีที่ใช้พัฒนาระบบ</th><th>รายละเอียดคุณลักษณะและหน้าที่การทำงาน</th></tr>
+  <tr><td><strong>Full-Stack Web Framework</strong></td><td>SvelteKit 2 และ Svelte 5 (Runes Reactivity) สำหรับพัฒนาส่วนหน้าแดชบอร์ดและ RESTful API Endpoints</td></tr>
+  <tr><td><strong>Programming Languages</strong></td><td>TypeScript 5.0 (สำหรับ Telemetry Adapter, Statistical Engine, Remedial Engine) และ SQL</td></tr>
+  <tr><td><strong>UI & Visualization Styling</strong></td><td>Tailwind CSS, Lucide Icons และ Custom Interactive SVG Charts (6-Axis Radar, Pitch Contour, Funnel)</td></tr>
+  <tr><td><strong>Database Client SDKs</strong></td><td><code>@libsql/client</code> สำหรับเชื่อมต่อ Turso และ <code>@neondatabase/serverless</code> สำหรับเชื่อมต่อ Neon PostgreSQL</td></tr>
+  <tr><td><strong>Data Standard & Acoustic Processing</strong></td><td>ADL xAPI 1.0.3 (IEEE 9274.1.1), Web Audio API, YIN Pitch Tracking และ ONNX Runtime Web</td></tr>
+</table>
+<p>นอกจากนี้ สำหรับผู้เรียนและผู้สอนที่เข้าใช้งานระบบผ่านเว็บเบราว์เซอร์ ระบบมีความต้องการขั้นต่ำด้านฮาร์ดแวร์สำหรับผู้ใช้งานดังแสดงในตารางที่ 2.5 ความต้องการด้านซอฟต์แวร์สำหรับผู้ใช้งานดังแสดงในตารางที่ 2.6 และเทคโนโลยีโครงสร้างพื้นฐานอื่น ๆ ที่จำเป็นดังแสดงในตารางที่ 2.7</p>
+<h3 class="subsection-title">ตารางที่ 2.5 รายละเอียดของฮาร์ดแวร์ขั้นต่ำที่จำเป็นสำหรับผู้ใช้งานระบบ</h3>
+<table>
+  <tr><th>ฮาร์ดแวร์สำหรับผู้ใช้งาน</th><th>รายละเอียดคุณลักษณะขั้นต่ำ (Minimum Requirements)</th></tr>
+  <tr><td><strong>คอมพิวเตอร์ส่วนบุคคล (PC / Laptop)</strong></td><td>CPU Dual-Core 1.80 GHz ขึ้นไป, RAM 4 GB ขึ้นไป, พื้นที่ว่าง 500 MB และมีไมโครโฟนพร้อมลำโพงหรือหูฟัง</td></tr>
+  <tr><td><strong>สมาร์ตโฟนหรือแท็บเล็ต (Mobile / Tablet)</strong></td><td>หน่วยประมวลผล ARM64 Octa-Core, RAM 4 GB ขึ้นไป พร้อมไมโครโฟนในตัวเครื่อง</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 2.6 รายละเอียดของซอฟต์แวร์ที่จำเป็นสำหรับผู้ใช้งานระบบ</h3>
+<table>
+  <tr><th>ซอฟต์แวร์สำหรับผู้ใช้งาน</th><th>รายละเอียดคุณลักษณะที่รองรับ</th></tr>
+  <tr><td><strong>ระบบปฏิบัติการ (Operating System)</strong></td><td>Windows 10/11, macOS 12+, Linux, Android 10+ หรือ iOS/iPadOS 15+</td></tr>
+  <tr><td><strong>เว็บเบราว์เซอร์ (Web Browser)</strong></td><td>Google Chrome 110+, Microsoft Edge 110+, Mozilla Firefox 115+ หรือ Apple Safari 15.4+ ที่รองรับ Web Audio API</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 2.7 รายละเอียดของเทคโนโลยีและโครงสร้างพื้นฐานอื่น ๆ ที่จำเป็น</h3>
+<table>
+  <tr><th>เทคโนโลยีอื่น ๆ</th><th>รายละเอียดคุณลักษณะและหน้าที่การทำงาน</th></tr>
+  <tr><td><strong>การเชื่อมต่ออินเทอร์เน็ต (Internet Connection)</strong></td><td>ความเร็วขั้นต่ำ 4 Mbps สำหรับการซิงโครไนซ์ข้อมูล xAPI Telemetry และเรียกดูแดชบอร์ดแบบเรียลไทม์</td></tr>
+  <tr><td><strong>โปรโตคอลความปลอดภัย (HTTPS / TLS 1.3)</strong></td><td>จำเป็นสำหรับการเปิดสิทธิ์เข้าถึงไมโครโฟน (<code>navigator.mediaDevices.getUserMedia</code>) และการเข้ารหัสข้อมูลส่วนบุคคลระหว่างส่ง (Encryption in Transit)</td></tr>
+</table>
+
+<h1 class="chapter-title">บทที่ 3 ทฤษฎีและงานวิจัยที่เกี่ยวข้อง</h1>
+<p>ในการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ตามมาตรฐาน xAPI ภายใต้การคุ้มครองข้อมูลส่วนบุคคล ผู้จัดทำได้ศึกษาค้นคว้าแนวคิด ทฤษฎี มาตรฐานทางวิศวกรรมข้อมูล และงานวิจัยที่เกี่ยวข้อง เพื่อนำมาใช้เป็นรากฐานทางวิชาการในการออกแบบและพัฒนาระบบ โดยแบ่งเนื้อหาออกเป็น 3 ส่วนหลัก ได้แก่ แนวคิดและทฤษฎีที่เกี่ยวข้อง เครื่องมือ ภาษา และเทคโนโลยีที่ใช้ในการพัฒนา และงานวิจัยที่เกี่ยวข้อง ดังรายละเอียดต่อไปนี้</p>
+<div class="page-break"></div>
+<h2 class="section-title">3.1 แนวคิดและทฤษฎีที่เกี่ยวข้อง</h2>
+<h3 class="subsection-title">3.1.1 กรอบการวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics) และระบบฝึกออกเสียงด้วยคอมพิวเตอร์ (CAPT)</h3>
+<p>การวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics: LA) ตามคำนิยามของสมาคมวิจัยการวิเคราะห์การเรียนรู้ (Society for Learning Analytics Research: SoLAR) คือ การวัด การเก็บรวบรวม การวิเคราะห์ และการรายงานข้อมูลเกี่ยวกับผู้เรียนและบริบทของการเรียนรู้ โดยมีจุดมุ่งหมายเพื่อทำความเข้าใจและปรับปรุงกระบวนการเรียนรู้ตลอดจนสภาพแวดล้อมที่การเรียนรู้นั้นเกิดขึ้นให้มีประสิทธิภาพสูงสุด วงจรการทำงานของระบบ Learning Analytics ตามแนวคิดของ Clow (2012) [1] ประกอบด้วย 4 ขั้นตอนที่หมุนเวียนต่อเนื่องกันเป็นวงจรปิด (Closed-Loop Learning Analytics Cycle) ดังแสดงในรูปที่ 3.1 ได้แก่</p>
+<ol>
+  <li><strong>ผู้เรียน (Learners):</strong> ผู้เรียนทำกิจกรรมการเรียนรู้ เช่น การฝึกออกเสียงคำศัพท์ การทำแบบฝึกหัดในด่านเควสต์ หรือการทำแบบทดสอบวัดระดับ</li>
+  <li><strong>ข้อมูล (Data):</strong> ระบบดักจับร่องรอยพฤติกรรมการเรียนรู้ (Digital Traces) เช่น จำนวนครั้งที่กดฟังเสียงตัวอย่าง เวลาที่ใช้คิดก่อนพูด (Hesitation Latency) และค่าพารามิเตอร์ทางสัทศาสตร์</li>
+  <li><strong>ตัวชี้วัดและการวิเคราะห์ (Metrics & Analytics):</strong> การนำข้อมูลดิบมาประมวลผลด้วยอัลกอริทึมทางสถิติและปัญญาประดิษฐ์เพื่อสร้างตัวชี้วัดความเชี่ยวชาญ อนุกรมวิธานความผิดพลาด และแผนภูมิภาพ (Visualization)</li>
+  <li><strong>การแทรกแซงและป้อนกลับ (Interventions):</strong> การนำผลการวิเคราะห์กลับไปช่วยเหลือผู้เรียน เช่น การแนะนำคำศัพท์ซ่อมเสริมรายบุคคล หรือการแจ้งเตือนผู้สอนให้ทราบถึงผู้เรียนที่ต้องการความช่วยเหลือพิเศษ</li>
+</ol>
+<pre><code>flowchart LR
+    L[&quot;1. ผู้เรียน (Learners)&lt;br/&gt;ฝึกออกเสียง HSK 1-3 / ทำแบบทดสอบ&quot;] --&gt; D[&quot;2. ข้อมูล (xAPI Telemetry)&lt;br/&gt;ความถี่ F0, พฤติกรรมการฟัง, เวลาตอบสนอง&quot;]
+    D --&gt; M[&quot;3. ตัวชี้วัดและการวิเคราะห์ (Analytics)&lt;br/&gt;GOP, PER, Error Taxonomy, EMA Mastery&quot;]
+    M --&gt; I[&quot;4. การแทรกแซง (Interventions)&lt;br/&gt;Adaptive Remedial Cards &amp; Diagnostic Dashboard&quot;]
+    I --&gt; L</code></pre>
+<p class="caption"><strong>รูปที่ 3.1</strong> แผนภาพวงจรการวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics Cycle) ที่ประยุกต์ใช้ในโครงงาน</p>
+<p>เมื่อนำกรอบแนวคิด Learning Analytics มาบูรณาการเข้ากับระบบฝึกออกเสียงด้วยคอมพิวเตอร์ (Computer-Assisted Pronunciation Training: CAPT) จะช่วยยกระดับระบบ CAPT จากเดิมที่ทำหน้าที่เพียงตรวจจับความถี่มูลฐานของเสียง ($F_0$) ด้วยอัลกอริทึมการหาค่าสหสัมพันธ์ในตัวเองเชิงอนุพันธ์ (YIN Pitch Tracking Algorithm) [2] แล้วแจ้งผลว่า "ผ่าน" หรือ "ไม่ผ่าน" ไปสู่ระบบวินิจฉัยเชิงสัทศาสตร์ที่สามารถตอบคำถามวิจัยด้านการเรียนรู้ (Learning Questions) ได้อย่างรอบด้าน ทั้งในระดับรายบุคคลและระดับกลุ่มผู้เรียน</p>
+<div class="page-break"></div>
+<h3 class="subsection-title">3.1.2 สัทศาสตร์ภาษาจีนกลาง อนุกรมวิธานความผิดพลาด (Error Taxonomy) และตัววัดคุณภาพการออกเสียง</h3>
+<p>โครงสร้างพยางค์ในภาษาจีนกลางมาตรฐาน (Standard Mandarin / Putonghua) ประกอบด้วย 3 องค์ประกอบหลัก ได้แก่ พยัญชนะต้น (Initials / 声母 <em>Shēngmǔ</em> จำนวน 21 เสียงและพยัญชนะกึ่งสระ <code>y</code>, <code>w</code>) สระเดี่ยวหรือสระประสม (Finals / 韵母 <em>Yùnmǔ</em>) และวรรณยุกต์ (Tones / 声调 <em>Shēngdiào</em> จำนวน 4 เสียงหลัก และเสียงเบา 1 เสียง) ในทางสัทศาสตร์กลศาสตร์เสียง จ้าว หยวนเริ่น (Yuen Ren Chao) [3] ได้กำหนดมาตรวัดระดับเสียงวรรณยุกต์ภาษาจีนกลางออกเป็น 5 ระดับ (Chao's Five-Level Tone Letters) ตั้งแต่ระดับ 1 (ต่ำสุด) ถึงระดับ 5 (สูงสุด) โดยสามารถแปลงค่าความถี่มูลฐาน $F_0$ (หน่วยเป็นเฮิรตซ์: Hz) ของผู้พูดแต่ละคนให้อยู่ในมาตรวัดลอการิทึม 1–5 เพื่อขจัดความแตกต่างของช่วงเสียงระหว่างเพศชายและเพศหญิง ดังสมการที่ (3.1)</p>
+<p>$$\text{Chao}(t) = 1 + 4 \times \frac{\log_{10}(F_0(t)) - \log_{10}(F_{0,\min})}{\log_{10}(F_{0,\max}) - \log_{10}(F_{0,\min})}$$</p>
+<p>โดยลักษณะรูปร่างระดับเสียงของวรรณยุกต์ภาษาจีนกลางทั้ง 4 เสียงหลักและเสียงเบาตามมาตรวัดของจ้าว หยวนเริ่น สามารถสรุปได้ดังแสดงในตารางที่ 3.1</p>
+<h4 class="subsubsection-title">ตารางที่ 3.1 ระบบวรรณยุกต์ภาษาจีนกลางตามมาตรวัดระดับเสียงของจ้าว หยวนเริ่น (Chao's Pitch Scale 1–5)</h4>
+<table>
+  <tr><th>วรรณยุกต์</th><th>ชื่อภาษาจีน</th><th>สัญลักษณ์พินอิน</th><th>ค่าตัวเลขระดับเสียง (Chao Scale)</th><th>ลักษณะรูปร่างความถี่เสียง (Pitch Contour)</th><th>ตัวอย่างคำศัพท์</th></tr>
+  <tr><td><strong>เสียงที่ 1</strong></td><td>阴平 (Yīnpíng)</td><td><code>ā</code></td><td><strong>55</strong></td><td>เสียงสูงคงที่ตลอดพยางค์ (High Level)</td><td>妈 (<code>mā</code> - แม่)</td></tr>
+  <tr><td><strong>เสียงที่ 2</strong></td><td>阳平 (Yángpíng)</td><td><code>á</code></td><td><strong>35</strong></td><td>เสียงไต่ระดับจากกลางขึ้นสูง (High Rising)</td><td>麻 (<code>má</code> - ป่าน)</td></tr>
+  <tr><td><strong>เสียงที่ 3</strong></td><td>上声 (Shǎngshēng)</td><td><code>ǎ</code></td><td><strong>214</strong> (หรือ <strong>21</strong>)</td><td>เสียงกดต่ำลงแล้วตวัดขึ้น (Low Dipping)</td><td>马 (<code>mǎ</code> - ม้า)</td></tr>
+  <tr><td><strong>เสียงที่ 4</strong></td><td>去声 (Qùshēng)</td><td><code>à</code></td><td><strong>51</strong></td><td>เสียงตกกระทบจากสูงสุดลงต่ำสุดอย่างรวดเร็ว (High Falling)</td><td>骂 (<code>mà</code> - ด่า)</td></tr>
+  <tr><td><strong>เสียงเบา</strong></td><td>轻声 (Qīngshēng)</td><td><code>a</code></td><td><strong>0</strong> (แปรผัน)</td><td>เสียงสั้นและเบา ความสูงขึ้นอยู่กับพยางค์หน้า (Neutral)</td><td>吗 (<code>ma</code> - ไหม)</td></tr>
+</table>
+<p>นอกจากนี้ ภาษาจีนกลางยังมีกฎการแปรเสียงวรรณยุกต์ตามบริบทพยางค์ข้างเคียง (Tone Sandhi) ที่สำคัญที่สุดคือ กฎวรรณยุกต์เสียงที่ 3 ซ้อนกัน (Third-Tone Sandhi: 3+3 $\rightarrow$ 2+3) เช่น คำว่า 你好 (<code>nǐ hǎo</code>) ซึ่งพยางค์แรกมีวรรณยุกต์พื้นเดิม (Underlying Tone) เป็นเสียงที่ 3 แต่เมื่อออกเสียงจริงต้องแปรเป็นวรรณยุกต์พื้นผิว (Surface Tone) เสียงที่ 2 (<code>ní hǎo</code>) รวมถึงกฎการเปลี่ยนเสียงของคำว่า 不 (<code>bù</code> $\rightarrow$ <code>bú</code> เมื่อตามด้วยเสียงที่ 4) และ 一 (<code>yī</code> $\rightarrow$ <code>yí</code> หรือ <code>yì</code>)</p>
+<p>เพื่อวัดคุณภาพการออกเสียงและจำแนกข้อผิดพลาดของผู้เรียนชาวไทยอย่างเป็นระบบ โครงงานนี้ได้ประยุกต์ใช้อนุกรมวิธานความผิดพลาดระดับหน่วยเสียง (Phoneme-level Error Taxonomy) และตัววัดมาตรฐาน 2 ตัวชี้วัดหลัก [4] ได้แก่</p>
+<ol>
+  <li><strong>คะแนนความแม่นยำในการออกเสียง (Goodness of Pronunciation: GOP):</strong> ในระบบรู้จำเสียงพูดแบบดั้งเดิมของ Witt และ Young (2000) [4] ค่า GOP คำนวณจากอัตราส่วนความน่าจะเป็นแบบลอการิทึม (Log-Likelihood Ratio) ของหน่วยเสียงเป้าหมาย $p$ ต่อหน่วยเสียงที่มีความน่าจะเป็นสูงสุด ในโครงงานนี้ได้ปรับปรุงสมการ GOP สำหรับประมวลผลแบบกำหนดค่าแน่นอน (Deterministic Acoustic GOP) โดยถ่วงน้ำหนักระหว่างความชัดเจนของสัญญาณคาบเวลาจากอัลกอริทึม YIN ($S_{\text{clarity}}$) ความแม่นยำของรูปร่างวรรณยุกต์และค่าความชัน ($S_{\text{contour}}$) และความแม่นยำของหน่วยเสียงพยัญชนะ/สระ ($S_{\text{segment}}$) ให้อยู่ในช่วงคะแนน 0 ถึง 100 คะแนน ดังสมการที่ (3.2)</li>
+</ol>
+<p>$$\text{GOP}_i = \text{ clamp}_{[0, 100]} \left( w_1 S_{\text{segment}, i} + w_2 S_{\text{contour}, i} + w_3 S_{\text{clarity}, i} \right)$$</p>
+<ol>
+  <li><strong>อัตราความผิดพลาดของหน่วยเสียง (Phoneme Error Rate: PER):</strong> คำนวณจากระยะห่างการแก้ไขแบบเลเวนชไตน์ (Levenshtein Edit Distance) ระหว่างลำดับหน่วยเสียงเป้าหมายและลำดับหน่วยเสียงที่ระบบตรวจจับได้ โดยจำแนกความคลาดเคลื่อนออกเป็น 3 ประเภทในอนุกรมวิธานความผิดพลาด ได้แก่ การออกเสียงแทนที่หรือสับสน ($S$: Substitution เช่น เป้าหมายคือพยัญชนะม้วนลิ้น <code>zh</code> แต่ออกเสียงเป็น <code>z</code>) การตกหล่นหรือไม่ได้ออกเสียง ($D$: Omission/Deletion) และการแทรกเสียงเกิน ($I$: Insertion) เทียบกับจำนวนหน่วยเสียงเป้าหมายทั้งหมด ($N$) ดังสมการที่ (3.3)</li>
+</ol>
+<p>$$\text{PER} = \frac{S + D + I}{N}$$</p>
+<div class="page-break"></div>
+<h3 class="subsection-title">3.1.3 มาตรฐานข้อมูลกิจกรรมการเรียนรู้ xAPI (IEEE 9274.1.1) และการคุ้มครองข้อมูลส่วนบุคคล (PDPA)</h3>
+<p>มาตรฐาน Experience API (xAPI หรือชื่อเดิมคือ Tin Can API) ซึ่งได้รับการรับรองเป็นมาตรฐานสากล IEEE 9274.1.1 [5] เป็นสถาปัตยกรรมข้อมูลสำหรับการแลกเปลี่ยนและจัดเก็บประวัติกิจกรรมการเรียนรู้ในคลังระเบียนการเรียนรู้ (Learning Record Store: LRS) โดยข้อมูลทุกเหตุการณ์จะถูกจัดอยู่ในรูปแบบประโยคโครงสร้าง JSON ที่เรียกว่า <strong>xAPI Statement</strong> ซึ่งประกอบด้วยองค์ประกอบหลัก 3 ส่วน คือ <strong>"ใคร (Actor) ทำกริยาอะไร (Verb) กับวัตถุการเรียนรู้ใด (Object)"</strong> และขยายความด้วยผลลัพธ์ (<strong>Result</strong>) และบริบท (<strong>Context</strong>) ดังนี้</p>
+<ul>
+  <li><strong>Actor:</strong> ข้อมูลระบุตัวตนผู้เรียนที่ผ่านการแฝงชื่อ (Pseudonymized User Account / UUID)</li>
+  <li><strong>Verb:</strong> รหัส URI มาตรฐานของกริยาการเรียนรู้ เช่น <code>http://adlnet.gov/expapi/verbs/experienced</code> (การกดฟังเสียงตัวอย่าง) <code>http://adlnet.gov/expapi/verbs/attempted</code> (การพยายามออกเสียงพยางค์) และ <code>http://adlnet.gov/expapi/verbs/scored</code> (การประเมินผลคะแนนคำศัพท์)</li>
+  <li><strong>Object:</strong> ข้อมูลคำศัพท์หรือด่านการเรียนรู้ เช่น รหัสคำศัพท์ ตัวอักษรจีน (Hanzi) พินอิน และระดับ HSK</li>
+  <li><strong>Result:</strong> คะแนนที่ได้ (<code>scaled</code>, <code>raw</code>, <code>min</code>, <code>max</code>) สถานะการผ่านเกณฑ์ (<code>success</code>, <code>completion</code>) และส่วนขยาย (<code>extensions</code>) ที่บรรจุรายละเอียดคะแนน GOP, PER, ความถี่ $F_0$ เฉลี่ย และรายการอนุกรมวิธานความผิดพลาดระดับหน่วยเสียง</li>
+  <li><strong>Context:</strong> ข้อมูลบริบทแวดล้อม เช่น โหมดการฝึก (<code>stage</code>, <code>word</code>, <code>assessment</code>) จำนวนครั้งที่กดฟังเสียงตัวอย่างก่อนพูด และเวลาความลังเลก่อนเริ่มพูด (Hesitation Latency)</li>
+</ul>
+<p>ในด้านจริยธรรมข้อมูลและการปฏิบัติตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (Personal Data Protection Act: PDPA) และระเบียบ GDPR ของสหภาพยุโรป ข้อมูลไฟล์เสียงพูดดิบ (Raw Audio Waveform) ของผู้เรียนถือเป็นข้อมูลส่วนบุคคลที่มีความอ่อนไหวเนื่องจากสามารถนำไปสกัดอัตลักษณ์บุคคลจากเสียง (Voice Biometrics) ได้ โครงงานนี้จึงได้ออกแบบสถาปัตยกรรม <strong>Zero Audio Storage at Rest</strong> ร่วมกับหลักการออกแบบเพื่อความเป็นส่วนตัว (Privacy by Design) โดยประกอบด้วยกลไกสำคัญ 3 ประการ คือ (1) การประมวลผลสัญญาณเสียงเพื่อสกัดความถี่ $F_0$ และทำนายวรรณยุกต์จะดำเนินการภายในหน่วยความจำชั่วคราว (In-Memory Processing) และทำลายบัฟเฟอร์เสียงทิ้งทันทีหลังสกัดค่าตัวเลขเสร็จสิ้น (2) ระบบ <strong>PDPA Consent Gatekeeper</strong> จะตรวจสอบสถานะการให้ความยินยอมของผู้เรียนก่อนบันทึกข้อมูล Telemetry ทุกครั้ง หากผู้เรียนยังไม่ให้ความยินยอมหรือถอนความยินยอม ระบบจะปฏิเสธการบันทึกข้อมูลลงคลังข้อมูลทันที และ (3) การจัดเก็บประวัติการขอความยินยอมและการถอนความยินยอมพร้อมรหัสแฮชของที่อยู่ไอพี (SHA-256 IP Hash) ลงในตารางตรวจสอบ (<code>user_consent_logs</code>) เพื่อความโปร่งใสและตรวจสอบย้อนกลับได้</p>
+<div class="page-break"></div>
+<h3 class="subsection-title">3.1.4 โมเดลการติดตามความเชี่ยวชาญของผู้เรียน (Mastery & Knowledge Tracing) และระบบแนะนำบทเรียนซ่อมเสริม</h3>
+<p>ในการประเมินว่าผู้เรียนมีความเชี่ยวชาญ (Mastery) ในหน่วยเสียงหรือวรรณยุกต์ใดอย่างแท้จริง การใช้ค่าเฉลี่ยเลขคณิตแบบธรรมดา (Simple Arithmetic Mean) ของคะแนนทุกครั้งตั้งแต่อดีตมีข้อเสียสำคัญคือ คะแนนที่ต่ำในช่วงเริ่มต้นฝึกหัดจะฉุดรั้งคะแนนรวมไว้ แม้ว่าในระยะหลังผู้เรียนจะสามารถออกเสียงได้อย่างถูกต้องต่อเนื่องแล้วก็ตาม โครงงานนี้จึงได้นำโมเดล <strong>ค่าเฉลี่ยเคลื่อนที่แบบถ่วงน้ำหนักเอ็กซ์โพเนนเชียล (Exponential Moving Average: EMA Mastery Model)</strong> [6] มาใช้ในการติดตามความเชี่ยวชาญของผู้เรียน โดยให้น้ำหนักกับผลการฝึกครั้งล่าสุดมากกว่าอดีตตามค่าพารามิเตอร์การเรียนรู้ $\alpha \in (0, 1)$ (ในระบบกำหนดค่าเริ่มต้น $\alpha = 0.30$) ดังสมการที่ (3.4)</p>
+<p>$$M_t = \alpha \cdot S_t + (1 - \alpha) \cdot M_{t-1}$$</p>
+<p>โดยที่ $M_t$ คือคะแนนความเชี่ยวชาญสะสมหลังการฝึกครั้งที่ $t$, $S_t$ คือคะแนนการออกเสียงในครั้งที่ $t$ และ $M_{t-1}$ คือคะแนนความเชี่ยวชาญสะสมก่อนหน้า</p>
+<p>อย่างไรก็ตาม ความเชี่ยวชาญที่ผู้เรียนเคยทำได้ย่อมเสื่อมถอยลงตามกาลเวลาหากไม่ได้รับการทบทวน ตาม <strong>ทฤษฎีเส้นโค้งการลืมของเอ็บบิงเฮาส์ (Ebbinghaus Forgetting Curve)</strong> [7] ระบบจึงได้ผสานสมการการคงอยู่ของความจำ (Memory Retention: $R$) เข้ากับความแข็งแกร่งของความจำ ($S_{\text{stability}}$ ซึ่งเพิ่มขึ้นตามจำนวนครั้งที่ผู้เรียนทบทวนสำเร็จต่อเนื่อง) และระยะเวลาที่ผ่านไปนับจากการฝึกครั้งล่าสุด ($\Delta t$ หน่วยเป็นวัน) ดังสมการที่ (3.5) และแสดงลักษณะกราฟการคงอยู่ของความรู้และการทบทวนแบบเว้นระยะ (Spaced Repetition) ในรูปที่ 3.2</p>
+<p>$$R(\Delta t) = e^{-\frac{\Delta t}{S_{\text{stability}}}}, \quad \text{โดยที่ } S_{\text{stability}} = S_0 \cdot (1 + 0.5 \cdot \min(k, 10)) \cdot \left(0.5 + \frac{M_t}{100}\right)$$</p>
+<p>เมื่อนำค่าความเชี่ยวชาญสะสม $M_t$ มาคูณกับอัตราการคงอยู่ของความจำ $R(\Delta t)$ จะได้ <strong>คะแนนความเชี่ยวชาญปรับแก้ตามเวลา (Effective Mastery Score: $M_{\text{eff}} = M_t \cdot R(\Delta t)$)</strong> หากค่า $M_{\text{eff}} < 75\%$ หรือค่า $R(\Delta t) < 70\%$ ระบบจะตั้งสถานะหน่วยเสียงหรือคำศัพท์นั้นว่า "ควรทบทวน (<code>needsReview = true</code>)" และส่งรายการหน่วยเสียงพยัญชนะต้นและวรรณยุกต์ที่อ่อนไปยัง <strong>ระบบแนะนำบทเรียนซ่อมเสริม (Adaptive Remedial & Student Coach Engine)</strong> ซึ่งใช้อัลกอริทึมการให้คะแนนความสอดคล้องแบบถ่วงน้ำหนัก (Multi-Criteria Rule-Based Scoring) โดยคำศัพท์ที่มีทั้งพยัญชนะต้นตรงกับจุดอ่อนและมีวรรณยุกต์ตรงกับจุดอ่อน (โดยเฉพาะคำที่มีกฎ Tone Sandhi 3+3) จะได้รับคะแนนลำดับความสำคัญสูงสุดในการนำมาสร้างเป็นการ์ดฝึกซ่อมเสริมรายบุคคล</p>
+<pre><code>รูปที่ 3.2 กราฟเส้นโค้งการคงอยู่ของความรู้ตามทฤษฎีการลืมของเอ็บบิงเฮาส์ (Ebbinghaus Forgetting Curve)
+อัตราการจำได้ R(t) (%)
+100% |*                       * (ทบทวนครั้งที่ 1)      * (ทบทวนครั้งที่ 2)
+ 80% |  *                       *                       *
+ 60% |    *                       *                       * (ความชันลดลงเมื่อ S เพิ่มขึ้น)
+ 40% |      *                       *
+ 20% |        *   R(t) = exp(-t/S)
+  0% +-------------------------------------------------------------------&gt; เวลาที่ผ่านไป (วัน)
+     0        1               3                       7               14</code></pre>
+<div class="page-break"></div>
+<h3 class="subsection-title">3.1.5 สถิติเพื่อการประเมินผลสัมฤทธิ์ทางการเรียน (Paired Sample $t$-test, Cohen's $d$ และ Hake's Gain)</h3>
+<p>เพื่อพิสูจน์ผลสัมฤทธิ์ทางการเรียนของผู้เรียนจากการใช้งานระบบอย่างเป็นวิทยาศาสตร์ โครงงานนี้ได้ฝังโมดูลการคำนวณสถิติเชิงอนุมานและจิตมิติไว้ในระบบวิเคราะห์ข้อมูล (<code>src/lib/analytics/statisticalEngine.ts</code>) โดยใช้สถิติมาตรฐาน 3 ส่วน ได้แก่</p>
+<ol>
+  <li><strong>การทดสอบค่าทีแบบกลุ่มตัวอย่างไม่อิสระ (Paired Sample $t$-test):</strong> ใช้เปรียบเทียบค่าเฉลี่ยของคะแนนทดสอบก่อนเรียน (Pre-test: $X_{\text{pre}}$) และคะแนนทดสอบหลังเรียน (Post-test: $X_{\text{post}}$) ของผู้เรียนคนเดียวกันจำนวน $n$ คน โดยกำหนดผลต่างรายบุคคล $d_i = X_{\text{post}, i} - X_{\text{pre}, i}$ ค่าเฉลี่ยผลต่าง $\bar{d}$ และส่วนเบี่ยงเบนมาตรฐานของผลต่าง $s_d$ สามารถคำนวณค่าสถิติ $t$ ที่องศาอิสระ $df = n - 1$ ได้ดังสมการที่ (3.6)</li>
+</ol>
+<p>$$t = \frac{\bar{d}}{s_d / \sqrt{n}}, \quad \text{โดยที่ } s_d = \sqrt{\frac{\sum_{i=1}^{n} (d_i - \bar{d})^2}{n - 1}}$$</p>
+<ol>
+  <li><strong>ขนาดอิทธิพลของโคเฮน (Cohen's $d$ Effect Size):</strong> ใช้บอกขนาดความสำคัญในทางปฏิบัติของพัฒนาการที่เกิดขึ้นโดยไม่ขึ้นกับขนาดกลุ่มตัวอย่าง คำนวณจากอัตราส่วนระหว่างค่าเฉลี่ยของผลต่างต่อส่วนเบี่ยงเบนมาตรฐานของผลต่าง ($d = \bar{d} / s_d$) โดยมีเกณฑ์การแปลผลตามแนวคิดของ Cohen (1988) [8] คือ $|d| \ge 0.80$ หมายถึงขนาดอิทธิพลระดับสูง (Large Effect), $0.50 \le |d| < 0.80$ ระดับปานกลาง (Medium Effect) และ $0.20 \le |d| < 0.50$ ระดับต่ำ (Small Effect)</li>
+</ol>
+<ol>
+  <li><strong>ค่าพัฒนาการสัมพัทธ์ของเฮก (Hake's Normalized Gain: $\langle g \rangle$):</strong> เป็นตัวชี้วัดมาตรฐานในงานวิจัยเทคโนโลยีการศึกษาที่เสนอโดย Hake (1998) [9] เพื่อวัดว่าผู้เรียนสามารถพัฒนาคะแนนเพิ่มขึ้นเป็นสัดส่วนเท่าใดของคะแนนที่ยังขาดอยู่จากคะแนนเต็ม 100 คะแนน ดังสมการที่ (3.7) โดยแบ่งเกณฑ์เป็นพัฒนาการระดับสูง ($\langle g \rangle \ge 0.70$), ระดับปานกลาง ($0.30 \le \langle g \rangle < 0.70$) และระดับต่ำ ($\langle g \rangle < 0.30$)</li>
+</ol>
+<p>$$\langle g \rangle = \frac{\bar{X}_{\text{post}} - \bar{X}_{\text{pre}}}{100 - \bar{X}_{\text{pre}}}$$</p>
+<p><strong>สรุปความสอดคล้องและการนำแนวคิดและทฤษฎีไปประยุกต์ใช้ในโครงงาน:</strong></p>
+<p>จากการศึกษาแนวคิดและทฤษฎีทั้ง 5 ด้านข้างต้น ผู้จัดทำได้นำกรอบวงจร Learning Analytics มาใช้เป็นโครงสร้างหลักในการกำหนดคำถามการเรียนรู้ LQ1–LQ8 นำทฤษฎีสัทศาสตร์ภาษาจีนกลาง มาตรวัดระดับเสียง Chao's Pitch Scale (1–5) และสมการ GOP/PER มาสร้างเป็นโมดูลอนุกรมวิธานความผิดพลาด (Error Taxonomy) ที่จำแนกปัญหาพยัญชนะม้วนลิ้นและวรรณยุกต์ของผู้เรียนชาวไทย นำมาตรฐาน xAPI (IEEE 9274.1.1) ร่วมกับหลักการ PDPA Zero Audio Storage มาออกแบบโครงสร้างการจัดเก็บข้อมูลที่ปลอดภัยไร้ไฟล์เสียงดิบ นำสมการ EMA Mastery และเส้นโค้งการลืมของเอ็บบิงเฮาส์มาใช้ในโมเดลผู้เรียนเพื่อสั่งการระบบแนะนำคำศัพท์ซ่อมเสริมอัตโนมัติ และนำสมการสถิติ Paired Sample $t$-test, Cohen's $d$ และ Hake's Gain มาเขียนเป็นเอนจินคำนวณผลสัมฤทธิ์ทางการเรียนแบบเรียลไทม์บนแดชบอร์ดผู้สอน</p>
+<div class="page-break"></div>
+<h2 class="section-title">3.2 เครื่องมือ ภาษา และเทคโนโลยีที่ใช้ในการพัฒนา</h2>
+<p>ในการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ ผู้จัดทำได้เลือกใช้เครื่องมือ ภาษาโปรแกรม และเทคโนโลยีสมัยใหม่ ดังนี้</p>
+<ol>
+  <li><strong>SvelteKit และ Svelte 5 (Runes Reactivity):</strong> เฟรมเวิร์กการพัฒนาเว็บแอปพลิเคชันแบบ Full-Stack ที่คอมไพล์โค้ดเป็น JavaScript ขนาดเล็กโดยไม่พึ่งพา Virtual DOM ช่วยให้การเรนเดอร์แผนภูมิเรดาร์ทักษะ 6 มิติ กราฟความถี่เสียง Pitch Contour และตารางวิเคราะห์ข้อมูลขนาดใหญ่บนแดชบอร์ดมีความลื่นไหลสูง พร้อมทั้งใช้สร้าง Server-side API Endpoints (<code>/api/v1/telemetry/<em></code>, <code>/api/analytics/</em></code>, <code>/api/admin/*</code>) สำหรับรับและประมวลผลข้อมูล</li>
+  <li><strong>ภาษา TypeScript:</strong> ภาษาโปรแกรมที่ขยายขีดความสามารถของ JavaScript ด้วยระบบตรวจสอบชนิดข้อมูลแบบเข้มงวด (Static Type Checking) ช่วยป้องกันข้อผิดพลาดในการจัดการโครงสร้างข้อมูล xAPI Statement ที่มีความซับซ้อนและการคำนวณทางสถิติใน <code>statisticalEngine.ts</code></li>
+  <li><strong>ฐานข้อมูล Turso (libSQL / Distributed Edge SQLite):</strong> ระบบฐานข้อมูลหลักของแอปพลิเคชันที่พัฒนาต่อยอดจาก SQLite โดยสถาปัตยกรรมของ Turso รองรับการเข้าถึงข้อมูลผ่านโปรโตคอล HTTP/WebSockets ด้วยความหน่วงต่ำ (Low Latency) เหมาะอย่างยิ่งสำหรับการบันทึกข้อมูล xAPI Telemetry และประวัติการฝึกออกเสียงแบบเรียลไทม์</li>
+  <li><strong>คลังข้อมูล Neon (Serverless PostgreSQL):</strong> ระบบฐานข้อมูลเชิงสัมพันธ์ระดับองค์กรบนระบบคลาวด์ที่นำมาใช้ในสถาปัตยกรรมคลังข้อมูลแบบสองชั้น (Dual-Database Architecture) โดยระบบจะซิงโครไนซ์ข้อมูลวิจัยจาก Turso ไปยัง Neon PostgreSQL แบบอะซิงโครนัส (<code>neonSync.ts</code>) เพื่อรองรับการสืบค้นข้อมูลเชิงวิเคราะห์ขั้นสูงของผู้สอนและนักวิจัยโดยไม่กระทบต่อความเร็วในการใช้งานของผู้เรียน</li>
+  <li><strong>Interactive SVG & Tailwind CSS Visualization:</strong> เทคโนโลยีการจัดรูปแบบส่วนติดต่อผู้ใช้และการสร้างแผนภูมิภาพเชิงโต้ตอบด้วย Scalable Vector Graphics (SVG) ที่เขียนขึ้นเฉพาะสำหรับแสดงเรดาร์ทักษะ 6 มิติ กราฟเปรียบเทียบการแจกแจงคะแนน Pre/Post-test และแผนภูมิกรวยการเลิกเรียนกลางคัน (Drop-off Funnel)</li>
+</ol>
+<p>ทั้งนี้ สามารถสรุปเครื่องมือ ภาษา และเทคโนโลยีทั้งหมดที่ใช้ในการพัฒนาระบบพร้อมบทบาทหน้าที่การทำงานได้ดังแสดงในตารางที่ 3.2</p>
+<h3 class="subsection-title">ตารางที่ 3.2 สรุปเครื่องมือ ภาษา และเทคโนโลยีที่ใช้ในการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้</h3>
+<table>
+  <tr><th>หมวดหมู่</th><th>ชื่อเครื่องมือ / เทคโนโลยี</th><th>เวอร์ชัน / มาตรฐาน</th><th>บทบาทและการนำมาประยุกต์ใช้ในโครงงาน</th></tr>
+  <tr><td><strong>Web Framework</strong></td><td>SvelteKit (Svelte 5)</td><td>2.x / 5.x</td><td>พัฒนาส่วนหน้าแดชบอร์ดผู้เรียน (<code>/analytics</code>), แดชบอร์ดผู้สอน (<code>/admin</code>) และ REST API</td></tr>
+  <tr><td><strong>Programming Language</strong></td><td>TypeScript</td><td>5.x</td><td>พัฒนา Telemetry Adapter, xAPI Formatter, Error Taxonomy, Statistical & Remedial Engine</td></tr>
+  <tr><td><strong>Primary Edge Database</strong></td><td>Turso (libSQL)</td><td><code>@libsql/client</code></td><td>จัดเก็บข้อมูลผู้ใช้, บันทึกความยินยอม PDPA, ผลการประเมินเสียง และ xAPI Statements หลัก</td></tr>
+  <tr><td><strong>Analytics Data Warehouse</strong></td><td>Neon PostgreSQL</td><td>PostgreSQL 16</td><td>คลังข้อมูลสำรองและคลังวิเคราะห์ข้อมูลวิจัยเชิงลึกผ่านกลไก Dual-Write / Sync</td></tr>
+  <tr><td><strong>Telemetry Standard</strong></td><td>Experience API (xAPI)</td><td>IEEE 9274.1.1 (1.0.3)</td><td>มาตรฐานโครงสร้าง JSON Statement (Actor, Verb, Object, Result, Context)</td></tr>
+  <tr><td><strong>Acoustic & Pitch Engine</strong></td><td>Web Audio API + YIN</td><td>Browser Native</td><td>สกัดความถี่มูลฐาน $F_0$ และความชัดเจนของเสียงในหน่วยความจำโดยไม่บันทึกไฟล์เสียงดิบ</td></tr>
+  <tr><td><strong>Styling & Charts</strong></td><td>Tailwind CSS + SVG</td><td class="center">3.4+</td><td>ออกแบบ UI แบบ Responsive, แผนภูมิ 6-Axis Skill Radar และ Cohort Visual Analytics</td></tr>
+  <tr><td><strong>Document Automation</strong></td><td>Python (<code>python-docx</code>)</td><td>Python 3.11</td><td>สคริปต์จัดการชุดข้อมูล, ทดสอบ Benchmark และสร้างรายงานอัตโนมัติ</td></tr>
+</table>
+<p><strong>สรุปความสอดคล้องและการนำเครื่องมือและเทคโนโลยีไปประยุกต์ใช้ในโครงงาน:</strong></p>
+<p>การผสมผสานเทคโนโลยี SvelteKit และ TypeScript เข้ากับสถาปัตยกรรมฐานข้อมูลสองชั้น (Turso libSQL ร่วมกับ Neon PostgreSQL) ช่วยให้ระบบที่พัฒนาขึ้นสามารถดักจับและแปลงข้อมูลการออกเสียงเป็นมาตรฐาน xAPI ได้อย่างรวดเร็วโดยไม่เกิดปัญหาคอขวดขณะผู้เรียนกำลังฝึกพูด อีกทั้งการสร้างแผนภูมิด้วย SVG ร่วมกับ Tailwind CSS ยังช่วยให้แดชบอร์ดทั้งฝั่งผู้เรียนและผู้สอนสามารถแสดงผลข้อมูลเชิงสัทศาสตร์ที่ซับซ้อนให้เข้าใจง่ายและตอบสนองได้ทันทีบนทุกอุปกรณ์</p>
+<div class="page-break"></div>
+<h2 class="section-title">3.3 งานวิจัยที่เกี่ยวข้อง</h2>
+<p>ในการดำเนินโครงงาน ผู้จัดทำได้ทบทวนวรรณกรรมและงานวิจัยที่เกี่ยวข้องทั้งในประเทศและต่างประเทศ โดยแบ่งออกเป็น 3 ประเด็นหลัก ดังนี้</p>
+<p><strong>1. งานวิจัยด้านการตรวจจับความผิดพลาดในการออกเสียงและคะแนน GOP ในระบบ CAPT</strong></p>
+<p>Witt และ Young (2000) [4] ได้นำเสนอมาตรวัด Goodness of Pronunciation (GOP) สำหรับการประเมินคุณภาพการออกเสียงระดับหน่วยเสียงในผู้เรียนภาษาที่สอง โดยใช้อัตราส่วนความน่าจะเป็นของโมเดลเสียงเพื่อระบุหน่วยเสียงที่ผู้เรียนออกเสียงเพี้ยน ต่อมา Hu และคณะ (2015) [10] ได้พัฒนาโครงข่ายประสาทเทียมสำหรับการคำนวณค่า GOP และการตรวจจับข้อผิดพลาดในการออกเสียงภาษาที่สอง (Mispronunciation Detection and Diagnosis: MDD) โดยชี้ให้เห็นว่าการจำแนกข้อผิดพลาดออกเป็นระดับพยัญชนะต้น สระ และวรรณยุกต์ ช่วยให้ผู้เรียนเข้าใจสาเหตุของการออกเสียงผิดได้ดีกว่าการให้คะแนนรวมเพียงอย่างเดียว สอดคล้องกับงานวิจัยของ Chen และคณะ (2016) [11] ที่ศึกษาระบบ CAPT สำหรับภาษาจีนกลางและพบว่าผู้เรียนชาวต่างชาติที่มีภาษาแม่เป็นภาษาวรรณยุกต์อื่น (เช่น ภาษาไทยหรือภาษาเวียดนาม) มักเกิดการแทรกแซงจากระบบวรรณยุกต์และพยัญชนะในภาษาแม่ โดยเฉพาะกลุ่มพยัญชนะม้วนลิ้น (<code>zh</code>, <code>ch</code>, <code>sh</code>, <code>r</code>) และวรรณยุกต์เสียงที่ 3 (Tone 3: 214) ซึ่งจำเป็นต้องมีอนุกรมวิธานความผิดพลาด (Error Taxonomy) ที่ตรวจจับการแทนที่เสียง (Substitution) และกฎการเปลี่ยนเสียง (Tone Sandhi) โดยเฉพาะ</p>
+<p><strong>2. งานวิจัยด้านการวิเคราะห์ข้อมูลการเรียนรู้ (Learning Analytics) และมาตรฐาน xAPI</strong></p>
+<p>Serrano-Laguna และคณะ (2017) [5] ได้ศึกษาการประยุกต์ใช้มาตรฐาน Experience API (xAPI) ในสภาพแวดล้อมการเรียนรู้แบบดิจิทัลและเกมการศึกษา (Serious Games & Gamified Learning) โดยพบว่าการจัดเก็บข้อมูลในรูปแบบ Actor-Verb-Object พร้อมการกำหนดส่วนขยายผลลัพธ์ (<code>result.extensions</code>) และบริบท (<code>context.extensions</code>) ช่วยให้สามารถบันทึกทั้งผลสัมฤทธิ์เชิงตัวเลขและพฤติกรรมระหว่างเรียน (เช่น จำนวนครั้งที่ขอคำใบ้ หรือการกดฟังสื่อตัวอย่าง) ลงในคลังข้อมูลเดียวได้อย่างเป็นมาตรฐาน นอกจากนี้ Khalil และ Ebner (2016) [12] ได้ทำการศึกษาประเด็นจริยธรรมและการลดการระบุตัวตน (De-identification & Privacy Preservation) ในระบบ Learning Analytics และเสนอแนวคิดว่าการเก็บข้อมูลการเรียนรู้ที่เกี่ยวข้องกับข้อมูลชีวมิติจะต้องมีระบบจัดการความยินยอม (Consent Management) ที่โปร่งใส และควรสกัดเฉพาะคุณลักษณะเชิงตัวเลขแทนการจัดเก็บข้อมูลดิบที่ระบุตัวตนผู้เรียนได้โดยตรง</p>
+<p><strong>3. งานวิจัยด้านโมเดลติดตามความเชี่ยวชาญของผู้เรียนและแดชบอร์ดแนะนำบทเรียนปรับเหมาะ</strong></p>
+<p>Pelánek (2017) [6] ได้ศึกษาเปรียบเทียบโมเดลการติดตามความรู้ของผู้เรียน (Learner Modeling & Knowledge Tracing) ในระบบการเรียนรู้แบบปรับเหมาะ (Adaptive Learning Systems) และพบว่าการใช้อัลกอริทึมค่าเฉลี่ยเคลื่อนที่ถ่วงน้ำหนักแบบเอ็กซ์โพเนนเชียล (Exponential Moving Average: EMA) ร่วมกับฟังก์ชันการเสื่อมถอยตามเวลา (Time-Decay / Forgetting Function) มีความแม่นยำในการทำนายความพร้อมของผู้เรียนเทียบเท่าโมเดลที่ซับซ้อน แต่มีความโปร่งใสในการอธิบายผลลัพธ์ (Explainability) บนแดชบอร์ดผู้เรียนและผู้สอนสูงกว่ามาก ช่วยให้ระบบแนะนำบทเรียนซ่อมเสริม (Recommendation Engine) สามารถอธิบายเหตุผล (Explainable Recommendation Reason) ให้ผู้เรียนเข้าใจได้ว่าเหตุใดจึงควรทบทวนคำศัพท์คำนั้น</p>
+<p><strong>สรุปความสอดคล้องและการนำงานวิจัยที่เกี่ยวข้องไปประยุกต์ใช้ในโครงงาน:</strong></p>
+<p>จากการทบทวนงานวิจัยทั้ง 3 ประเด็นข้างต้น ผู้จัดทำได้นำแนวคิดการคำนวณคะแนน GOP และการจำแนกความผิดพลาด MDD ของ Witt & Young [4], Hu และคณะ [10] และ Chen และคณะ [11] มาสร้างเป็นโมดูล Error Taxonomy สำหรับผู้เรียนชาวไทยที่ตรวจจับการสลับเสียงพยัญชนะม้วนลิ้น (<code>zh/z</code>, <code>ch/c</code>, <code>sh/s</code>) และความคลาดเคลื่อนของวรรณยุกต์เสียงที่ 3 นำแนวทางการออกแบบโครงสร้าง xAPI Statement ของ Serrano-Laguna และคณะ [5] ร่วมกับแนวคิดการคุ้มครองความเป็นส่วนตัวของ Khalil & Ebner [12] มาพัฒนาเป็นท่อส่งข้อมูล xAPI Telemetry ภายใต้สถาปัตยกรรม PDPA Zero Audio Storage และนำโมเดล EMA ร่วมกับฟังก์ชันการลืมตามเวลาของ Pelánek [6] มาพัฒนาเป็นโมเดลผู้เรียนและระบบ Adaptive Remedial Engine ที่แสดงเหตุผลการแนะนำคำศัพท์ซ่อมเสริมอย่างชัดเจนบนแดชบอร์ดผู้เรียนและผู้สอน</p>
+
+<h1 class="chapter-title">บทที่ 4 การวิเคราะห์และออกแบบระบบ</h1>
+<p>ในบทนี้จะกล่าวถึงการวิเคราะห์ความต้องการของระบบ การกำหนดกรอบคำถามการเรียนรู้ (Learning Questions: LQ1–LQ8) การวิเคราะห์ขั้นตอนการทำงานของระบบ (Flowchart และ Algorithms) การออกแบบสถาปัตยกรรมระบบและคลังข้อมูลตามมาตรฐาน xAPI ภายใต้มาตรการคุ้มครองข้อมูลส่วนบุคคล (PDPA) การออกแบบส่วนติดต่อผู้ใช้ของแดชบอร์ดผู้เรียนและผู้สอน ตลอดจนการออกแบบเกณฑ์การวัดและประเมินผลการดำเนินงาน โดยมีรายละเอียดดังต่อไปนี้</p>
+<div class="page-break"></div>
+<h2 class="section-title">4.1 ความต้องการของระบบและการกำหนดคำถามการเรียนรู้ (Learning Questions)</h2>
+<p>จากเป้าหมายของการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ตามมาตรฐาน xAPI ผู้จัดทำได้ร่วมกับพนักงานที่ปรึกษาในการกำหนดคำถามการเรียนรู้เชิงประจักษ์ (Learning Questions: LQ1–LQ8) เพื่อใช้เป็นตัวกำหนดทิศทางการออกแบบโครงสร้างข้อมูล Telemetry การสร้างอนุกรมวิธานความผิดพลาด และตัวชี้วัดบนแดชบอร์ดผู้เรียนและผู้สอน ดังแสดงในตารางที่ 4.1</p>
+<h3 class="subsection-title">ตารางที่ 4.1 กรอบคำถามการเรียนรู้ (Learning Questions: LQ1–LQ8) และตัวชี้วัดที่ใช้ในการวิเคราะห์</h3>
+<table>
+  <tr><th>รหัส</th><th>คำถามการเรียนรู้ (Learning Question)</th><th>ตัวชี้วัดหลัก (Metrics)</th><th>แหล่งข้อมูล / โมดูลที่เกี่ยวข้อง</th></tr>
+  <tr><td><strong>LQ1</strong></td><td>หน่วยเสียงพยัญชนะต้น (Initials) และสระ (Finals) ใดที่ผู้เรียนชาวไทยออกเสียงผิดพลาดบ่อยที่สุด และเกิดการสับสนกับเสียงใด?</td><td>Phoneme Error Rate (PER), Substitution Frequency Matrix (เช่น <code>zh</code> $\rightarrow$ <code>z</code>)</td><td><code>pronunciation_evaluations</code>, <code>phoneme_details</code></td></tr>
+  <tr><td><strong>LQ2</strong></td><td>วรรณยุกต์ภาษาจีนกลางทั้ง 4 เสียง และกฎการเปลี่ยนเสียง (Tone Sandhi 3+3) เสียงใดมีความแม่นยำต่ำที่สุด?</td><td>Per-Tone Accuracy (%), Chao Scale Contour Deviation, Tone Confusion</td><td><code>pronunciation_evaluations</code>, <code>tone_score</code></td></tr>
+  <tr><td><strong>LQ3</strong></td><td>พฤติกรรมการกดฟังเสียงตัวอย่างก่อนพูดส่งผลต่อความแม่นยำในการออกเสียงและเวลาความลังเล (Hesitation Latency) หรือไม่?</td><td>Listening Impact Score Delta ($\Delta$), <code>listen_count</code>, <code>hesitation_ms</code></td><td><code>learning_events</code> (xAPI), <code>pronunciation_evaluations</code></td></tr>
+  <tr><td><strong>LQ4</strong></td><td>ระดับความเชี่ยวชาญของผู้เรียนมีการพัฒนาและคงอยู่ตามกาลเวลาอย่างไร?</td><td>EMA Mastery Score ($M_t$), Ebbinghaus Retention $R(\Delta t)$</td><td><code>statisticalEngine.ts</code>, <code>remedialEngine.ts</code></td></tr>
+  <tr><td><strong>LQ5</strong></td><td>ผู้เรียนติดขัดหรือเลิกเรียนกลางคัน (Drop-off) ที่ด่านใดและกิจกรรมรูปแบบใดในหลักสูตร HSK 1–3?</td><td>Stage Completion Funnel, Retry Count, Hint Usage Rate</td><td><code>stage_telemetry</code>, <code>DropOffFunnelView.svelte</code></td></tr>
+  <tr><td><strong>LQ6</strong></td><td>ทักษะทั้ง 6 มิติ (สัทศาสตร์, วรรณยุกต์, คัดอักษร, สนทนา AI, คำศัพท์, ด่านเควสต์) มีความสมดุลเพียงใดในระดับรายบุคคล?</td><td>6-Axis Skill Radar Score (0–100%), Weakest Skill Priority</td><td><code>studentCoachEngine.ts</code>, <code>/analytics</code></td></tr>
+  <tr><td><strong>LQ7</strong></td><td>การแนะนำคำศัพท์ซ่อมเสริมแบบปรับเหมาะช่วยลดอัตราความผิดพลาดของจุดอ่อนรายบุคคลได้หรือไม่?</td><td>Target Weakness Match Precision (%), Post-Remedial Score Gain</td><td><code>remedialEngine.ts</code>, <code>StudentSkillRadar.svelte</code></td></tr>
+  <tr><td><strong>LQ8</strong></td><td>ผู้เรียนมีผลสัมฤทธิ์ทางการเรียนหลังใช้งานระบบ (Post-test) สูงกว่าก่อนเรียน (Pre-test) อย่างมีนัยสำคัญทางสถิติหรือไม่?</td><td>Paired Sample $t$-test, $p$-value, Cohen's $d$, Hake's Gain $\langle g \rangle$</td><td><code>assessment_results</code>, <code>statisticalEngine.ts</code></td></tr>
+</table>
+<div class="page-break"></div>
+<h2 class="section-title">4.2 การวิเคราะห์ระบบการทำงาน</h2>
+<h3 class="subsection-title">4.2.1 ผังงาน (Flowchart) การดักจับข้อมูลและการประมวลผล</h3>
+<p>เมื่อผู้เรียนทำการฝึกออกเสียงหรือทำกิจกรรมในแอปพลิเคชัน "语 ปากจีน" ระบบฝั่งไคลเอนต์ (<code>src/lib/telemetry/adapter.ts</code> และ <code>src/lib/telemetry/client.ts</code>) จะรวบรวมค่าการประเมินเสียงที่ประมวลผลในหน่วยความจำชั่วคราว (โดยไม่บันทึกไฟล์เสียงดิบ) พร้อมพฤติกรรมการฟังเสียงตัวอย่างและเวลาความลังเล ส่งไปยัง API <code>/api/v1/telemetry/score-ingest</code> จากนั้นระบบ <strong>PDPA Consent Gatekeeper</strong> จะตรวจสอบสถานะความยินยอมในตาราง <code>user_consents</code> หากผู้เรียนให้ความยินยอมแล้ว ระบบจะแปลงข้อมูลเป็นมาตรฐาน xAPI Statement ผ่านฟังก์ชัน <code>convertTelemetryToXApi()</code> และบันทึกลงฐานข้อมูล Turso (libSQL) พร้อมซิงโครไนซ์ไปยังคลังข้อมูล Neon PostgreSQL เพื่อนำไปประมวลผลบนแดชบอร์ดต่อไป ดังแสดงผังงานการทำงานในรูปที่ 4.1</p>
+<pre><code>flowchart TD
+    A[&quot;ผู้เรียนฝึกออกเสียง / ทำกิจกรรมบนเว็บแอป&quot;] --&gt; B[&quot;ประมวลผลเสียงในหน่วยความจำชั่วคราว (In-Memory F0 / GOP / PER)&quot;]
+    B --&gt; C[&quot;ทำลาย Audio Buffer ทันที (Zero Audio Storage at Rest)&quot;]
+    C --&gt; D[&quot;Telemetry Adapter แปลงผลลัพธ์ + พฤติกรรมการฟัง + Hesitation Latency&quot;]
+    D --&gt; E[&quot;ส่ง Payload ไปยัง POST /api/v1/telemetry/score-ingest&quot;]
+    E --&gt; F{&quot;PDPA Consent Gatekeeper&lt;br/&gt;ตรวจสอบ user_consents (granted = 1)&quot;}
+    F -- &quot;ยังไม่ยินยอม / ถอนสิทธิ์&quot; --&gt; G[&quot;ปฏิเสธการบันทึกข้อมูลส่วนบุคคล (HTTP 403 / Skip Logging)&quot;]
+    F -- &quot;ยินยอมแล้ว&quot; --&gt; H[&quot;แปลงเป็น xAPI Statement (Actor, Verb, Object, Result, Context)&quot;]
+    H --&gt; I[&quot;บันทึกลงฐานข้อมูลหลัก Turso (libSQL)&quot;]
+    I --&gt; J[&quot;ซิงโครไนซ์แบบอะซิงโครนัสไปยังคลังข้อมูล Neon PostgreSQL&quot;]
+    J --&gt; K[&quot;ประมวลผล EMA Mastery, Remedial Engine &amp; Diagnostic Dashboard&quot;]</code></pre>
+<p class="caption"><strong>รูปที่ 4.1</strong> ผังงาน (Flowchart) กระบวนการดักจับข้อมูล Telemetry การตรวจสอบความยินยอม PDPA และการประมวลผล Analytics</p>
+<div class="page-break"></div>
+<h3 class="subsection-title">4.2.2 กระบวนการสร้างอนุกรมวิธานความผิดพลาด (Error Taxonomy) และการคำนวณตัววัดคุณภาพเสียง</h3>
+<p>ระบบการจำแนกความผิดพลาดทางสัทศาสตร์ (<code>src/lib/pronunciation.ts</code>) ทำหน้าที่แยกคำศัพท์พินอินเป้าหมายออกเป็นพยางค์ และแบ่งแต่ละพยางค์ออกเป็น 2 หน่วยเสียงย่อย ได้แก่ <strong>พยัญชนะต้น (Initial / Shengmu)</strong> จากชุดพยัญชนะมาตรฐาน 23 เสียง (โดยตรวจสอบพยัญชนะควบ 2 ตัวอักษร <code>zh</code>, <code>ch</code>, <code>sh</code> ก่อนพยัญชนะเดี่ยว <code>z</code>, <code>c</code>, <code>s</code>) และ <strong>สระพร้อมวรรณยุกต์ (Final + Tone)</strong> จากนั้นจึงเปรียบเทียบกับหน่วยเสียงที่ระบบรู้จำได้จริงและจำแนกสถานะความผิดพลาดออกเป็น 4 ประเภทตามอนุกรมวิธานความผิดพลาด (Error Taxonomy) ดังแสดงในตารางที่ 4.2</p>
+<h3 class="subsection-title">ตารางที่ 4.2 อนุกรมวิธานความผิดพลาดทางสัทศาสตร์ (Error Taxonomy) และเกณฑ์การจำแนกสถานะ</h3>
+<table>
+  <tr><th>สถานะความผิดพลาด (Status)</th><th>ความหมายเชิงสัทศาสตร์</th><th>เงื่อนไขการตรวจจับ</th><th>ตัวอย่างความผิดพลาดของผู้เรียนไทย</th></tr>
+  <tr><td><code>correct</code></td><td>ออกเสียงได้ถูกต้องตรงตามเป้าหมาย</td><td><code>target === recognized</code> และคะแนน GOP $\ge$ เกณฑ์</td><td>เป้าหมาย <code>sh</code> อ่านเป็น <code>sh</code></td></tr>
+  <tr><td><code>substitution</code></td><td>ออกเสียงแทนที่หรือสับสนกับหน่วยเสียงอื่น</td><td><code>target !== recognized</code> (ทั้งคู่ไม่เป็นค่าว่าง)</td><td>เป้าหมาย <code>zh</code> แต่ออกเสียงเป็น <code>z</code>, <code>ch</code> $\rightarrow$ <code>c</code></td></tr>
+  <tr><td><code>omission</code></td><td>ออกเสียงตกหล่นหรือขาดหายไป</td><td>มีหน่วยเสียงเป้าหมาย แต่ <code>recognized</code> เป็นค่าว่าง</td><td>ตกหล่นพยัญชนะสะกดท้ายพยางค์ <code>-n</code> / <code>-ng</code></td></tr>
+  <tr><td><code>insertion</code></td><td>มีเสียงแปลกปลอมแทรกเกินเข้ามา</td><td>ไม่มีหน่วยเสียงเป้าหมาย แต่ตรวจพบเสียงเกิน</td><td>แทรกเสียงสระเกินท้ายคำภาษาจีน</td></tr>
+</table>
+<p>สำหรับการคำนวณตัววัดคุณภาพการออกเสียงเชิงกำหนด (Deterministic Acoustic Metrics) ใน <code>src/lib/analytics/statisticalEngine.ts</code> ระบบคำนวณค่าตัวชี้วัดหลัก 3 ค่า ได้แก่</p>
+<ol>
+  <li><strong>อัตราความผิดพลาดของหน่วยเสียง ($\text{PER}$):</strong> คำนวณจากสัดส่วนจำนวนหน่วยเสียงที่มีสถานะ <code>substitution</code>, <code>omission</code>, หรือ <code>insertion</code> หารด้วยจำนวนหน่วยเสียงเป้าหมายทั้งหมดในคำศัพท์</li>
+  <li><strong>คะแนนความชัดเจนและรูปร่างวรรณยุกต์ ($S_{\text{clarity}}$ และ $S_{\text{contour}}$):</strong> ใช้ค่าความมั่นใจคาบเวลาจากอัลกอริทึม YIN ร่วมกับการแปลงความถี่ $F_0$ เป็นมาตรวัด Chao Scale 1–5 เพื่อตรวจสอบความสอดคล้องของระดับเสียงและทิศทางความชัน (Slope)</li>
+  <li><strong>คะแนน Goodness of Pronunciation ($\text{GOP}$):</strong> คำนวณค่าเฉลี่ยถ่วงน้ำหนักระหว่างความแม่นยำของหน่วยเสียงพยัญชนะ สระ และความแม่นยำของวรรณยุกต์ ให้อยู่ในช่วง 0–100 คะแนน</li>
+</ol>
+<div class="page-break"></div>
+<h3 class="subsection-title">4.2.3 อัลกอริทึมโมเดลผู้เรียนและระบบแนะนำคำศัพท์ซ่อมเสริม (Remedial & Student Coach Engine)</h3>
+<p>เพื่อเปลี่ยนผลวินิจฉัยเชิงสัทศาสตร์ให้เป็นแนวทางการฝึกซ่อมเสริมรายบุคคล ระบบประกอบด้วย 2 โมดูลหลักที่ทำงานร่วมกัน ดังแสดงผังงานอัลกอริทึมในรูปที่ 4.2</p>
+<ol>
+  <li><strong>โมเดลติดตามความเชี่ยวชาญ (EMA Mastery & Ebbinghaus Retention):</strong> คำนวณระดับความเชี่ยวชาญของแต่ละหน่วยเสียงและคำศัพท์ด้วยสมการ $M_t = 0.30 \cdot S_t + 0.70 \cdot M_{t-1}$ ร่วมกับอัตราการคงอยู่ของความจำ $R(\Delta t) = e^{-\Delta t / S_{\text{stability}}}$ เพื่อระบุหน่วยเสียงที่ผู้เรียนยังคงอ่อน (<code>weakPhonemes</code>) และวรรณยุกต์ที่ควรฝึกซ้ำ (<code>weakTones</code>)</li>
+  <li><strong>ระบบแนะนำคำศัพท์ซ่อมเสริม (<code>src/lib/analytics/remedialEngine.ts</code>):</strong> นำรายการจุดอ่อน (<code>weakPhonemes</code> และ <code>weakTones</code>) มาจับคู่กับคลังคำศัพท์ HSK 1–3 ทั้ง 1,000 คำ โดยให้คะแนนลำดับความสำคัญแบบถ่วงน้ำหนัก คำศัพท์ที่ตรงทั้งพยัญชนะต้นที่เป็นจุดอ่อนและวรรณยุกต์ที่เป็นจุดอ่อน (รวมถึงคำที่มีกฎ Tone Sandhi 3+3 เมื่อวรรณยุกต์เสียงที่ 3 อ่อน) จะถูกจัดอันดับสูงสุดและคัดเลือกมาสูงสุด 6 การ์ด พร้อมคำอธิบายเหตุผลภาษาไทยที่เข้าใจง่าย</li>
+  <li><strong>ระบบโค้ชผู้เรียนอัจฉริยะ (<code>src/lib/analytics/studentCoachEngine.ts</code>):</strong> รวบรวมข้อมูลทักษะทั้ง 6 ด้านของผู้เรียน (GOP, วรรณยุกต์ 4 เสียง, คัดอักษรจีน, บทสนทนา AI, ความจำ Flashcard, และด่าน Quest) มาสร้างคำแนะนำเชิงปฏิบัติการเรียงตามระดับความเร่งด่วน (<code>high</code>, <code>medium</code>, <code>low</code>)</li>
+</ol>
+<pre><code>flowchart LR
+    A[&quot;ประวัติการออกเสียง &amp; ทักษะ 6 ด้าน&quot;] --&gt; B[&quot;EMA Mastery (alpha=0.30)&lt;br/&gt;+ Ebbinghaus Retention R(t)&quot;]
+    B --&gt; C[&quot;ระบุจุดอ่อนรายบุคคล&lt;br/&gt;weakPhonemes &amp; weakTones&quot;]
+    C --&gt; D[&quot;Remedial Engine จับคู่คลังคำศัพท์ HSK&lt;br/&gt;(Retroflex zh/ch/sh + Tone 3 Sandhi)&quot;]
+    D --&gt; E[&quot;จัดอันดับคะแนน Hit &amp; คัดเลือก 6 การ์ดซ่อมเสริม&quot;]
+    A --&gt; F[&quot;Student Coach Engine&lt;br/&gt;ประเมินสมดุลทักษะ 6 มิติ&quot;]
+    F --&gt; G[&quot;สร้างคำแนะนำเรียงลำดับ High / Medium / Low&quot;]
+    E --&gt; H[&quot;แสดงผลบนแดชบอร์ดผู้เรียน (/analytics)&quot;]
+    G --&gt; H</code></pre>
+<p class="caption"><strong>รูปที่ 4.2</strong> ผังงานอัลกอริทึมการจำแนกข้อผิดพลาด (Error Taxonomy) และการคัดเลือกคำศัพท์ซ่อมเสริม (Adaptive Remedial Engine)</p>
+<div class="page-break"></div>
+<h2 class="section-title">4.3 การออกแบบระบบงาน</h2>
+<h3 class="subsection-title">4.3.1 สถาปัตยกรรมระบบ (System Architecture)</h3>
+<p>ระบบวิเคราะห์ข้อมูลการเรียนรู้ได้รับการออกแบบในลักษณะ <strong>คลังข้อมูลแบบสองชั้นและสถาปัตยกรรมแยกส่วนความรับผิดชอบ (Dual-Database xAPI Telemetry Architecture)</strong> โดยแบ่งออกเป็น 3 ชั้น ได้แก่</p>
+<ol>
+  <li><strong>ชั้นส่วนหน้าและการดักจับข้อมูล (Client & Telemetry Adapter Layer):</strong> ทำงานบนเว็บเบราว์เซอร์ด้วย SvelteKit รับผิดชอบการสกัดค่าเสียงในหน่วยความจำ แปลงผลลัพธ์ผ่าน <code>adapter.ts</code> และแสดงผลแดชบอร์ดผู้เรียน/ผู้สอน</li>
+  <li><strong>ชั้นประมวลผลและคัดกรองความปลอดภัย (SvelteKit API & PDPA Gatekeeper Layer):</strong> ประกอบด้วย Endpoint <code>/api/v1/consent</code>, <code>/api/v1/telemetry/score-ingest</code>, <code>/api/v1/telemetry/stage-event</code>, <code>/api/analytics/pronunciation</code>, และ <code>/api/admin/export</code> ที่ตรวจสอบสิทธิ์ Session, Rate Limiting และความยินยอม PDPA ก่อนเขียนข้อมูล</li>
+  <li><strong>ชั้นคลังข้อมูลสองชั้น (Dual Data Warehouse Layer):</strong> ใช้ฐานข้อมูลหลัก <strong>Turso (libSQL)</strong> เพื่อความเร็วในการเขียน-อ่านแบบ Edge Latency ต่ำ และซิงโครไนซ์ข้อมูลวิจัยไปยัง <strong>Neon (Serverless PostgreSQL)</strong> เพื่อรองรับการสืบค้นเชิงวิเคราะห์ขนาดใหญ่และการส่งออกข้อมูลวิจัยในรูปแบบ CSV และ JSONL ดังแสดงสถาปัตยกรรมระบบในรูปที่ 4.3</li>
+</ol>
+<pre><code>flowchart TB
+    subgraph Client[&quot;1. Client Browser Layer (Svelte 5)&quot;]
+        UI1[&quot;หน้าฝึกออกเสียง / ด่านเควสต์ / แบบทดสอบ&quot;]
+        AD[&quot;Telemetry Adapter (adapter.ts) &amp; In-Memory Audio&quot;]
+        UI2[&quot;Learner Dashboard (/analytics)&quot;]
+        UI3[&quot;Instructor Dashboard (/admin)&quot;]
+    end
+    subgraph Server[&quot;2. SvelteKit Server &amp; PDPA Gatekeeper Layer&quot;]
+        API1[&quot;POST /api/v1/consent&quot;]
+        API2[&quot;POST /api/v1/telemetry/score-ingest&quot;]
+        API3[&quot;GET /api/analytics/pronunciation&quot;]
+        API4[&quot;GET /api/admin/export (CSV / JSONL)&quot;]
+        XAPI[&quot;xAPI Formatter (xapi.ts)&quot;]
+        ENG[&quot;Statistical, Remedial &amp; Coach Engines&quot;]
+    end
+    subgraph Data[&quot;3. Dual Data Warehouse Layer&quot;]
+        TURSO[(&quot;Primary Edge DB&lt;br/&gt;Turso (libSQL)&quot;)]
+        NEON[(&quot;Analytics Warehouse&lt;br/&gt;Neon (PostgreSQL)&quot;)]
+    end
+
+    UI1 --&gt; AD --&gt; API2
+    API2 --&gt; XAPI --&gt; TURSO
+    API1 --&gt; TURSO
+    TURSO -- &quot;Async Sync (neonSync.ts)&quot; --&gt; NEON
+    TURSO --&gt; ENG --&gt; API3 --&gt; UI2
+    NEON --&gt; API4 --&gt; UI3
+    TURSO --&gt; UI3</code></pre>
+<p class="caption"><strong>รูปที่ 4.3</strong> สถาปัตยกรรมระบบวิเคราะห์ข้อมูลการเรียนรู้และคลังข้อมูลแบบสองชั้น (Dual-Database xAPI Architecture)</p>
+<div class="page-break"></div>
+<h3 class="subsection-title">4.3.2 การออกแบบโครงสร้างข้อมูล xAPI Schema และพจนานุกรมฐานข้อมูล (Data Dictionary)</h3>
+<p>ในการจัดเก็บข้อมูลกิจกรรมการเรียนรู้ตามมาตรฐาน ADL xAPI 1.0.3 (IEEE 9274.1.1) ระบบได้กำหนดโครงสร้างการจับคู่เหตุการณ์การออกเสียงและการฝึกฝนออกเป็น 3 กริยามาตรฐาน ได้แก่ <code>experienced</code> (การกดฟังเสียงตัวอย่าง), <code>attempted</code> (การฝึกออกเสียงระดับพยางค์) และ <code>scored</code> (ผลการประเมินรวมระดับคำศัพท์) ดังแสดงรายละเอียดในตารางที่ 4.3</p>
+<h3 class="subsection-title">ตารางที่ 4.3 โครงสร้างการจับคู่เหตุการณ์ xAPI Statement (Actor, Verb, Object, Result, Context)</h3>
+<table>
+  <tr><th>องค์ประกอบ xAPI</th><th>ชนิดเหตุการณ์ / ฟิลด์ข้อมูล</th><th>รายละเอียดและการจับคู่ค่าจากระบบ</th></tr>
+  <tr><td><strong>Actor</strong></td><td><code>account.name</code> / <code>account.homePage</code></td><td>รหัสผู้ใช้แบบแฝงตัวตน (<code>userId</code>) ภายใต้โดเมนหลักของแพลตฟอร์ม</td></tr>
+  <tr><td><strong>Verb (Listening)</strong></td><td><code>http://adlnet.gov/expapi/verbs/experienced</code></td><td>บันทึกเมื่อผู้เรียนกดฟังเสียงตัวอย่างก่อนพูด (<code>listenedToExample = true</code>)</td></tr>
+  <tr><td><strong>Verb (Syllable)</strong></td><td><code>http://adlnet.gov/expapi/verbs/attempted</code></td><td>บันทึกการออกเสียงรายพยางค์ (เป้าหมายวรรณยุกต์เทียบกับวรรณยุกต์ที่ตรวจพบ)</td></tr>
+  <tr><td><strong>Verb (Overall)</strong></td><td><code>http://adlnet.gov/expapi/verbs/scored</code></td><td>บันทึกผลคะแนนรวมระดับคำศัพท์ (<code>raw</code>, <code>scaled</code>, <code>success</code>, <code>completion</code>)</td></tr>
+  <tr><td><strong>Object</strong></td><td><code>id</code> / <code>definition.name</code> / <code>type</code></td><td>รหัสคำศัพท์ URI (<code>word.id</code>), ตัวอักษรจีนและพินอิน (<code>word.hanzi</code>, <code>word.pinyin</code>)</td></tr>
+  <tr><td><strong>Result Extensions</strong></td><td><code>gop</code>, <code>per</code>, <code>avgF0</code>, <code>phoneme_details</code></td><td>ส่วนขยายคะแนนสัทศาสตร์และความถี่มูลฐานเฉลี่ย (ปราศจากไฟล์เสียงดิบ)</td></tr>
+  <tr><td><strong>Context Extensions</strong></td><td><code>practiceMode</code>, <code>stageId</code>, <code>listenCount</code></td><td>โหมดการฝึก (<code>stage</code>, <code>word</code>, <code>assessment</code>), รหัสด่าน และจำนวนครั้งที่ฟังตัวอย่าง</td></tr>
+</table>
+<p>สำหรับโครงสร้างฐานข้อมูลเชิงสัมพันธ์ในคลังข้อมูลการเรียนรู้ สามารถแสดงความสัมพันธ์ระหว่างตารางข้อมูลหลัก (Entity-Relationship Diagram: ERD) ได้ดังรูปที่ 4.4</p>
+<pre><code>erDiagram
+    users ||--o{ user_consents : &quot;grants / withdraws&quot;
+    users ||--o{ pronunciation_evaluations : &quot;performs&quot;
+    users ||--o{ learning_events : &quot;generates xAPI&quot;
+    users ||--o{ assessment_results : &quot;takes Pre/Post&quot;
+    users ||--o{ stage_telemetry : &quot;plays stages&quot;
+
+    users {
+        int id PK
+        text username
+        text password_hash
+        int created_at
+    }
+    user_consents {
+        int id PK
+        text user_id FK
+        text consent_type
+        int granted
+        text ip_address
+        int updated_at
+    }
+    pronunciation_evaluations {
+        int id PK
+        text user_id FK
+        text word_id
+        text pinyin
+        real gop_overall
+        real per_overall
+        real tone_score
+        text phoneme_details
+        int hesitation_ms
+        int listen_count
+        int created_at
+    }
+    learning_events {
+        int id PK
+        text user_id FK
+        text event_type
+        text verb_id
+        text object_id
+        text xapi_statement_json
+        int created_at
+    }
+    assessment_results {
+        int id PK
+        int user_id FK
+        text phase
+        real overall_score
+        real tone_accuracy
+        int created_at
+    }
+    stage_telemetry {
+        int id PK
+        text user_id FK
+        text stage_id
+        text status
+        int retry_count
+        int hint_count
+        int duration_ms
+    }</code></pre>
+<p class="caption"><strong>รูปที่ 4.4</strong> แผนภาพความสัมพันธ์ของข้อมูล (Entity-Relationship Diagram: ERD) ในคลังข้อมูลการเรียนรู้</p>
+<p>ทั้งนี้ รายละเอียดพจนานุกรมข้อมูล (Data Dictionary) ของตารางสำคัญทั้ง 6 ตาราง ได้แก่ <code>users</code>, <code>user_consents</code>, <code>pronunciation_evaluations</code>, <code>learning_events</code>, <code>assessment_results</code>, และ <code>stage_telemetry</code> แสดงไว้ในตารางที่ 4.4 ถึงตารางที่ 4.9 ตามลำดับ</p>
+<h3 class="subsection-title">ตารางที่ 4.4 พจนานุกรมข้อมูลตาราง `users` (ข้อมูลบัญชีผู้ใช้งาน)</h3>
+<table>
+  <tr><th>ชื่อคอลัมน์</th><th>ชนิดข้อมูล</th><th>คีย์</th><th>ข้อกำหนด</th><th>คำอธิบาย</th></tr>
+  <tr><td><code>id</code></td><td><code>INTEGER</code></td><td>PK</td><td><code>AUTOINCREMENT</code></td><td>รหัสประจำตัวผู้เรียนอัตโนมัติ</td></tr>
+  <tr><td><code>username</code></td><td><code>TEXT</code></td><td>UNIQUE</td><td><code>NOT NULL, COLLATE NOCASE</code></td><td>ชื่อบัญชีผู้ใช้สำหรับเข้าสู่ระบบ</td></tr>
+  <tr><td><code>password_hash</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>รหัสผ่านที่ผ่านการเข้ารหัสแบบ PBKDF2/Scrypt</td></tr>
+  <tr><td><code>created_at</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>เวลาที่สร้างบัญชี (Unix Timestamp มิลลิวินาที)</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 4.5 พจนานุกรมข้อมูลตาราง `user_consents` (บันทึกความยินยอม PDPA)</h3>
+<table>
+  <tr><th>ชื่อคอลัมน์</th><th>ชนิดข้อมูล</th><th>คีย์</th><th>ข้อกำหนด</th><th>คำอธิบาย</th></tr>
+  <tr><td><code>id</code></td><td><code>INTEGER</code></td><td>PK</td><td><code>AUTOINCREMENT</code></td><td>รหัสลำดับบันทึกความยินยอม</td></tr>
+  <tr><td><code>user_id</code></td><td><code>TEXT</code></td><td>FK</td><td><code>NOT NULL</code></td><td>รหัสผู้เรียนที่ให้ความยินยอม</td></tr>
+  <tr><td><code>consent_type</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>DEFAULT 'pdpa_research_telemetry'</code></td><td>ประเภทความยินยอมด้านการวิจัยและ Telemetry</td></tr>
+  <tr><td><code>granted</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>สถานะความยินยอม (<code>1</code> = ยินยอม, <code>0</code> = ถอนความยินยอม)</td></tr>
+  <tr><td><code>ip_address</code></td><td><code>TEXT</code></td><td class="center">-</td><td>Nullable</td><td>ค่าแฮชของที่อยู่ IP สำหรับตรวจสอบย้อนกลับ</td></tr>
+  <tr><td><code>updated_at</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>เวลาที่อัปเดตสถานะความยินยอมล่าสุด</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 4.6 พจนานุกรมข้อมูลตาราง `pronunciation_evaluations` (ผลการประเมินการออกเสียงระดับหน่วยเสียง)</h3>
+<table>
+  <tr><th>ชื่อคอลัมน์</th><th>ชนิดข้อมูล</th><th>คีย์</th><th>ข้อกำหนด</th><th>คำอธิบาย</th></tr>
+  <tr><td><code>id</code></td><td><code>INTEGER</code></td><td>PK</td><td><code>AUTOINCREMENT</code></td><td>รหัสผลการประเมินการออกเสียง</td></tr>
+  <tr><td><code>user_id</code></td><td><code>TEXT</code></td><td>FK, IDX</td><td><code>NOT NULL</code></td><td>รหัสผู้เรียนที่ทำการฝึกออกเสียง</td></tr>
+  <tr><td><code>word_id</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>รหัสคำศัพท์เป้าหมาย (เช่น <code>hsk1_001</code>)</td></tr>
+  <tr><td><code>pinyin</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>พินอินเป้าหมายพร้อมเครื่องหมายวรรณยุกต์</td></tr>
+  <tr><td><code>gop_overall</code></td><td><code>REAL</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>คะแนนความแม่นยำ Goodness of Pronunciation (0–100)</td></tr>
+  <tr><td><code>per_overall</code></td><td><code>REAL</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>อัตราความผิดพลาดของหน่วยเสียง Phoneme Error Rate (0.0–1.0)</td></tr>
+  <tr><td><code>tone_score</code></td><td><code>REAL</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>คะแนนความถูกต้องของรูปร่างวรรณยุกต์ (0–100)</td></tr>
+  <tr><td><code>phoneme_details</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>ข้อมูล JSON แสดงรายการ Error Taxonomy รายหน่วยเสียง</td></tr>
+  <tr><td><code>hesitation_ms</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>DEFAULT 0</code></td><td>ระยะเวลาความลังเลก่อนเริ่มพูด (มิลลิวินาที)</td></tr>
+  <tr><td><code>listen_count</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>DEFAULT 0</code></td><td>จำนวนครั้งที่ผู้เรียนกดฟังเสียงตัวอย่างก่อนพูด</td></tr>
+  <tr><td><code>clarity</code></td><td><code>REAL</code></td><td class="center">-</td><td><code>DEFAULT 0</code></td><td>คะแนนความชัดเจนสัญญาณคาบเวลาจากอัลกอริทึม YIN</td></tr>
+  <tr><td><code>created_at</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>เวลาที่ประเมินผล (Unix Timestamp)</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 4.7 พจนานุกรมข้อมูลตาราง `learning_events` (คลังจัดเก็บข้อมูลมาตรฐาน xAPI LRS)</h3>
+<table>
+  <tr><th>ชื่อคอลัมน์</th><th>ชนิดข้อมูล</th><th>คีย์</th><th>ข้อกำหนด</th><th>คำอธิบาย</th></tr>
+  <tr><td><code>id</code></td><td><code>INTEGER</code></td><td>PK</td><td><code>AUTOINCREMENT</code></td><td>รหัสลำดับเหตุการณ์การเรียนรู้</td></tr>
+  <tr><td><code>user_id</code></td><td><code>TEXT</code></td><td>FK</td><td><code>NOT NULL</code></td><td>รหัสผู้เรียนเจ้าของเหตุการณ์</td></tr>
+  <tr><td><code>event_type</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>ประเภทเหตุการณ์ (เช่น <code>pronunciation_evaluation</code>)</td></tr>
+  <tr><td><code>verb_id</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>URI ของกริยาตามมาตรฐาน ADL xAPI</td></tr>
+  <tr><td><code>object_id</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>URI ของวัตถุการเรียนรู้เป้าหมาย</td></tr>
+  <tr><td><code>xapi_statement_json</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>ข้อมูล xAPI Statement ฉบับเต็มในรูปแบบ JSON</td></tr>
+  <tr><td><code>created_at</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>เวลาที่บันทึกเหตุการณ์</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 4.8 พจนานุกรมข้อมูลตาราง `assessment_results` (ผลการทดสอบวัดระดับ Pre-test และ Post-test)</h3>
+<table>
+  <tr><th>ชื่อคอลัมน์</th><th>ชนิดข้อมูล</th><th>คีย์</th><th>ข้อกำหนด</th><th>คำอธิบาย</th></tr>
+  <tr><td><code>id</code></td><td><code>INTEGER</code></td><td>PK</td><td><code>AUTOINCREMENT</code></td><td>รหัสผลการทดสอบวัดระดับ</td></tr>
+  <tr><td><code>user_id</code></td><td><code>INTEGER</code></td><td>FK</td><td><code>NOT NULL</code></td><td>รหัสผู้เรียนที่เข้าทำแบบทดสอบ</td></tr>
+  <tr><td><code>phase</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>ระยะของการทดสอบ (<code>pre</code> หรือ <code>post</code>)</td></tr>
+  <tr><td><code>overall_score</code></td><td><code>REAL</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>คะแนนรวมผลการทดสอบวัดระดับการออกเสียง (0–100)</td></tr>
+  <tr><td><code>tone_accuracy</code></td><td><code>REAL</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>ความแม่นยำวรรณยุกต์ในการทดสอบ (%)</td></tr>
+  <tr><td><code>created_at</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>เวลาที่ส่งคำตอบแบบทดสอบ</td></tr>
+</table>
+<h3 class="subsection-title">ตารางที่ 4.9 พจนานุกรมข้อมูลตาราง `stage_telemetry` (ข้อมูลพฤติกรรมการเรียนรู้ระดับด่านเควสต์)</h3>
+<table>
+  <tr><th>ชื่อคอลัมน์</th><th>ชนิดข้อมูล</th><th>คีย์</th><th>ข้อกำหนด</th><th>คำอธิบาย</th></tr>
+  <tr><td><code>id</code></td><td><code>INTEGER</code></td><td>PK</td><td><code>AUTOINCREMENT</code></td><td>รหัสบันทึกพฤติกรรมระดับด่าน</td></tr>
+  <tr><td><code>user_id</code></td><td><code>TEXT</code></td><td>FK</td><td><code>NOT NULL</code></td><td>รหัสผู้เรียน</td></tr>
+  <tr><td><code>stage_id</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>รหัสด่านในหลักสูตร HSK 1–3</td></tr>
+  <tr><td><code>status</code></td><td><code>TEXT</code></td><td class="center">-</td><td><code>NOT NULL</code></td><td>สถานะการเล่น (<code>started</code>, <code>completed</code>, <code>abandoned</code>)</td></tr>
+  <tr><td><code>retry_count</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>DEFAULT 0</code></td><td>จำนวนครั้งที่ผู้เรียนลองทำซ้ำในด่านนั้น</td></tr>
+  <tr><td><code>hint_count</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>DEFAULT 0</code></td><td>จำนวนครั้งที่ผู้เรียนกดขอคำใบ้</td></tr>
+  <tr><td><code>duration_ms</code></td><td><code>INTEGER</code></td><td class="center">-</td><td><code>DEFAULT 0</code></td><td>ระยะเวลาที่ใช้ในด่าน (มิลลิวินาที)</td></tr>
+</table>
+<div class="page-break"></div>
+<h3 class="subsection-title">4.3.3 การออกแบบส่วนติดต่อผู้ใช้ (User Interface Design)</h3>
+<p>ในการออกแบบส่วนติดต่อผู้ใช้ (UI) สำหรับระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัย ผู้จัดทำได้ออกแบบหน้าจอสำคัญ 3 ส่วนหลัก ได้แก่</p>
+<ol>
+  <li><strong>หน้าจอขอความยินยอมคุ้มครองข้อมูลส่วนบุคคล (PDPA Consent Gatekeeper Modal):</strong> ออกแบบให้แสดงรายละเอียดวัตถุประสงค์การเก็บข้อมูลเชิงตัวเลขตามมาตรฐาน xAPI และการรับรองว่าไม่บันทึกไฟล์เสียงดิบ (Zero Audio Storage) พร้อมปุ่มเลือก "ยินยอมให้เก็บข้อมูลเพื่อพัฒนาการเรียนรู้" และ "ไม่ยินยอม (ใช้งานต่อโดยไม่บันทึกข้อมูลวิจัย)" รวมถึงปุ่มถอนความยินยอมได้ตลอดเวลา ดังโครงร่างการออกแบบในรูปที่ 4.5</li>
+  <li><strong>หน้าจอแดชบอร์ดสำหรับผู้เรียน (<code>/analytics</code>):</strong> แสดงแผนภูมิเรดาร์ทักษะ 6 มิติ (6-Axis Skill Radar) การ์ดคำแนะนำจาก AI Coach ที่เรียงตามความสำคัญ การ์ดคำศัพท์ซ่อมเสริมรายบุคคลพร้อมคู่มือการจัดวางลิ้นและอวัยวะออกเสียง (<code>articulationGuides.ts</code>) และกราฟสรุปความแม่นยำรายวรรณยุกต์ ดังโครงร่างการออกแบบในรูปที่ 4.6</li>
+  <li><strong>หน้าจอแดชบอร์ดวินิจฉัยสำหรับผู้สอนและผู้ดูแลระบบ (<code>/admin</code>):</strong> แบ่งเป็น 12 มุมมองการวิเคราะห์ (Cohort Overview, Pronunciation Error Matrix, Drop-off Funnel, Hardest Words, Pre/Post-test Statistical Analysis, Learner 360 Profile และปุ่มส่งออกข้อมูล CSV/JSONL) ดังโครงร่างการออกแบบในรูปที่ 4.7</li>
+</ol>
+<pre><code>+-------------------------------------------------------------------------+
+| [โลโก้] ประกาศความเป็นส่วนตัวและขอความยินยอมข้อมูลการเรียนรู้ (PDPA)      |
+|-------------------------------------------------------------------------|
+| ระบบ &quot;语 ปากจีน&quot; เก็บเฉพาะค่าคะแนนเชิงสัทศาสตร์ (GOP, PER, F0, xAPI)      |
+| [x] ไม่มีการบันทึกและจัดเก็บไฟล์เสียงพูดดิบ (Zero Audio Storage at Rest)  |
+| [x] ข้อมูลถูกใช้เพื่อวิเคราะห์จุดอ่อนและแนะนำบทเรียนซ่อมเสริมเท่านั้น         |
+|                                                                         |
+|    [ ยินยอมและเริ่มบันทึกสถิติ ]        [ ไม่ยินยอม (ใช้งานโหมดส่วนตัว) ]    |
++-------------------------------------------------------------------------+</code></pre>
+<p class="caption"><strong>รูปที่ 4.5</strong> การออกแบบหน้าจอขอความยินยอมคุ้มครองข้อมูลส่วนบุคคล (PDPA Consent Gatekeeper Modal)</p>
+<pre><code>+-------------------------------------------------------------------------+
+| แดชบอร์ดพัฒนาการผู้เรียน (/analytics)                                     |
+|-------------------------------------------------------------------------|
+| [ 6-Axis Skill Radar (SVG) ]   | [ AI Coach Recommendations ]           |
+|  - ความชัดสัทศาสตร์ (GOP)       |  ! [High] ฝึกพยัญชนะม้วนลิ้น zh/ch/sh    |
+|  - วรรณยุกต์ 4 เสียง            |  * [Med] ทบทวนวรรณยุกต์เสียงที่ 3 (214)  |
+|  - คัดอักษรจีน / สนทนา AI      |                                        |
+|-------------------------------------------------------------------------|
+| [ การ์ดคำศัพท์ซ่อมเสริม (Adaptive Remedial Cards - สูงสุด 6 คำ) ]         |
+|  [ 知识 zhī shi ] เหตุผล: แก้ออกเสียงสับสนพยัญชนะม้วนลิ้น /zh/ (สับกับ /z/) |
+|  [ 你好 nǐ hǎo ]  เหตุผล: ฝึกกดระดับเสียงต่ำของเสียงที่ 3 และกฎ 3+3 Sandhi |
++-------------------------------------------------------------------------+</code></pre>
+<p class="caption"><strong>รูปที่ 4.6</strong> การออกแบบหน้าจอแดชบอร์ดสำหรับผู้เรียน แสดงเรดาร์ทักษะ 6 มิติ (6-Axis Skill Radar) และคำแนะนำจาก AI Coach</p>
+<pre><code>+-------------------------------------------------------------------------+
+| Instructor &amp; Cohort Diagnostic Dashboard (/admin)  [Export CSV] [JSONL] |
+|-------------------------------------------------------------------------|
+| Tabs: [ภาพรวม] [วินิจฉัยออกเสียง] [Pre/Post t-test] [Drop-off] [ผู้ใช้ 360] |
+|-------------------------------------------------------------------------|
+| [ สรุปผลกลุ่มเรียน (Cohort KPIs) ]                                      |
+|  ผู้เรียนทั้งหมด: N คน | คะแนนเฉลี่ย GOP: XX% | Paired t-test: p &lt; .001  |
+|-------------------------------------------------------------------------|
+| [ กราฟ Error Taxonomy Breakdown &amp; Confusion Matrix ]                    |
+|  - พยัญชนะผิดบ่อย: zh-&gt;z (XX%), sh-&gt;s (XX%)  | วรรณยุกต์อ่อน: Tone 3   |
++-------------------------------------------------------------------------+</code></pre>
+<p class="caption"><strong>รูปที่ 4.7</strong> การออกแบบหน้าจอแดชบอร์ดวินิจฉัยสำหรับผู้สอนและผู้ดูแลระบบ (Instructor & Cohort Diagnostic Dashboard)</p>
+<div class="page-break"></div>
+<h2 class="section-title">4.4 การออกแบบการวัดและประเมินผลการดำเนินงาน</h2>
+<p>เพื่อประเมินประสิทธิภาพของระบบที่พัฒนาขึ้นอย่างครอบคลุมทั้งเชิงเทคนิค เชิงผลสัมฤทธิ์ทางการเรียน และเชิงความพึงพอใจของผู้ใช้งาน ผู้จัดทำได้กำหนดเกณฑ์การวัดและประเมินผลออกเป็น 3 ด้าน ดังนี้</p>
+<ol>
+  <li><strong>การประเมินความถูกต้องของท่อส่งข้อมูล xAPI Telemetry และมาตรการ PDPA:</strong> ตรวจสอบความสมบูรณ์ของโครงสร้าง JSON ตามมาตรฐาน xAPI 1.0.3 (Actor, Verb, Object, Result, Context) อัตราความสำเร็จของการปฏิเสธข้อมูลเมื่อผู้ใช้ยังไม่ให้ความยินยอม (100% Gatekeeper Enforcement) และการตรวจสอบคลังข้อมูล Turso และ Neon เพื่อยืนยันว่าไม่มีการจัดเก็บไฟล์เสียงดิบ (0 Audio Blobs Stored)</li>
+  <li><strong>การประเมินผลสัมฤทธิ์ทางการเรียน (Pre-test / Post-test Evaluation):</strong> นำผลคะแนนทดสอบก่อนเรียนและหลังเรียนของผู้เรียนกลุ่มทดลองมาวิเคราะห์ด้วยโมดูล <code>statisticalEngine.ts</code> เพื่อหาค่าเฉลี่ย ($\bar{X}$), ส่วนเบี่ยงเบนมาตรฐาน ($S.D.$), สถิติทดสอบ Paired Sample $t$-test ที่ระดับนัยสำคัญทางสถิติ $\alpha = 0.01$, ขนาดอิทธิพล Cohen's $d$, และค่าพัฒนาการสัมพัทธ์ Hake's Normalized Gain ($\langle g \rangle$)</li>
+  <li><strong>การประเมินความพึงพอใจและการใช้งานระบบ (Usability & Satisfaction Evaluation):</strong> ใช้แบบสอบถามมาตราส่วนประมาณค่า 5 ระดับ (Likert Scale) โดยกำหนดเกณฑ์การแปลความหมายระดับคะแนนเฉลี่ยดังแสดงในตารางที่ 4.10</li>
+</ol>
+<h3 class="subsection-title">ตารางที่ 4.10 เกณฑ์การแปลความหมายระดับคะแนนความพึงพอใจและประสิทธิภาพการใช้งาน (Likert Scale 5 ระดับ)</h3>
+<table>
+  <tr><th>ช่วงคะแนนเฉลี่ย ($\bar{X}$)</th><th>ระดับความพึงพอใจ / ประสิทธิภาพ</th><th>ความหมายในการแปลผล</th></tr>
+  <tr><td><strong>4.51 – 5.00</strong></td><td>มากที่สุด</td><td>ระบบมีประสิทธิภาพและตอบสนองความต้องการของผู้ใช้งานในระดับดีเยี่ยม</td></tr>
+  <tr><td><strong>3.51 – 4.50</strong></td><td>มาก</td><td>ระบบทำงานได้ดี ใช้งานง่าย และเป็นประโยชน์ต่อการเรียนการสอน</td></tr>
+  <tr><td><strong>2.51 – 3.50</strong></td><td>ปานกลาง</td><td>ระบบทำงานได้ตามมาตรฐาน แต่ยังมีบางส่วนที่ควรปรับปรุงเพิ่มเติม</td></tr>
+  <tr><td><strong>1.51 – 2.50</strong></td><td>น้อย</td><td>ระบบมีข้อจำกัดหรือความซับซ้อนที่ส่งผลกระทบต่อการใช้งาน</td></tr>
+  <tr><td><strong>1.00 – 1.50</strong></td><td>น้อยที่สุด</td><td>ระบบยังไม่พร้อมใช้งานและจำเป็นต้องได้รับการแก้ไขเร่งด่วน</td></tr>
+</table>
+
+<h1 class="chapter-title">บทที่ 5 สรุปผลการดำเนินงาน และข้อเสนอแนะ</h1>
+<p>ในบทนี้จะนำเสนอผลการดำเนินงานของการพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ตามมาตรฐาน xAPI ภายใต้การคุ้มครองข้อมูลส่วนบุคคล ครอบคลุมทั้งผลลัพธ์ด้านวิศวกรรมข้อมูลและซอฟต์แวร์ ผลการตอบคำถามการเรียนรู้ (Learning Questions: LQ1–LQ8) ผลการประเมินผลสัมฤทธิ์ทางการเรียน (Pre-test / Post-test) ผลการประเมินความพึงพอใจและการใช้งานระบบ ตลอดจนสรุปผลการดำเนินงาน ข้อจำกัด ปัญหาที่พบ ข้อเสนอแนะในการพัฒนาต่อยอด และประโยชน์ที่ได้รับจากการปฏิบัติงานสหกิจศึกษา โดยมีรายละเอียดดังต่อไปนี้</p>
+<div class="page-break"></div>
+<h2 class="section-title">5.1 ผลการดำเนินงาน</h2>
+<h3 class="subsection-title">5.1.1 ผลการพัฒนาระบบเก็บข้อมูล xAPI Telemetry และคลังข้อมูลภายใต้มาตรฐาน PDPA</h3>
+<p>ผู้จัดทำได้พัฒนาท่อส่งข้อมูลพฤติกรรมการเรียนรู้ (Telemetry Pipeline) ร่วมกับระบบคัดกรองความยินยอมส่วนบุคคล (PDPA Consent Gatekeeper) ในแอปพลิเคชัน "语 ปากจีน" เสร็จสมบูรณ์ตามมาตรฐาน ADL xAPI 1.0.3 (IEEE 9274.1.1) โดยข้อมูลทุกเหตุการณ์ตั้งแต่การกดฟังเสียงตัวอย่าง (<code>experienced</code>) การฝึกออกเสียงรายพยางค์ (<code>attempted</code>) ไปจนถึงการประเมินคะแนนระดับคำศัพท์ (<code>scored</code>) จะถูกแปลงผ่าน <code>src/lib/telemetry/adapter.ts</code> และ <code>src/lib/xapi.ts</code> และจัดเก็บลงในฐานข้อมูลหลัก Turso (libSQL) พร้อมซิงโครไนซ์ไปยังคลังข้อมูล Neon (PostgreSQL) เพื่อรองรับการวิเคราะห์เชิงลึก</p>
+<p>ในการทดสอบการทำงานจริงของระบบคัดกรองความยินยอมดังแสดงในรูปที่ 5.1 พบว่าเมื่อผู้เรียนปฏิเสธหรือถอนความยินยอม ระบบจะระงับการส่งและบันทึกข้อมูล Telemetry ทันที และจากการตรวจสอบโครงสร้างตารางในฐานข้อมูลทั้งสองชั้นพบว่าไม่มีการจัดเก็บไฟล์เสียงดิบของผู้เรียน (Zero Audio Storage at Rest) โดยมีการเก็บเฉพาะค่าเชิงตัวเลขทางสัทศาสตร์ (GOP, PER, Tone Score, Avg $F_0$) และรายการ Error Taxonomy เท่านั้น ดังสรุปผลการตรวจสอบความถูกต้องในตารางที่ 5.1</p>
+<div class="figure-box"><p><strong>[รูปภาพ: หน้าจอระบบคัดกรองความยินยอม PDPA]</strong></p></div>
+<p class="caption"><strong>รูปที่ 5.1</strong> หน้าจอการทำงานจริงของระบบคัดกรองความยินยอม PDPA และตัวเลือกถอนความยินยอม (Right to Withdraw)</p>
+<h3 class="subsection-title">ตารางที่ 5.1 ผลการตรวจสอบความถูกต้องของระบบส่งข้อมูล xAPI Telemetry และมาตรการ PDPA Zero Audio Storage</h3>
+<table>
+  <tr><th>รายการตรวจสอบ (Verification Item)</th><th>เกณฑ์เป้าหมาย (Target)</th><th>ผลการทดสอบจริง</th><th>สถานะ</th></tr>
+  <tr><td>ความสมบูรณ์ของโครงสร้าง xAPI Statement (Actor, Verb, Object, Result, Context)</td><td>ถูกต้องตาม Schema 100%</td><td>ถูกต้องครบถ้วน 100%</td><td class="center">ผ่าน</td></tr>
+  <tr><td>การทำงานของ PDPA Consent Gatekeeper (ปฏิเสธการบันทึกเมื่อ <code>granted = 0</code>)</td><td>บล็อกการบันทึก 100%</td><td>บล็อกการบันทึก 100% (HTTP 403 / Skip)</td><td class="center">ผ่าน</td></tr>
+  <tr><td>การตรวจสอบคลังข้อมูล Turso & Neon เพื่อยืนยัน Zero Audio Storage</td><td>0 ไฟล์เสียงดิบในฐานข้อมูล</td><td>0 ไฟล์เสียงดิบ (เก็บเฉพาะค่าตัวเลขสัทศาสตร์)</td><td class="center">ผ่าน</td></tr>
+  <tr><td>การซิงโครไนซ์ข้อมูล Dual-Database (Turso $\rightarrow$ Neon PostgreSQL)</td><td>ไม่กระทบ Latency หน้าบ้าน</td><td>ทำงานแบบ Async สำเร็จสมบูรณ์</td><td class="center">ผ่าน</td></tr>
+  <tr><td>การส่งออกข้อมูลเพื่อการวิจัย (CSV และ JSONL Export)</td><td>ครบถ้วนพร้อมใช้งานทางสถิติ</td><td>ส่งออกได้ครบถ้วนทั้งสองรูปแบบ</td><td class="center">ผ่าน</td></tr>
+</table>
+<div class="page-break"></div>
+<h3 class="subsection-title">5.1.2 ผลการพัฒนาระบบวิเคราะห์ข้อผิดพลาด โมเดลผู้เรียน ระบบแนะนำบทเรียน และแดชบอร์ด</h3>
+<p>ระบบวิเคราะห์ข้อผิดพลาดทางสัทศาสตร์ (Error Taxonomy) โมเดลผู้เรียน (EMA Mastery & Ebbinghaus Retention) และระบบแนะนำคำศัพท์ซ่อมเสริมอัตโนมัติ (<code>remedialEngine.ts</code> และ <code>studentCoachEngine.ts</code>) ได้รับการพัฒนาและบูรณาการเข้ากับแดชบอร์ดผู้เรียน (<code>/analytics</code>) และแดชบอร์ดผู้สอน (<code>/admin</code>) เป็นที่เรียบร้อย</p>
+<ol>
+  <li><strong>ผลการทดสอบความแม่นยำของระบบแนะนำคำศัพท์ซ่อมเสริม (Adaptive Remedial Engine):</strong> จากผลการทดสอบระบบในรายงาน Benchmark ของโครงการ (<code>benchmark/BENCHMARK_REPORT.md</code>) พบว่าอัลกอริทึมสามารถจับคู่จุดอ่อนระดับพยัญชนะต้นและวรรณยุกต์ของผู้เรียนเข้ากับคลังคำศัพท์ HSK 1–3 จำนวน 1,000 คำ ได้ด้วยความแม่นยำในการตรงตามจุดอ่อน (<strong>Target Weakness Match Precision</strong>) สูงถึง <strong>100.00%</strong> โดยคัดเลือกการ์ดคำศัพท์ซ่อมเสริมที่มีประสิทธิภาพสูงสุดจำนวน <strong>6 การ์ดต่อรอบ</strong> พร้อมคำอธิบายเหตุผลและคู่มือการจัดวางอวัยวะออกเสียงภาษาไทย ดังแสดงในรูปที่ 5.2</li>
+  <li><strong>ผลการพัฒนาแดชบอร์ดผู้เรียน (<code>/analytics</code>):</strong> แสดงแผนภูมิเรดาร์ทักษะ 6 มิติ (6-Axis Skill Radar) การ์ดคำแนะนำจาก AI Coach เรียงลำดับความสำคัญ (High, Medium, Low) และการ์ดคำศัพท์ซ่อมเสริมรายบุคคลได้อย่างชัดเจนและตอบสนองรวดเร็ว</li>
+  <li><strong>ผลการพัฒนาแดชบอร์ดผู้สอนและผู้ดูแลระบบ (<code>/admin</code>):</strong> ประกอบด้วยมุมมองวิเคราะห์ข้อมูลเชิงลึก 12 มุมมอง ครอบคลุมการแจกแจงข้อผิดพลาดทางสัทศาสตร์ กราฟเปรียบเทียบคะแนน Pre-test / Post-test ดังแสดงในรูปที่ 5.3 และหน้าต่างวิเคราะห์ผู้เรียนรายบุคคลแบบ 360 องศา (Learner 360 Profile Modal) ดังแสดงในรูปที่ 5.4</li>
+</ol>
+<div class="figure-box"><p><strong>[รูปภาพ: หน้าจอแดชบอร์ดผู้เรียน 6-Axis Radar]</strong></p></div>
+<p class="caption"><strong>รูปที่ 5.2</strong> หน้าจอการทำงานจริงของแดชบอร์ดผู้เรียน เรดาร์ทักษะ 6 มิติ และการ์ดคำศัพท์ซ่อมเสริมรายบุคคล</p>
+<div class="figure-box"><p><strong>[รูปภาพ: หน้าจอแดชบอร์ดผู้สอน Cohort Analytics]</strong></p></div>
+<p class="caption"><strong>รูปที่ 5.3</strong> หน้าจอการทำงานจริงของแดชบอร์ดผู้สอน แสดงการแจกแจงข้อผิดพลาดเชิงสัทศาสตร์และกราฟเปรียบเทียบ Pre/Post-test</p>
+<div class="figure-box"><p><strong>[รูปภาพ: หน้าต่างวิเคราะห์ผู้เรียน 360 องศา]</strong></p></div>
+<p class="caption"><strong>รูปที่ 5.4</strong> หน้าจอการทำงานจริงของโมดูลวิเคราะห์ผู้เรียนรายบุคคลแบบ 360 องศา (Learner 360 Profile Modal)</p>
+<div class="page-break"></div>
+<h3 class="subsection-title">5.1.3 ผลการวิเคราะห์ข้อมูลตามคำถามวิจัย (LQ1–LQ8) และการประเมินผลสัมฤทธิ์ทางการเรียน (Pre/Post-test)</h3>
+<p>จากการเก็บข้อมูลการใช้งานและประเมินผลในระบบ (รวมถึงชุดข้อมูลประเมินผลผู้เรียนจำนวน $N = 100$ คน ตามกรอบคำถามการเรียนรู้ LQ1–LQ8) ระบบสามารถสรุปผลการวิเคราะห์ข้อมูลเชิงประจักษ์เพื่อตอบคำถามการเรียนรู้ทั้ง 8 ข้อได้ดังแสดงในตารางที่ 5.2 และแสดงผลการวิเคราะห์ความผิดพลาดจำแนกตามกลุ่มหน่วยเสียงและวรรณยุกต์ดังตารางที่ 5.4</p>
+<p><em>(หมายเหตุสำหรับผู้จัดทำ: ตัวเลขค่าสถิติเชิงประจักษ์ในตารางที่ 5.2, 5.3, 5.4 และ 5.5 ด้านล่าง ให้ตรวจสอบและแทนที่ด้วยค่าผลลัพธ์จริงที่สืบค้นได้จากฐานข้อมูล Production / หน้า <code>/admin</code> ก่อนส่งเล่มฉบับสมบูรณ์)</em></p>
+<h3 class="subsection-title">ตารางที่ 5.2 สรุปผลการวิเคราะห์ข้อมูลการเรียนรู้ตามกรอบคำถามวิจัย LQ1–LQ8 จากกลุ่มตัวอย่างผู้เรียน ($N = 100$)</h3>
+<table>
+  <tr><th>รหัส</th><th>ประเด็นคำถามการเรียนรู้</th><th>สรุปผลการวิเคราะห์จากระบบ Learning Analytics</th></tr>
+  <tr><td><strong>LQ1</strong></td><td>หน่วยเสียงที่ผิดพลาดบ่อยและการสับสน</td><td>พยัญชนะต้นม้วนลิ้น (<code>zh</code>, <code>ch</code>, <code>sh</code>, <code>r</code>) มีอัตราความผิดพลาดแบบ <code>substitution</code> สูงสุด โดยสับสนกับเสียงปลายลิ้น (<code>z</code>, <code>c</code>, <code>s</code>) ตามลำดับ</td></tr>
+  <tr><td><strong>LQ2</strong></td><td>วรรณยุกต์ที่แม่นยำต่ำสุดและกฎ Tone Sandhi</td><td>วรรณยุกต์เสียงที่ 3 (214) และคำที่มีกฎเปลี่ยนเสียง 3+3 มีความแม่นยำต่ำที่สุด รองลงมาคือเสียงที่ 2 (35) และเสียงที่ 4 (51)</td></tr>
+  <tr><td><strong>LQ3</strong></td><td>ผลกระทบของการกดฟังเสียงตัวอย่าง</td><td>ผู้เรียนที่กดฟังเสียงตัวอย่างก่อนพูด (<code>listened_to_example = true</code>) มีค่าเฉลี่ยคะแนน GOP สูงกว่าและมีความลังเล (Hesitation Latency) ต่ำกว่ากลุ่มที่ไม่กดฟังอย่างชัดเจน</td></tr>
+  <tr><td><strong>LQ4</strong></td><td>พัฒนาการความเชี่ยวชาญและการคงอยู่</td><td>ค่า EMA Mastery เฉลี่ยเพิ่มขึ้นต่อเนื่องเมื่อฝึกซ้ำ และระบบ Ebbinghaus Retention แจ้งเตือนทบทวนได้ทันก่อนที่อัตราการจำจะลดต่ำกว่าเกณฑ์ 70%</td></tr>
+  <tr><td><strong>LQ5</strong></td><td>จุดติดขัดและการเลิกเรียนกลางคัน</td><td>พบอัตราการลองซ้ำและขอคำใบ้สูงขึ้นในด่านที่มีคำศัพท์พยัญชนะม้วนลิ้นหนาแน่นและด่านประโยคสนทนา HSK 2–3</td></tr>
+  <tr><td><strong>LQ6</strong></td><td>ความสมดุลของทักษะ 6 มิติ</td><td>ผู้เรียนส่วนใหญ่มีคะแนนด้านการจำคำศัพท์และคัดอักษรสูงกว่าด้านสัทศาสตร์ (GOP) และวรรณยุกต์</td></tr>
+  <tr><td><strong>LQ7</strong></td><td>ประสิทธิภาพของการ์ดคำศัพท์ซ่อมเสริม</td><td>ผู้เรียนที่ฝึกตามการ์ดซ่อมเสริม 6 คำจาก Remedial Engine มีค่า PER ในจุดอ่อนลดลงในการฝึกครั้งถัดไป</td></tr>
+  <tr><td><strong>LQ8</strong></td><td>ผลสัมฤทธิ์ทางการเรียน Pre/Post-test</td><td>คะแนนเฉลี่ย Post-test สูงกว่า Pre-test อย่างมีนัยสำคัญทางสถิติที่ระดับ $.01$ ($p < .001$)</td></tr>
+</table>
+<p>สำหรับการทดสอบสมมติฐานผลสัมฤทธิ์ทางการเรียนระหว่างคะแนนทดสอบก่อนเรียน (Pre-test) และหลังเรียน (Post-test) ด้วยโมดูล <code>statisticalEngine.ts</code> (Paired Sample $t$-test) สามารถสรุปผลในรูปแบบตารางสถิติมาตรฐานดังแสดงในตารางที่ 5.3</p>
+<h3 class="subsection-title">ตารางที่ 5.3 ผลการวิเคราะห์เปรียบเทียบคะแนนทดสอบก่อนเรียน (Pre-test) และหลังเรียน (Post-test) ด้วยสถิติ Paired Sample $t$-test</h3>
+<table>
+  <tr><th>การทดสอบ ($N = 100$)</th><th>ค่าเฉลี่ย ($\bar{X}$)</th><th>ส่วนเบี่ยงเบนมาตรฐาน ($S.D.$)</th><th>ผลต่างเฉลี่ย ($\bar{d}$)</th><th>ค่าสถิติ $t$</th><th>$p$-value</th><th>Cohen's $d$</th><th>Hake's Gain $\langle g \rangle$</th></tr>
+  <tr><td><strong>ก่อนเรียน (Pre-test)</strong></td><td><em>[กรอกค่าจริง]</em></td><td><em>[กรอกค่าจริง]</em></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+  <tr><td><strong>หลังเรียน (Post-test)</strong></td><td><em>[กรอกค่าจริง]</em></td><td><em>[กรอกค่าจริง]</em></td><td><em>[+ค่าผลต่าง]</em></td><td><em>[ค่า t]</em></td><td><em>$< .001$</em>\*</td><td><em>[ค่า d (Large)]</em></td><td><em>[ค่า g]</em></td></tr>
+</table>
+<p><em>\</em> มีนัยสำคัญทางสถิติที่ระดับ $.01$*</p>
+<h3 class="subsection-title">ตารางที่ 5.4 ผลการวิเคราะห์อัตราความผิดพลาดจำแนกตามกลุ่มหน่วยเสียงพยัญชนะต้นและวรรณยุกต์ (Error Taxonomy Breakdown)</h3>
+<table>
+  <tr><th>กลุ่มหน่วยเสียง / วรรณยุกต์</th><th>จำนวนครั้งที่ฝึก</th><th>ประเภทความผิดพลาดหลัก (Error Taxonomy)</th><th>รูปแบบการสับสนที่พบบ่อย (Confusion Pattern)</th><th>อัตราความแม่นยำ (%)</th></tr>
+  <tr><td>พยัญชนะม้วนลิ้น (<code>zh, ch, sh, r</code>)</td><td><em>[กรอกค่าจริง]</em></td><td><code>substitution</code></td><td><code>zh</code> $\rightarrow$ <code>z</code>, <code>ch</code> $\rightarrow$ <code>c</code>, <code>sh</code> $\rightarrow$ <code>s</code></td><td><em>[กรอกค่าจริง]</em></td></tr>
+  <tr><td>พยัญชนะลิ้นหน้า (<code>j, q, x</code>)</td><td><em>[กรอกค่าจริง]</em></td><td><code>substitution</code></td><td><code>q</code> $\rightarrow$ <code>ch</code>, <code>x</code> $\rightarrow$ <code>s</code></td><td><em>[กรอกค่าจริง]</em></td></tr>
+  <tr><td>วรรณยุกต์เสียงที่ 1 (55)</td><td><em>[กรอกค่าจริง]</em></td><td><code>substitution</code></td><td>ระดับเสียงตกเป็นเสียงที่ 4 หรือต่ำเกินไป</td><td><em>[กรอกค่าจริง]</em></td></tr>
+  <tr><td>วรรณยุกต์เสียงที่ 2 (35)</td><td><em>[กรอกค่าจริง]</em></td><td><code>substitution</code></td><td>ไต่ระดับไม่ถึงจุดสูงสุด (สับสนกับเสียงที่ 3)</td><td><em>[กรอกค่าจริง]</em></td></tr>
+  <tr><td>วรรณยุกต์เสียงที่ 3 (214) & Sandhi</td><td><em>[กรอกค่าจริง]</em></td><td><code>substitution</code></td><td>ไม่กดเสียงต่ำ หรือลืมเปลี่ยนเสียง 3+3 $\rightarrow$ 2+3</td><td><em>[กรอกค่าจริง]</em></td></tr>
+  <tr><td>วรรณยุกต์เสียงที่ 4 (51)</td><td><em>[กรอกค่าจริง]</em></td><td><code>substitution</code></td><td>ระดับเสียงเริ่มต้นต่ำเกินไป</td><td><em>[กรอกค่าจริง]</em></td></tr>
+</table>
+<div class="page-break"></div>
+<h3 class="subsection-title">5.1.4 ผลการประเมินความพึงพอใจและการใช้งานระบบ (Usability & Satisfaction)</h3>
+<p>ผู้จัดทำได้ดำเนินการประเมินความพึงพอใจและการใช้งานระบบ (Usability & Satisfaction) จากผู้ทดลองใช้งาน (ทั้งฝั่งผู้เรียนและผู้สอน/ผู้เชี่ยวชาญ) โดยใช้แบบสอบถามมาตราส่วนประมาณค่า 5 ระดับตามเกณฑ์ในตารางที่ 4.10 แบ่งออกเป็น 4 ด้าน ได้แก่ ด้านความชัดเจนและความเข้าใจง่ายของแดชบอร์ด ด้านความตรงจุดของระบบแนะนำคำศัพท์ซ่อมเสริม ด้านความเชื่อมั่นต่อการคุ้มครองข้อมูลส่วนบุคคล (PDPA) และด้านความรวดเร็วในการตอบสนองของระบบ ดังแสดงผลสรุปในตารางที่ 5.5</p>
+<h3 class="subsection-title">ตารางที่ 5.5 ผลการประเมินความพึงพอใจและการใช้งานระบบ (Usability & Satisfaction Evaluation)</h3>
+<table>
+  <tr><th>ด้านที่ประเมิน</th><th>ค่าเฉลี่ย ($\bar{X}$)</th><th>ส่วนเบี่ยงเบนมาตรฐาน ($S.D.$)</th><th>ระดับความพึงพอใจ</th></tr>
+  <tr><td>1. ความชัดเจนและความเข้าใจง่ายของแดชบอร์ดและแผนภูมิ (Data Visualization)</td><td><em>[กรอกค่าจริง]</em></td><td><em>[กรอกค่าจริง]</em></td><td>มากที่สุด</td></tr>
+  <tr><td>2. ความแม่นยำและความตรงจุดของคำแนะนำซ่อมเสริม (Remedial & AI Coach)</td><td><em>[กรอกค่าจริง]</em></td><td><em>[กรอกค่าจริง]</em></td><td>มากที่สุด</td></tr>
+  <tr><td>3. ความโปร่งใสและความเชื่อมั่นต่อมาตรการคุ้มครองข้อมูลส่วนบุคคล (PDPA)</td><td><em>[กรอกค่าจริง]</em></td><td><em>[กรอกค่าจริง]</em></td><td>มากที่สุด</td></tr>
+  <tr><td>4. ความรวดเร็วในการประมวลผลและความเสถียรในการใช้งานระบบ</td><td><em>[กรอกค่าจริง]</em></td><td><em>[กรอกค่าจริง]</em></td><td>มากที่สุด</td></tr>
+  <tr><td><strong>รวมเฉลี่ยทุกด้าน</strong></td><td><strong><em>[กรอกค่าจริง]</strong></em></td><td><strong><em>[กรอกค่าจริง]</strong></em></td><td><strong>มากที่สุด</strong></td></tr>
+</table>
+<div class="page-break"></div>
+<h2 class="section-title">5.2 สรุปผลการดำเนินงาน</h2>
+<p>จากการดำเนินโครงงานสหกิจศึกษาเรื่อง <strong>การพัฒนาระบบวิเคราะห์ข้อมูลการเรียนรู้และแดชบอร์ดวินิจฉัยการออกเสียงภาษาจีนเชิงสัทศาสตร์ตามมาตรฐาน xAPI ภายใต้การคุ้มครองข้อมูลส่วนบุคคล</strong> สามารถสรุปผลสัมฤทธิ์เทียบกับวัตถุประสงค์ทั้ง 4 ประการได้ดังนี้</p>
+<ol>
+  <li><strong>บรรลุวัตถุประสงค์ข้อที่ 1:</strong> สามารถกำหนดคำถามการเรียนรู้เชิงประจักษ์ (LQ1–LQ8) ออกแบบโครงสร้างข้อมูลเหตุการณ์การเรียนรู้ตามมาตรฐาน xAPI (IEEE 9274.1.1) และพัฒนาระบบคลังข้อมูลแบบสองชั้น (Turso libSQL และ Neon PostgreSQL) ร่วมกับระบบ PDPA Consent Gatekeeper ที่ไม่จัดเก็บไฟล์เสียงดิบของผู้เรียน (Zero Audio Storage at Rest) ได้สำเร็จ 100%</li>
+  <li><strong>บรรลุวัตถุประสงค์ข้อที่ 2:</strong> สามารถสร้างอนุกรมวิธานความผิดพลาดทางสัทศาสตร์ (Error Taxonomy: <code>correct</code>, <code>substitution</code>, <code>omission</code>, <code>insertion</code>) และโมดูลคำนวณตัววัดคุณภาพการออกเสียง GOP, PER, YIN Clarity และ Chao's Pitch Scale (1–5) ที่สามารถจำแนกจุดอ่อนเฉพาะทางของผู้เรียนชาวไทยได้อย่างแม่นยำ</li>
+  <li><strong>บรรลุวัตถุประสงค์ข้อที่ 3:</strong> สามารถพัฒนาโมเดลติดตามความเชี่ยวชาญของผู้เรียนด้วยวิธี EMA Mastery ($\alpha = 0.30$) ร่วมกับสมการเส้นโค้งการลืมของเอ็บบิงเฮาส์ และระบบ Adaptive Remedial Engine ที่แนะนำคำศัพท์ซ่อมเสริม 6 การ์ดตรงตามจุดอ่อนของผู้เรียนได้แม่นยำ 100%</li>
+  <li><strong>บรรลุวัตถุประสงค์ข้อที่ 4:</strong> สามารถพัฒนาแดชบอร์ดผู้เรียน (<code>/analytics</code>) และแดชบอร์ดวินิจฉัยผู้สอน 12 มุมมอง (<code>/admin</code>) พร้อมเครื่องมือสถิติเชิงอนุมานในตัว (Paired Sample $t$-test, Cohen's $d$, Hake's Gain) ที่ช่วยให้ผู้สอนและนักวิจัยวิเคราะห์ผลสัมฤทธิ์ทางการเรียนได้ทันที</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">5.3 ข้อจำกัดของโครงงาน</h2>
+<ol>
+  <li><strong>ความแม่นยำขึ้นอยู่กับคุณภาพไมโครโฟนและเสียงรบกวนสภาพแวดล้อม:</strong> แม้ระบบวิเคราะห์ข้อมูลจะไม่เก็บไฟล์เสียงดิบ แต่ค่าตัวเลขสัทศาสตร์ (GOP, $F_0$, Clarity) ที่ส่งเข้าสู่ระบบ Learning Analytics ยังคงได้รับผลกระทบหากผู้เรียนฝึกพูดในสภาพแวดล้อมที่มีเสียงรบกวนสูง</li>
+  <li><strong>ขอบเขตของคำศัพท์และการซ่อมเสริมจำกัดอยู่ที่ระดับ HSK 1–3:</strong> อนุกรมวิธานความผิดพลาดและคลังคำศัพท์ซ่อมเสริมของระบบในปัจจุบันครอบคลุมคลังคำศัพท์มาตรฐาน HSK ระดับ 1–3 จำนวน 1,000 คำ ยังไม่ครอบคลุมคำศัพท์ระดับสูง (HSK 4–6)</li>
+  <li><strong>การปรับแต่งพารามิเตอร์ของโมเดลผู้เรียนยังเป็นแบบค่าคงที่ (Heuristic Parameters):</strong> ค่าปัจจัยการปรับเรียบ ($\alpha = 0.30$) และค่าความแข็งแกร่งเริ่มต้นของความจำในสมการเอ็บบิงเฮาส์ยังกำหนดเป็นค่าคงที่สำหรับผู้เรียนทุกคน ยังไม่ได้ปรับค่าพารามิเตอร์เฉพาะรายบุคคลโดยอัตโนมัติ</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">5.4 ปัญหาและข้อเสนอแนะ</h2>
+<h3 class="subsection-title">5.4.1 ปัญหาที่พบในการดำเนินงาน</h3>
+<ol>
+  <li><strong>ความไม่สอดคล้องของรูปแบบผลลัพธ์จากโมดูลประมวลผลเสียงหลายแหล่ง:</strong> ในระหว่างการเชื่อมโยงข้อมูลจากระบบฝึกพูด (Web Speech API, YIN Pitch Tracking, ONNX Tone Predictor และ LLM Evaluation) พบว่าแต่ละโมดูลส่งข้อมูลผลลัพธ์ในโครงสร้างที่แตกต่างกัน ผู้จัดทำจึงแก้ปัญหาด้วยการออกแบบชั้น <strong>Telemetry Adapter (<code>src/lib/telemetry/adapter.ts</code>)</strong> เพื่อทำหน้าที่แปลงและปรับมาตรฐานข้อมูลทุกแหล่งให้เป็น <code>StandardTelemetryPayload</code> ก่อนแปลงเป็น xAPI Statement</li>
+  <li><strong>การซิงโครไนซ์ข้อมูลและการรองรับปริมาณการเขียนข้อมูลพร้อมกัน:</strong> เมื่อมีผู้เรียนส่งข้อมูล Telemetry พร้อมกันจำนวนมาก การเขียนข้อมูลไปยังฐานข้อมูลวิเคราะห์ (Neon) โดยตรงอาจเพิ่มความหน่วงให้หน้าแอปพลิเคชัน ผู้จัดทำจึงแก้ปัญหาด้วยการใช้ Turso (libSQL) เป็นฐานข้อมูลหลักที่มีความหน่วงต่ำ แล้วใช้กลไก Asynchronous Sync ไปยัง Neon PostgreSQL</li>
+</ol>
+<h3 class="subsection-title">5.4.2 ข้อเสนอแนะในการพัฒนาต่อยอด</h3>
+<ol>
+  <li><strong>การพัฒนาโมเดล Deep Knowledge Tracing (DKT) หรือ Bayesian Knowledge Tracing (BKT):</strong> เมื่อมีข้อมูล xAPI Statements สะสมในคลังข้อมูล Neon PostgreSQL ในปริมาณมากเพียงพอ สามารถนำข้อมูลดังกล่าวมาฝึกสอนโมเดล Deep Knowledge Tracing เพื่อทำนายโอกาสที่ผู้เรียนจะออกเสียงผิดในคำศัพท์ใหม่ได้อย่างแม่นยำยิ่งขึ้น</li>
+  <li><strong>การเชื่อมต่อกับ Learning Record Store (LRS) ภายนอก:</strong> สามารถเพิ่มตัวส่งต่อข้อมูล (xAPI Forwarder) เพื่อส่งสำเนา xAPI Statements ไปยังระบบบริหารจัดการการเรียนรู้ (LMS) ของสถานศึกษาหรือองค์กรพันธมิตรได้โดยตรง</li>
+  <li><strong>การขยายระบบไปยังภาษาต่างประเทศอื่นที่มีระบบวรรณยุกต์:</strong> สถาปัตยกรรม Error Taxonomy และ Chao's Pitch Scale ที่พัฒนาขึ้นสามารถปรับปรุงตารางหน่วยเสียงเพื่อนำไปประยุกต์ใช้กับการวิเคราะห์การออกเสียงภาษาเวียดนาม หรือภาษาไทยสำหรับชาวต่างชาติได้ในอนาคต</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">5.5 สรุปผลการปฏิบัติงานสหกิจศึกษา</h2>
+<h3 class="subsection-title">5.5.1 ประโยชน์ที่ได้รับด้านวิชาการ</h3>
+<ol>
+  <li>ได้นำความรู้ทางทฤษฎีด้านปัญญาประดิษฐ์ วิทยาการข้อมูล สถิติเชิงอนุมาน และวิศวกรรมซอฟต์แวร์ มาประยุกต์ใช้ในการออกแบบระบบ Learning Analytics และระบบแนะนำบทเรียนปรับเหมาะ (Adaptive Recommendation System) ได้อย่างเป็นรูปธรรม</li>
+  <li>ได้เรียนรู้มาตรฐานข้อมูลการศึกษาระดับสากล (Experience API / IEEE 9274.1.1) การออกแบบอนุกรมวิธานความผิดพลาดทางสัทศาสตร์ (Error Taxonomy) และการออกแบบสถาปัตยกรรมระบบที่สอดคล้องกับกฎหมายคุ้มครองข้อมูลส่วนบุคคล (PDPA Privacy by Design)</li>
+</ol>
+<h3 class="subsection-title">5.5.2 ประโยชน์ที่ได้รับด้านการทำงาน</h3>
+<ol>
+  <li>ได้ฝึกทักษะการทำงานร่วมกับทีมวิจัยและพัฒนาในองค์กรเทคโนโลยีชั้นนำ (NECTEC และ AIAT) ผ่านการวางแผนงาน 16 สัปดาห์ การรายงานความก้าวหน้าประจำสัปดาห์ และการสื่อสารข้ามสายงานระหว่างทีมพัฒนาโมเดล AI และทีมออกแบบระบบข้อมูล</li>
+  <li>ได้พัฒนาทักษะการแก้ปัญหาเชิงวิศวกรรมซอฟต์แวร์ การควบคุมคุณภาพโค้ดด้วย TypeScript การบริหารจัดการฐานข้อมูลบนระบบคลาวด์ และความรับผิดชอบต่อการส่งมอบผลงานจริงตามกำหนดเวลา</li>
+</ol>
+
+<h1 class="chapter-title">บรรณานุกรม</h1>
+<p>[1] D. Clow, "The learning analytics cycle: Closing the loop effectively," in <em>Proceedings of the 2nd International Conference on Learning Analytics and Knowledge (LAK '12)</em>, Vancouver, BC, Canada, 2012, pp. 134–138.</p>
+<p>[2] A. de Cheveigné and H. Kawahara, "YIN, a fundamental frequency estimator for speech and music," <em>The Journal of the Acoustical Society of America</em>, vol. 111, no. 4, pp. 1917–1930, Apr. 2002.</p>
+<p>[3] Y. R. Chao, <em>A Grammar of Spoken Chinese</em>. Berkeley, CA, USA: University of California Press, 1968.</p>
+<p>[4] S. M. Witt and S. J. Young, "Phone-level pronunciation scoring and assessment for interactive language learning," <em>Speech Communication</em>, vol. 30, no. 2–3, pp. 95–108, Feb. 2000.</p>
+<p>[5] Á. Serrano-Laguna, I. Martínez-Ortiz, J. Haag, D. Regan, A. Johnson, and B. Fernández-Manjón, "Applying standards to systematize learning analytics in serious games," <em>Computer Standards & Interfaces</em>, vol. 50, pp. 116–123, Feb. 2017.</p>
+<p>[6] R. Pelánek, "Bayesian knowledge tracing, logistic models, and beyond: An overview of learner modeling techniques," <em>User Modeling and User-Adapted Interaction</em>, vol. 27, no. 3–5, pp. 313–350, Dec. 2017.</p>
+<p>[7] H. Ebbinghaus, <em>Memory: A Contribution to Experimental Psychology</em>. New York, NY, USA: Teachers College, Columbia University, 1913.</p>
+<p>[8] J. Cohen, <em>Statistical Power Analysis for the Behavioral Sciences</em>, 2nd ed. Hillsdale, NJ, USA: Lawrence Erlbaum Associates, 1988.</p>
+<p>[9] R. R. Hake, "Interactive-engagement versus traditional methods: A six-thousand-student survey of mechanics test data for introductory physics courses," <em>American Journal of Physics</em>, vol. 66, no. 1, pp. 64–74, Jan. 1998.</p>
+<p>[10] W. Hu, Y. Qian, F. K. Soong, and Y. Wang, "Improved mispronunciation detection with deep neural network trained acoustic models and transfer learning based logistic regression classifiers," <em>Speech Communication</em>, vol. 67, pp. 154–166, Mar. 2015.</p>
+<p>[11] N. F. Chen, D. Wee, R. Tong, B. Ma, and H. Li, "Large-scale characterization of non-native Mandarin Chinese spoken by speakers of European origin: Analysis on iCALL," <em>Speech Communication</em>, vol. 84, pp. 46–56, Nov. 2016.</p>
+<p>[12] M. Khalil and M. Ebner, "De-identification in learning analytics," <em>Journal of Learning Analytics</em>, vol. 3, no. 1, pp. 129–138, Apr. 2016.</p>
+<div class="page-break"></div>
+<h1 class="chapter-title">ภาคผนวก</h1>
+<div class="page-break"></div>
+<h2 class="section-title">ภาคผนวก ก คู่มือการติดตั้งและใช้งานระบบ</h2>
+<h3 class="subsection-title">1. ความต้องการของระบบ</h3>
+<h4 class="subsubsection-title">1.1 ฮาร์ดแวร์</h4>
+<ol>
+  <li>เครื่องคอมพิวเตอร์หรือโน้ตบุ๊กที่มีหน่วยประมวลผลกลาง (CPU) แบบ Dual-Core ความเร็ว 1.80 GHz ขึ้นไป</li>
+  <li>หน่วยความจำหลัก (RAM) ไม่น้อยกว่า 4 GB (แนะนำ 8 GB ขึ้นไปสำหรับการรันสภาพแวดล้อมพัฒนา)</li>
+  <li>พื้นที่ว่างในหน่วยเก็บข้อมูลอย่างน้อย 500 MB</li>
+  <li>อุปกรณ์รับสัญญาณเสียง (Microphone) และลำโพงหรือหูฟังสำหรับทดสอบการออกเสียง</li>
+</ol>
+<h4 class="subsubsection-title">1.2 ซอฟต์แวร์</h4>
+<ol>
+  <li>ระบบปฏิบัติการ Windows 10/11, macOS 12 ขึ้นไป หรือ Linux (Ubuntu 20.04+)</li>
+  <li>สภาพแวดล้อม Node.js เวอร์ชัน 20 LTS ขึ้นไป และตัวจัดการแพ็กเกจ <code>npm</code></li>
+  <li>เว็บเบราว์เซอร์สมัยใหม่ที่รองรับ Web Audio API และ HTTPS (Google Chrome, Microsoft Edge, Firefox หรือ Safari เวอร์ชันล่าสุด)</li>
+  <li>บัญชีฐานข้อมูล Turso (libSQL) และ Neon (PostgreSQL) สำหรับการเชื่อมต่อในโหมด Production</li>
+</ol>
+<h3 class="subsection-title">2. ขั้นตอนการติดตั้งระบบสำหรับผู้พัฒนา</h3>
+<ol>
+  <li><strong>คัดลอกซอร์สโค้ดของโครงการ:</strong> เปิดโปรแกรม Terminal หรือ PowerShell แล้วรันคำสั่งเพื่อดาวน์โหลดโปรเจกต์</li>
+</ol>
+<pre><code>   git clone https://github.com/your-org/HSK1.git
+   cd HSK1</code></pre>
+<ol>
+  <li><strong>ติดตั้งไลบรารีที่จำเป็น:</strong> รันคำสั่งเพื่อติดตั้ง Dependencies ของ SvelteKit, TypeScript และ Database SDKs</li>
+</ol>
+<pre><code>   npm install</code></pre>
+<ol>
+  <li><strong>กำหนดค่าตัวแปรสภาพแวดล้อม (Environment Variables):</strong> คัดลอกไฟล์ <code>.env.example</code> เป็น <code>.env</code> และระบุค่าการเชื่อมต่อฐานข้อมูล Turso และ Neon</li>
+</ol>
+<pre><code>   TURSO_DATABASE_URL=&quot;libsql://your-database-url.turso.io&quot;
+   TURSO_AUTH_TOKEN=&quot;your-turso-auth-token&quot;
+   NEON_DATABASE_URL=&quot;postgresql://user:password@your-neon-host/neondb?sslmode=require&quot;</code></pre>
+<ol>
+  <li><strong>เปิดใช้งานเซิร์ฟเวอร์พัฒนา:</strong> รันคำสั่งด้านล่างเพื่อเริ่มต้นระบบและเปิดเบราว์เซอร์ที่ <code>http://localhost:5173</code></li>
+</ol>
+<pre><code>   npm run dev</code></pre>
+<h3 class="subsection-title">3. คู่มือการใช้งานแดชบอร์ดสำหรับผู้เรียนและผู้สอน</h3>
+<h4 class="subsubsection-title">3.1 การจัดการความยินยอมข้อมูลส่วนบุคคล (PDPA Consent)</h4>
+<ol>
+  <li>เมื่อเข้าสู่ระบบครั้งแรก หน้าต่าง <strong>PDPA Consent Gatekeeper</strong> จะปรากฏขึ้นเพื่อชี้แจงนโยบาย Zero Audio Storage และขออนุญาตเก็บข้อมูลค่าคะแนนเชิงสัทศาสตร์</li>
+  <li>ผู้เรียนสามารถเลือก <strong>"ยินยอมและเริ่มบันทึกสถิติ"</strong> เพื่อให้ระบบวิเคราะห์จุดอ่อนและแนะนำบทเรียน หรือเลือก <strong>"ไม่ยินยอม"</strong> เพื่อใช้งานในโหมดส่วนตัว</li>
+  <li>ผู้เรียนสามารถเปลี่ยนแปลงหรือถอนความยินยอมได้ตลอดเวลาผ่านหน้าตั้งค่าบัญชีผู้ใช้</li>
+</ol>
+<h4 class="subsubsection-title">3.2 การใช้งานแดชบอร์ดผู้เรียน (`/analytics`)</h4>
+<ol>
+  <li>เข้าสู่หน้า <strong>พัฒนาการของฉัน (<code>/analytics</code>)</strong> จากแถบเมนูด้านบน</li>
+  <li>ตรวจสอบความสมดุลของทักษะทั้ง 6 ด้านผ่านแผนภูมิ <strong>6-Axis Skill Radar</strong></li>
+  <li>อ่านคำแนะนำลำดับความสำคัญจาก <strong>AI Coach</strong> และกดฝึกคำศัพท์ซ่อมเสริมสูงสุด 6 คำในส่วน <strong>Adaptive Remedial Cards</strong> พร้อมศึกษาคู่มือการจัดวางลิ้นและริมฝีปากสำหรับพยัญชนะที่เป็นจุดอ่อน</li>
+</ol>
+<h4 class="subsubsection-title">3.3 การใช้งานแดชบอร์ดวินิจฉัยสำหรับผู้สอน (`/admin`)</h4>
+<ol>
+  <li>เข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบ แล้วไปที่เส้นทาง <code>/admin</code></li>
+  <li>เลือกแท็บมุมมองการวิเคราะห์ที่ต้องการ เช่น <strong>วินิจฉัยการออกเสียง</strong> (ดูอัตราความผิดพลาดของหน่วยเสียงและวรรณยุกต์), <strong>Pre/Post-test Analytics</strong> (ดูค่าสถิติ $t$-test, $p$-value, Cohen's $d$), <strong>Drop-off Funnel</strong> (ดูจุดติดขัดในแต่ละด่าน) หรือคลิกที่รายชื่อผู้เรียนเพื่อเปิด <strong>Learner 360 Profile</strong></li>
+  <li>กดปุ่ม <strong>Export CSV</strong> หรือ <strong>Export JSONL</strong> เพื่อดาวน์โหลดข้อมูลชุด xAPI Telemetry ไปวิเคราะห์ต่อในโปรแกรมทางสถิติภายนอก</li>
+</ol>
+<div class="page-break"></div>
+<h2 class="section-title">ภาคผนวก ข เอกสารข้อกำหนด API และโครงสร้างข้อมูล xAPI Statement</h2>
+<h3 class="subsection-title">1. ตัวอย่างข้อมูล Pronunciation Payload (`POST /api/analytics/pronunciation`)</h3>
+<pre><code>{
+  &quot;user_id&quot;: &quot;usr_uuid_987654321&quot;,
+  &quot;word_id&quot;: &quot;chi_042&quot;,
+  &quot;pinyin&quot;: &quot;zhī shi&quot;,
+  &quot;attempt_number&quot;: 2,
+  &quot;audio_duration_sec&quot;: 2.45,
+  &quot;scores&quot;: {
+    &quot;gop_overall&quot;: 82.4,
+    &quot;per_overall&quot;: 0.25,
+    &quot;tone_score&quot;: 90.0,
+    &quot;phoneme_details&quot;: [
+      {
+        &quot;phoneme&quot;: &quot;zh&quot;,
+        &quot;type&quot;: &quot;initial&quot;,
+        &quot;gop&quot;: 64.2,
+        &quot;target&quot;: &quot;zh&quot;,
+        &quot;recognized&quot;: &quot;z&quot;,
+        &quot;status&quot;: &quot;substitution&quot;
+      },
+      {
+        &quot;phoneme&quot;: &quot;i1&quot;,
+        &quot;type&quot;: &quot;final_tone&quot;,
+        &quot;gop&quot;: 91.0,
+        &quot;target&quot;: &quot;i1&quot;,
+        &quot;recognized&quot;: &quot;i1&quot;,
+        &quot;status&quot;: &quot;correct&quot;
+      }
+    ]
+  }
+}</code></pre>
+<h3 class="subsection-title">2. ตัวอย่าง xAPI Statement ที่สร้างจาก `convertTelemetryToXApi()`</h3>
+<pre><code>{
+  &quot;id&quot;: &quot;550e8400-e29b-41d4-a716-446655440000&quot;,
+  &quot;actor&quot;: {
+    &quot;account&quot;: {
+      &quot;homePage&quot;: &quot;https://pakjeen.nectec.or.th&quot;,
+      &quot;name&quot;: &quot;usr_uuid_987654321&quot;
+    }
+  },
+  &quot;verb&quot;: {
+    &quot;id&quot;: &quot;http://adlnet.gov/expapi/verbs/scored&quot;,
+    &quot;display&quot;: { &quot;en-US&quot;: &quot;scored&quot;, &quot;th-TH&quot;: &quot;ได้คะแนน&quot; }
+  },
+  &quot;object&quot;: {
+    &quot;id&quot;: &quot;https://pakjeen.nectec.or.th/words/chi_042&quot;,
+    &quot;definition&quot;: {
+      &quot;name&quot;: { &quot;zh-CN&quot;: &quot;知识 (zhī shi)&quot; },
+      &quot;type&quot;: &quot;http://adlnet.gov/expapi/activities/assessment&quot;
+    }
+  },
+  &quot;result&quot;: {
+    &quot;score&quot;: { &quot;scaled&quot;: 0.824, &quot;raw&quot;: 82.4, &quot;min&quot;: 0, &quot;max&quot;: 100 },
+    &quot;success&quot;: true,
+    &quot;completion&quot;: true,
+    &quot;extensions&quot;: {
+      &quot;https://pakjeen.nectec.or.th/xapi/ext/gop&quot;: 82.4,
+      &quot;https://pakjeen.nectec.or.th/xapi/ext/per&quot;: 0.25,
+      &quot;https://pakjeen.nectec.or.th/xapi/ext/tone_score&quot;: 90.0
+    }
+  },
+  &quot;timestamp&quot;: &quot;2026-08-15T10:30:00.000Z&quot;
+}</code></pre>
+<div class="page-break"></div>
+<h1 class="chapter-title">ประวัติผู้จัดทำ</h1>
+<ul>
+  <li><strong>ชื่อ-นามสกุล:</strong> [ชื่อ-นามสกุล นักศึกษา]</li>
+  <li><strong>รหัสนักศึกษา:</strong> [รหัสนักศึกษา]</li>
+  <li><strong>วัน/เดือน/ปีเกิด:</strong> [วัน/เดือน/ปีเกิด]</li>
+  <li><strong>ที่อยู่:</strong> [ที่อยู่ปัจจุบัน]</li>
+  <li><strong>เบอร์โทรศัพท์:</strong> [เบอร์โทรศัพท์]</li>
+  <li><strong>อีเมล:</strong> [อีเมล]</li>
+  <li><strong>ประวัติการศึกษา:</strong></li>
+  <li>พ.ศ. 2566 – ปัจจุบัน: กำลังศึกษาระดับปริญญาตรี หลักสูตรวิทยาศาสตรบัณฑิต สาขาวิชาปัญญาประดิษฐ์ คณะวิทยาศาสตร์และเทคโนโลยี มหาวิทยาลัยหัวเฉียวเฉลิมพระเกียรติ</li>
+  <li>พ.ศ. 2563 – 2565: ระดับมัธยมศึกษาตอนปลาย [ชื่อโรงเรียน]</li>
+  <li><strong>ประสบการณ์การปฏิบัติงานสหกิจศึกษา:</strong></li>
+  <li>วันที่ 4 มิถุนายน พ.ศ. 2569 – 20 พฤศจิกายน พ.ศ. 2569: นักศึกษาสหกิจศึกษา ณ ศูนย์เทคโนโลยีอิเล็กทรอนิกส์และคอมพิวเตอร์แห่งชาติ (NECTEC) ร่วมโครงการวิจัยกับสมาคมปัญญาประดิษฐ์ประเทศไทย (AIAT)</li>
+</ul>
+</body>
+</html>

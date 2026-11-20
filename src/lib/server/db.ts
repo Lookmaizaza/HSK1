@@ -4,7 +4,7 @@ import { computePairedTTest, type PairedTTestResult } from '$lib/analytics/stati
 // and against a remote Turso database (libsql://...) in production.
 
 import { createClient, type Client } from '@libsql/client';
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { env } from '$env/dynamic/private';
@@ -127,7 +127,20 @@ CREATE TABLE IF NOT EXISTS learning_events (
 	word_id TEXT NOT NULL,
 	statement_id TEXT NOT NULL UNIQUE,
 	xapi_statement TEXT NOT NULL,
-	practice_mode TEXT NOT NULL DEFAULT 'unknown',
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
+	stage_id TEXT,
+	created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS app_learning_events (
+	statement_id TEXT PRIMARY KEY,
+	user_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	xapi_statement TEXT NOT NULL,
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
 	stage_id TEXT,
 	created_at INTEGER NOT NULL
 );
@@ -143,7 +156,20 @@ CREATE TABLE IF NOT EXISTS phoneme_evaluations (
 	status TEXT NOT NULL,
 	target TEXT NOT NULL,
 	recognized TEXT NOT NULL,
-	practice_mode TEXT NOT NULL DEFAULT 'unknown',
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
+	stage_id TEXT,
+	created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS app_learning_events (
+	statement_id TEXT PRIMARY KEY,
+	user_id TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	word_id TEXT NOT NULL,
+	xapi_statement TEXT NOT NULL,
+	practice_mode TEXT NOT NULL DEFAULT 'unknown'
+		CHECK (practice_mode IN ('word', 'stage', 'assessment', 'flashcard', 'lesson', 'unknown')),
 	stage_id TEXT,
 	created_at INTEGER NOT NULL
 );
@@ -629,7 +655,13 @@ export async function addXp(userId: number, amount: number): Promise<void> {
 }
 
 export async function loseHeart(userId: number): Promise<void> {
-	void userId;
+	const client = getDb();
+	if (!client) return;
+	await init();
+	await client.execute({
+		sql: 'UPDATE progress SET hearts = MAX(0, hearts - 1) WHERE user_id = ?',
+		args: [userId]
+	});
 }
 
 export async function refillHearts(userId: number, max: number): Promise<void> {
@@ -933,6 +965,23 @@ export async function clearUserMistakes(userId: number): Promise<void> {
 	});
 }
 
+export function normalizePerPercentage(rawPer: unknown, phonemeDetails?: any[], fallbackPer = 0): number {
+	if (Array.isArray(phonemeDetails) && phonemeDetails.length > 0) {
+		const explicitStatuses = phonemeDetails.filter((d) => d && typeof d.status === 'string');
+		if (explicitStatuses.length > 0) {
+			const totalPhonemes = explicitStatuses.length;
+			const totalErrors = explicitStatuses.filter((d) => d.status !== 'correct').length;
+			return Number(((totalErrors / Math.max(1, totalPhonemes)) * 100).toFixed(2));
+		}
+	}
+	const num = Number(rawPer);
+	if (!Number.isFinite(num) || num < 0) return fallbackPer;
+	if (num > 0 && num <= 1) {
+		return Number((num * 100).toFixed(2));
+	}
+	return Number(Math.min(100, num).toFixed(2));
+}
+
 // Pronunciation Evaluation Queries & Logs
 export async function recordPronunciationEvaluation(payload: {
 	user_id: string;
@@ -975,7 +1024,7 @@ export async function recordPronunciationEvaluation(payload: {
 		attemptNumber: Number(payload.attempt_number ?? 1),
 		audioDurationSec: Number(payload.audio_duration_sec ?? 0),
 		gopOverall: Number(payload.scores.gop_overall ?? 0),
-		perOverall: Number(payload.scores.per_overall ?? 0),
+		perOverall: normalizePerPercentage(payload.scores.per_overall, payload.scores.phoneme_details),
 		toneScore: Number(payload.scores.tone_score ?? 0),
 		phonemeDetails: payload.scores.phoneme_details ?? [],
 		practiceMode,
@@ -989,10 +1038,13 @@ export async function recordPronunciationEvaluation(payload: {
 	};
 
 	if (client) {
-		// Dedup guard: check if identical record already exists
+		// Dedup guard: check if identical record already exists (including recent assessment window)
 		const existingCheck = await client.execute({
-			sql: `SELECT id FROM pronunciation_evaluations WHERE user_id = ? AND word_id = ? AND created_at = ? LIMIT 1`,
-			args: [evaluation.userId, evaluation.wordId, createdAt]
+			sql: `SELECT id FROM pronunciation_evaluations
+			      WHERE user_id = ? AND word_id = ?
+			        AND (created_at = ? OR idempotency_key = ? OR (? = 'assessment' AND practice_mode = 'assessment' AND ABS(created_at - ?) <= 5000))
+			      LIMIT 1`,
+			args: [evaluation.userId, evaluation.wordId, createdAt, idempotencyKey, practiceMode, createdAt]
 		}).catch(() => ({ rows: [] }));
 		if (existingCheck.rows && existingCheck.rows.length > 0) {
 			return; // Skip duplicate insertion
@@ -1124,7 +1176,7 @@ export async function getPronunciationEvaluations(
 			slope_type: r.slope_type == null ? null : String(r.slope_type),
 			scores: {
 				gop_overall: Number(r.gop_overall),
-				per_overall: Number(r.per_overall),
+				per_overall: normalizePerPercentage(r.per_overall, phonemeDetails),
 				tone_score: Number(r.tone_score),
 				phoneme_details: phonemeDetails
 			},
@@ -1163,14 +1215,27 @@ export async function getPronunciationPhonemeErrorStats(userId?: string | string
 	let totalGop = 0;
 	let totalPer = 0;
 	let totalTone = 0;
+	let totalErrors = 0;
+	let totalPhonemes = 0;
 	const substitutionMap: Record<string, { target: string; recognized: string; count: number }> = {};
 
 	for (const item of list) {
 		totalGop += item.scores.gop_overall;
-		totalPer += item.scores.per_overall;
 		totalTone += item.scores.tone_score;
 
-		for (const p of item.scores.phoneme_details) {
+		const details = item.scores.phoneme_details || [];
+		const explicitStatuses = details.filter((p: any) => p && typeof p.status === 'string');
+		if (explicitStatuses.length > 0) {
+			const pCnt = explicitStatuses.length;
+			const errCnt = explicitStatuses.filter((p: any) => p.status !== 'correct').length;
+			totalPhonemes += pCnt;
+			totalErrors += errCnt;
+			totalPer += (errCnt / Math.max(1, pCnt)) * 100;
+		} else {
+			totalPer += normalizePerPercentage(item.scores.per_overall, details);
+		}
+
+		for (const p of details) {
 			if (p.status === 'substitution' && p.target && p.recognized && p.target !== p.recognized) {
 				const key = `${p.target}->${p.recognized}`;
 				if (!substitutionMap[key]) {
@@ -1217,15 +1282,20 @@ export async function getPronunciationPhonemeErrorStats(userId?: string | string
 	}
 
 	const frequentSubstitutions = Object.values(substitutionMap).sort((a, b) => b.count - a.count).slice(0, 10);
+	const computedAvgPer = totalPhonemes > 0
+		? Number(((totalErrors / Math.max(1, totalPhonemes)) * 100).toFixed(2))
+		: Number((totalPer / list.length).toFixed(2));
 
 	return {
 		totalAttempts: list.length,
 		avgGop: Number((totalGop / list.length).toFixed(1)),
-		avgPer: Number((totalPer / list.length).toFixed(2)),
+		avgPer: computedAvgPer,
 		avgToneScore: Number((totalTone / list.length).toFixed(1)),
 		frequentSubstitutions
 	};
 }
+
+export const getCohortPronunciationDiagnostics = getPronunciationPhonemeErrorStats;
 
 // -------------------------------------------------------------
 // Learning Events (xAPI Statements Storage - Zero Audio Storage at Rest)
@@ -1391,6 +1461,30 @@ export async function getUserConsent(
 	return Number(result.rows[0].granted) === 1;
 }
 
+export async function getUserConsentsSummary(userId: string): Promise<{ audio: boolean; research: boolean }> {
+	const client = getDb();
+	if (!client) return { audio: true, research: true };
+	await init();
+	const result = await client.execute({
+		sql: `SELECT consent_type, granted FROM user_consents
+		      WHERE user_id = ? AND consent_type IN ('audio_processing', 'pdpa_research_telemetry')
+		      ORDER BY updated_at DESC`,
+		args: [String(userId)]
+	});
+	let audio: boolean | null = null;
+	let research: boolean | null = null;
+	for (const r of result.rows) {
+		const ct = String(r.consent_type);
+		if (ct === 'audio_processing' && audio === null) {
+			audio = Number(r.granted) === 1;
+		} else if (ct === 'pdpa_research_telemetry' && research === null) {
+			research = Number(r.granted) === 1;
+		}
+		if (audio !== null && research !== null) break;
+	}
+	return { audio: Boolean(audio), research: Boolean(research) };
+}
+
 export async function hasUserConsent(
 	userId: string,
 	consentType = 'pdpa_research_telemetry'
@@ -1491,13 +1585,26 @@ export async function getDiagnosticAnalytics(
 	let totalGop = 0;
 	let totalPer = 0;
 	let totalTone = 0;
+	let totalErrors = 0;
+	let totalPhonemes = 0;
 
 	for (const ev of evalList) {
 		totalGop += ev.scores.gop_overall;
-		totalPer += ev.scores.per_overall;
 		totalTone += ev.scores.tone_score;
 
-		for (const p of ev.scores.phoneme_details) {
+		const details = ev.scores.phoneme_details || [];
+		const explicitStatuses = details.filter((p: any) => p && typeof p.status === 'string');
+		if (explicitStatuses.length > 0) {
+			const pCnt = explicitStatuses.length;
+			const errCnt = explicitStatuses.filter((p: any) => p.status !== 'correct').length;
+			totalPhonemes += pCnt;
+			totalErrors += errCnt;
+			totalPer += (errCnt / Math.max(1, pCnt)) * 100;
+		} else {
+			totalPer += normalizePerPercentage(ev.scores.per_overall, details);
+		}
+
+		for (const p of details) {
 			const pName = p.phoneme || p.target;
 			if (!pName) continue;
 
@@ -1682,11 +1789,18 @@ export async function getDiagnosticAnalytics(
 		.filter((t) => toneStats[t].total > 0 && toneStats[t].sumScore / toneStats[t].total < 75)
 		.map((t) => t);
 
+	const computedAvgPer =
+		totalAttempts > 0
+			? totalPhonemes > 0
+				? Number(((totalErrors / Math.max(1, totalPhonemes)) * 100).toFixed(2))
+				: Number((totalPer / totalAttempts).toFixed(2))
+			: null;
+
 	return {
 		hasData: totalAttempts > 0,
 		totalAttempts,
 		overallAccuracy: totalAttempts > 0 ? Number((totalGop / totalAttempts).toFixed(1)) : null,
-		avgPer: totalAttempts > 0 ? Number((totalPer / totalAttempts).toFixed(2)) : null,
+		avgPer: computedAvgPer,
 		avgToneScore: totalAttempts > 0 ? Number((totalTone / totalAttempts).toFixed(1)) : null,
 		toneAccuracy,
 		listeningImpact: {
@@ -1703,6 +1817,8 @@ export async function getDiagnosticAnalytics(
 		weakTones
 	};
 }
+
+export const getLearner360Diagnostics = getDiagnosticAnalytics;
 
 // -------------------------------------------------------------
 // Research Data Export (IEEE 9274.1.1 xAPI Telemetry & Acoustic Metrics)
@@ -2338,7 +2454,7 @@ export async function recordPhonemeEvaluations(
 	if (items.length === 0) return;
 	if (client) await init();
 
-	for (const item of items) {
+	const preparedRecords = items.map((item) => {
 		const id = item.id || randomBytes(16).toString('hex');
 		const now = item.createdAt || Date.now();
 		const practiceMode = item.practiceMode ?? 'unknown';
@@ -2346,7 +2462,7 @@ export async function recordPhonemeEvaluations(
 		if (practiceMode === 'stage' && (!stageId || !/^[a-zA-Z0-9_-]{2,64}$/.test(stageId))) {
 			throw new Error('Quest phoneme evaluation requires a valid stage ID.');
 		}
-		const record = {
+		return {
 			id,
 			userId: String(item.userId),
 			wordId: String(item.wordId),
@@ -2361,9 +2477,12 @@ export async function recordPhonemeEvaluations(
 			stageId,
 			createdAt: now
 		};
-		if (client) {
-			await client.execute({
-				sql: `INSERT INTO phoneme_evaluations
+	});
+
+	if (client && preparedRecords.length > 0) {
+		await client.batch(
+			preparedRecords.map((record) => ({
+				sql: `INSERT OR IGNORE INTO phoneme_evaluations
 				      (id, user_id, word_id, pinyin, phoneme, phoneme_type, gop, status, target, recognized, practice_mode, stage_id, created_at)
 				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				args: [
@@ -2371,17 +2490,20 @@ export async function recordPhonemeEvaluations(
 					record.phonemeType, record.gop, record.status, record.target, record.recognized,
 					record.practiceMode, record.stageId, record.createdAt
 				]
-			});
-		}
-		try {
-			await recordNeonPhonemeEvaluation({
+			}))
+		);
+	}
+
+	await Promise.all(
+		preparedRecords.map((record) =>
+			recordNeonPhonemeEvaluation({
 				...record,
 				practiceMode: record.practiceMode === 'stage' || record.practiceMode === 'word' || record.practiceMode === 'assessment' ? record.practiceMode : 'word'
-			});
-		} catch (e) {
-			console.error('⚠️ [Neon] Failed to mirror phoneme evaluation:', e);
-		}
-	}
+			}).catch((e) => {
+				console.error('⚠️ [Neon] Failed to mirror phoneme evaluation:', e);
+			})
+		)
+	);
 }
 
 export async function getPhonemeEvaluations(
@@ -2729,6 +2851,7 @@ export async function recordAuditLog(params: {
 	userAgent?: string | null;
 }): Promise<void> {
 	const client = getDb();
+	const id = randomUUID();
 	const now = Date.now();
 	const detailsStr = typeof params.details === 'object' && params.details !== null
 		? JSON.stringify(params.details)
@@ -2738,9 +2861,10 @@ export async function recordAuditLog(params: {
 		try {
 			await init();
 			await client.execute({
-				sql: `INSERT INTO audit_logs (actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO audit_logs (id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				args: [
+					id,
 					params.actorUsername,
 					params.action,
 					params.resourceType,
@@ -2774,11 +2898,11 @@ export async function getAuditLogs(limit = 100): Promise<AuditLogEntry[]> {
 	try {
 		await init();
 		const res = await client.execute({
-			sql: 'SELECT id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at FROM audit_logs ORDER BY created_at DESC LIMIT ?',
+			sql: 'SELECT rowid AS _rowid, id, actor_username, action, resource_type, resource_id, details, ip_address, user_agent, created_at FROM audit_logs ORDER BY created_at DESC LIMIT ?',
 			args: [limit]
 		});
-		return res.rows.map((r) => ({
-			id: String(r.id),
+		return res.rows.map((r, idx) => ({
+			id: r.id != null && String(r.id) !== 'null' && String(r.id) !== '' ? String(r.id) : `audit_${r._rowid ?? idx}_${r.created_at ?? 0}`,
 			actorUsername: String(r.actor_username),
 			action: String(r.action),
 			resourceType: String(r.resource_type),
@@ -3888,12 +4012,12 @@ export async function getParticipationTrend(): Promise<ParticipationTrendPoint[]
 				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
 				UNION ALL
 				SELECT
-					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
+					strftime('%Y-%m-%d', datetime(completed_at/1000, 'unixepoch')) AS day,
 					CAST(user_id AS TEXT) AS user_id,
 					'exam' AS activity_type,
 					NULL AS gop
 				FROM exam_attempts
-				WHERE created_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
+				WHERE completed_at >= CAST(strftime('%s', 'now', '-6 days') AS INTEGER) * 1000
 				UNION ALL
 				SELECT
 					strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) AS day,
@@ -4117,6 +4241,7 @@ export type AssessmentWordInput = {
 	toneScore: number;
 	gopOverall: number;
 	perOverall: number;
+	createdAt?: number;
 };
 
 export type AssessmentSummaryInput = {
@@ -4134,6 +4259,13 @@ export async function recordAssessmentWord(input: AssessmentWordInput): Promise<
 	if (!client) return;
 	await init();
 
+	const safePerOverall = normalizePerPercentage(
+		input.perOverall,
+		undefined,
+		Number(input.targetTone) === Number(input.detectedTone) ? 0 : 25
+	);
+	const createdAt = input.createdAt ?? Date.now();
+
 	await client.execute({
 		sql: `INSERT INTO assessment_records (
 			user_id, test_type, word_id, pinyin, target_tone, detected_tone,
@@ -4149,8 +4281,8 @@ export async function recordAssessmentWord(input: AssessmentWordInput): Promise<
 			input.toneConfidence,
 			input.toneScore,
 			input.gopOverall,
-			input.perOverall,
-			Date.now()
+			safePerOverall,
+			createdAt
 		]
 	});
 }
@@ -4194,13 +4326,20 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 
 	// Fetch existing user_id + word_id + created_at to avoid duplicating the same attempt
 	const existingQuery = userId
-		? { sql: "SELECT user_id, word_id, created_at FROM pronunciation_evaluations WHERE user_id = ?", args: [userId] }
-		: { sql: "SELECT user_id, word_id, created_at FROM pronunciation_evaluations", args: [] };
+		? { sql: "SELECT user_id, word_id, created_at, practice_mode FROM pronunciation_evaluations WHERE user_id = ?", args: [userId] }
+		: { sql: "SELECT user_id, word_id, created_at, practice_mode FROM pronunciation_evaluations", args: [] };
 
 	const existingRes = await client.execute(existingQuery).catch(() => ({ rows: [] }));
 	const existingKeys = new Set(
 		existingRes.rows.map((r) => `${r.user_id}_${r.word_id}_${r.created_at}`)
 	);
+	const existingTimestampsByUserWord = new Map<string, number[]>();
+	for (const r of existingRes.rows) {
+		const uw = `${r.user_id}_${r.word_id}`;
+		const list = existingTimestampsByUserWord.get(uw) ?? [];
+		list.push(Number(r.created_at || 0));
+		existingTimestampsByUserWord.set(uw, list);
+	}
 
 	for (const row of recordsRes.rows) {
 		const uId = String(row.user_id);
@@ -4209,14 +4348,18 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 		const wordId = String(row.word_id);
 		const createdAt = Number(row.created_at || Date.now());
 		const key = `${uId}_${wordId}_${createdAt}`;
-		if (existingKeys.has(key)) continue;
+		const uw = `${uId}_${wordId}`;
+		const nearTimestamps = existingTimestampsByUserWord.get(uw) ?? [];
+		if (existingKeys.has(key) || nearTimestamps.some((ts) => Math.abs(ts - createdAt) <= 5000)) {
+			continue;
+		}
 
 		const targetTone = Number(row.target_tone);
 		const detectedTone = Number(row.detected_tone);
 		const isToneMatch = targetTone === detectedTone;
 		const toneScore = Number(row.tone_score || 0);
 		const gopOverall = Number(row.gop_overall || toneScore);
-		const perOverall = Number(row.per_overall || (isToneMatch ? 0 : 25));
+		const perOverall = normalizePerPercentage(row.per_overall, undefined, isToneMatch ? 0 : 25);
 		const pinyin = String(row.pinyin || '');
 		const testType = String(row.test_type || 'pre').toLowerCase();
 
@@ -4240,6 +4383,7 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 					gop: gopOverall,
 					toneScore: toneScore,
 					type: 'final_tone',
+					status: isToneMatch ? 'correct' : 'substitution',
 					isMatch: isToneMatch,
 					targetTone,
 					detectedTone
@@ -4248,6 +4392,8 @@ export async function syncAllAssessmentsToEvaluations(userId?: string): Promise<
 		});
 
 		existingKeys.add(key);
+		nearTimestamps.push(createdAt);
+		existingTimestampsByUserWord.set(uw, nearTimestamps);
 
 		const targetPhonemes = extractTargetPhonemes(pinyin);
 		if (targetPhonemes.length > 0) {
@@ -4321,7 +4467,7 @@ export async function getUserAssessmentStatus(userId: string): Promise<{
 // Advanced Learning Analytics (5 Core Pedagogical Modules)
 // -------------------------------------------------------------
 
-export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word' = 'stage') {
+export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word' | 'all' = 'stage') {
 	const client = getDb();
 	await init();
 
@@ -4463,11 +4609,13 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 	const overallDropOffRate = totalAttempts > 0 ? Math.round((totalFailed / totalAttempts) * 100) : 0;
 
 	const modeSqlFilter =
-		practiceMode === 'stage'
+		practiceMode === 'all'
+			? "practice_mode IN ('stage', 'lesson', 'word', 'flashcard', 'assessment', 'unknown')"
+			: practiceMode === 'stage'
 			? "practice_mode IN ('stage', 'lesson')"
 			: "practice_mode IN ('word', 'flashcard', 'assessment', 'unknown')";
 
-	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB, filtered by practiceMode with fallback)
+	// 2. Phoneme Substitution Matrix (Real counts & percentages from DB, filtered by practiceMode)
 	const phonemeTargets = ['zh', 'ch', 'sh', 'z', 'c', 's', 'j', 'q', 'x'];
 	const matrixData: Record<string, Record<string, number>> = {};
 	for (const t of phonemeTargets) {
@@ -4481,20 +4629,12 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 
 	try {
 		// 1) From phoneme_evaluations table
-		let peRes = await client.execute(`
+		const peRes = await client.execute(`
 			SELECT target, recognized, COUNT(*) as cnt 
 			FROM phoneme_evaluations 
 			WHERE target IS NOT NULL AND recognized IS NOT NULL AND ${modeSqlFilter}
 			GROUP BY target, recognized
 		`);
-		if (peRes.rows.length === 0) {
-			peRes = await client.execute(`
-				SELECT target, recognized, COUNT(*) as cnt 
-				FROM phoneme_evaluations 
-				WHERE target IS NOT NULL AND recognized IS NOT NULL 
-				GROUP BY target, recognized
-			`);
-		}
 		for (const r of peRes.rows) {
 			const t = String(r.target);
 			const rec = String(r.recognized);
@@ -4508,10 +4648,7 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 		}
 
 		// 2) From pronunciation_evaluations phoneme_details
-		let proRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter}`);
-		if (proRes.rows.length === 0) {
-			proRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
-		}
+		const proRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter} ORDER BY created_at DESC LIMIT 2000`);
 		for (const r of proRes.rows) {
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
@@ -4527,15 +4664,16 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			}
 		}
 
-		// Calculate accuracy percentage on diagonal
+		// Convert every cell in each target row to a consistent 0-100 percentage scale
 		for (const t of phonemeTargets) {
-			const correct = matrixData[t][t] || 0;
 			let totalForTarget = 0;
 			for (const r of phonemeTargets) {
 				totalForTarget += matrixData[t][r];
 			}
 			if (totalForTarget > 0) {
-				matrixData[t][t] = Math.round((correct / totalForTarget) * 100);
+				for (const r of phonemeTargets) {
+					matrixData[t][r] = Math.round((matrixData[t][r] / totalForTarget) * 100);
+				}
 			}
 		}
 	} catch (e) {
@@ -4575,10 +4713,7 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 	};
 
 	try {
-		let toneRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter}`);
-		if (toneRes.rows.length === 0) {
-			toneRes = await client.execute('SELECT phoneme_details FROM pronunciation_evaluations');
-		}
+		const toneRes = await client.execute(`SELECT phoneme_details FROM pronunciation_evaluations WHERE ${modeSqlFilter} ORDER BY created_at DESC LIMIT 2000`);
 		for (const r of toneRes.rows) {
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
@@ -4657,29 +4792,25 @@ export async function getAdvancedLearningAnalytics(practiceMode: 'stage' | 'word
 			listenEventsByUserWord.set(key, arr);
 		}
 
-		let proRes = await client.execute(`
+		const proRes = await client.execute(`
 			SELECT user_id, word_id, gop_overall, per_overall, tone_score, listen_count, hesitation_ms, phoneme_details, created_at
 			FROM pronunciation_evaluations
 			WHERE ${modeSqlFilter}
+			ORDER BY created_at DESC
+			LIMIT 2000
 		`);
-		if (proRes.rows.length === 0) {
-			proRes = await client.execute(`
-				SELECT user_id, word_id, gop_overall, per_overall, tone_score, listen_count, hesitation_ms, phoneme_details, created_at
-				FROM pronunciation_evaluations
-			`);
-		}
 
 		for (const r of proRes.rows) {
 			const uid = String(r.user_id);
 			const wid = String(r.word_id);
 			const gop = Number(r.gop_overall || 0);
 			const tone = Number(r.tone_score || 0);
-			const per = Number(r.per_overall || 0);
 			const createdAt = Number(r.created_at || 0);
 			const isPassed = gop >= 70 ? 1 : 0;
 
 			let details: any[] = [];
 			try { details = JSON.parse(String(r.phoneme_details || '[]')); } catch {}
+			const per = normalizePerPercentage(r.per_overall, details);
 
 			const listenCntCol = Number(r.listen_count || 0);
 			const detailsListened = details.some((d: any) => Boolean(d.listenedToExample) || Number(d.exampleListenCount || 0) > 0);
@@ -5161,7 +5292,7 @@ export async function getTeacherInterventions(userId: string): Promise<any[]> {
 	});
 }
 
-/** Marks pending interventions as 'improved' when all assigned remedial words are passed (GOP >= 70) after assignment OR overall average GOP reaches >= 75%. Returns rows updated. */
+/** Marks pending interventions as 'improved' when all assigned remedial words are passed (GOP >= 70) after assignment OR post-intervention average GOP reaches >= 75%. Returns rows updated. */
 export async function checkAndUpdateInterventionStatus(): Promise<number> {
 	const client = getDb();
 	if (!client) return 0;
@@ -5184,10 +5315,14 @@ export async function checkAndUpdateInterventionStatus(): Promise<number> {
 			if (rawWords.length > 0) {
 				const evalRes = await client.execute({
 					sql: 'SELECT word_id, MAX(gop_overall) as max_gop FROM pronunciation_evaluations WHERE user_id = ? AND created_at >= ? GROUP BY word_id',
-					args: [uid, createdAt - 60000]
+					args: [uid, createdAt]
 				});
 				const passedSet = new Set(
-					evalRes.rows.filter((r) => Number(r.max_gop || 0) >= 70).map((r) => String(r.word_id))
+					evalRes.rows.filter((r) => {
+						const rawGop = Number(r.max_gop || 0);
+						const normGop = rawGop > 0 && rawGop <= 1 ? rawGop * 100 : rawGop;
+						return normGop >= 70;
+					}).map((r) => String(r.word_id))
 				);
 				if (rawWords.every((w) => passedSet.has(w))) {
 					await client.execute({
@@ -5195,30 +5330,38 @@ export async function checkAndUpdateInterventionStatus(): Promise<number> {
 						args: [id]
 					});
 					updatedCount++;
+					continue;
 				}
+			}
+
+			// Check post-intervention average GOP (normalized to 0-100 scale, requiring practice after assignment)
+			const postAvgRes = await client.execute({
+				sql: `
+					SELECT COUNT(*) as cnt,
+					       AVG(CASE WHEN gop_score > 0 AND gop_score <= 1 THEN gop_score * 100.0 ELSE gop_score END) as avg_gop
+					FROM (
+						SELECT gop_overall AS gop_score FROM pronunciation_evaluations WHERE user_id = ? AND created_at >= ?
+						UNION ALL
+						SELECT gop_overall AS gop_score FROM assessment_records WHERE user_id = ? AND created_at >= ?
+					)
+				`,
+				args: [uid, createdAt, uid, createdAt]
+			});
+			const postCnt = Number(postAvgRes.rows[0]?.cnt || 0);
+			const postAvgGop = Number(postAvgRes.rows[0]?.avg_gop || 0);
+			if (postCnt > 0 && postAvgGop >= 75) {
+				await client.execute({
+					sql: "UPDATE teacher_interventions SET status = 'improved' WHERE id = ?",
+					args: [id]
+				});
+				updatedCount++;
 			}
 		}
 	} catch (e) {
 		console.warn('Failed per-word intervention status check:', e);
 	}
 
-	const res = await client.execute(`
-		UPDATE teacher_interventions
-		SET status = 'improved'
-		WHERE status = 'pending'
-		  AND user_id IN (
-			SELECT user_id FROM (
-				SELECT user_id, AVG(gop_score) AS avg_gop
-				FROM (
-					SELECT user_id, gop_overall AS gop_score FROM pronunciation_evaluations
-					UNION ALL
-					SELECT user_id, gop_overall AS gop_score FROM assessment_records
-				)
-				GROUP BY user_id
-			) WHERE avg_gop >= 75
-		)
-	`);
-	return updatedCount + (res.rowsAffected ?? 0);
+	return updatedCount;
 }
 
 export async function getAllTeacherInterventions(): Promise<any[]> {

@@ -5,7 +5,6 @@ import {
 	findUserByUsername,
 	verifyPassword,
 	createSession,
-	deleteSession,
 	getResearchExportStats,
 	getUserFullDetail,
 	getStageTelemetryStats,
@@ -37,7 +36,7 @@ import { checkLoginProtection, handleLoginFailure, handleLoginSuccess } from '$l
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
-	const { locals, url, cookies } = event;
+	const { locals, url } = event;
 	const currentUser = locals.realAdmin || locals.user;
 
 	// Show login form inline when anonymous
@@ -50,13 +49,7 @@ export const load: PageServerLoad = async (event) => {
 		};
 	}
 	if (!currentUser.isAdmin) {
-		const token = cookies.get('session');
-		if (token) {
-			await deleteSession(token).catch(() => {});
-		}
-		cookies.delete('session', { path: '/' });
-		cookies.delete('impersonate_user_id', { path: '/' });
-		throw redirect(303, '/admin');
+		throw redirect(302, '/');
 	}
 
 	const selectedUserId = url.searchParams.get('userId')
@@ -78,8 +71,7 @@ export const load: PageServerLoad = async (event) => {
 		participationTrend,
 		practiceBreakdown,
 		selectedUserDetail,
-		questAnalytics,
-		pitchAnalytics,
+		advancedAnalytics,
 		flashcardAnalytics
 	] = await Promise.all([
 		getSkillsAnalyticsSummary(),
@@ -95,9 +87,10 @@ export const load: PageServerLoad = async (event) => {
 		getPracticeBreakdown(),
 		selectedUserId ? getUserFullDetail(selectedUserId) : Promise.resolve(null),
 		getAdvancedLearningAnalytics('stage'),
-		getAdvancedLearningAnalytics('word'),
 		getFlashcardAnalytics()
 	]);
+	const questAnalytics = advancedAnalytics;
+	const pitchAnalytics = advancedAnalytics;
 
 	const learnerUsers = users.filter((u) => !u.isAdmin);
 	const adminUsers = users.filter((u) => u.isAdmin);
@@ -118,7 +111,7 @@ export const load: PageServerLoad = async (event) => {
 		const cur = completionsByUser.get(c.userId) ?? {};
 		cur[c.lessonKey] = c.stars;
 		completionsByUser.set(c.userId, cur);
-		if (c.stars > 0) {
+		if (c.stars > 0 && !adminUserIdSet.has(c.userId)) {
 			completionsCountByStage[c.lessonKey] = (completionsCountByStage[c.lessonKey] || 0) + 1;
 		}
 	}

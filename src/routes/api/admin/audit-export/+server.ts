@@ -35,17 +35,28 @@ function formatThaiDate(ts: number): string {
 
 function escapeCsv(val: any): string {
 	if (val === null || val === undefined) return '""';
-	const str = String(val).replace(/"/g, '""');
-	return `"${str}"`;
+	let str = String(val);
+	// Neutralize CSV Formula Injection by prefixing a single quote on cells starting with =, +, -, @, \t, \r
+	if (/^[=+\-@\t\r]/.test(str)) {
+		str = `'${str}`;
+	}
+	return `"${str.replace(/"/g, '""')}"`;
 }
 
-export const GET: RequestHandler = async ({ locals }) => {
+export const GET: RequestHandler = async ({ locals, url }) => {
 	const admin = locals.realAdmin || locals.user;
 	if (!admin?.isAdmin) {
 		throw error(403, 'Forbidden: Admin access required');
 	}
 
-	const logs = await getAuditLogs(1000);
+	const limitParam = Math.min(Math.max(1, Math.floor(Number(url.searchParams.get('limit')) || 1000)), 10000);
+	const daysParam = url.searchParams.has('days')
+		? Math.min(Math.max(1, Math.floor(Number(url.searchParams.get('days')) || 30)), 3650)
+		: null;
+	const cutoffMs = daysParam ? Date.now() - daysParam * 24 * 60 * 60 * 1000 : 0;
+
+	const rawLogs = await getAuditLogs(limitParam);
+	const logs = cutoffMs > 0 ? rawLogs.filter((l) => Number(l.createdAt || 0) >= cutoffMs) : rawLogs;
 
 	// Record that admin exported audit logs
 	await recordAuditLog({
