@@ -6,6 +6,7 @@
 	import InAppBrowserGuard from '$lib/components/InAppBrowserGuard.svelte';
 	import AssessmentPromptModal from '$lib/components/AssessmentPromptModal.svelte';
 	import PdpaConsentModal from '$lib/components/PdpaConsentModal.svelte';
+	import MascotTutorial from '$lib/components/MascotTutorial.svelte';
 
 	let { children, data } = $props();
 
@@ -39,6 +40,7 @@
 
 {@render children()}
 <InAppBrowserGuard />
+<MascotTutorial />
 
 {#if data.showConsent && !data.user?.isAdmin && !data.user?.isImpersonated && !isAuthOrAdminPage}
 	<PdpaConsentModal user={data.user} initiallyOpen={data.showConsent} />
