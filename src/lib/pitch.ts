@@ -21,6 +21,18 @@ export type AudioCaptureDiagnostics = {
 	quality: 'ok' | 'no-signal' | 'low-signal' | 'noisy';
 };
 
+/** Shared timing and voice-gate settings for every microphone practice surface. */
+export const MICROPHONE_CAPTURE = {
+	maxDurationMs: 6000,
+	silenceAfterSpeechMs: 650,
+	minFramesBeforeSilenceCheck: 10,
+	minClarity: 0.32
+} as const;
+
+export function isUsableVoicePoint(point: PitchPoint): boolean {
+	return point.f0 >= 75 && point.f0 <= 480 && point.clarity >= MICROPHONE_CAPTURE.minClarity;
+}
+
 export type SyllableInfo = {
 	hanzi: string; // e.g. '白', '天'
 	pinyin: string; // e.g. 'bái', 'tiān'

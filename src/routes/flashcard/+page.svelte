@@ -42,6 +42,8 @@
 	} from '$lib/speech';
 	import {
 		RealtimePitchTracker,
+		MICROPHONE_CAPTURE,
+		isUsableVoicePoint,
 		analyzeMultiSyllableToneContour,
 		type PitchPoint,
 		type SyllableInfo,
@@ -244,21 +246,21 @@
 		let hasVoicedSpeech = false;
 
 		activePitchTracker.onPitchUpdate = (point, allPoints) => {
-			if (point.volume > 0.015 && point.f0 > 0 && point.clarity > 0.28) {
+			if (isUsableVoicePoint(point)) {
 				hasVoicedSpeech = true;
 			}
 
 			// Auto-stop: detect end of word when voice drops to silence
-			if (hasVoicedSpeech && allPoints.length >= 8) {
-				const recent = allPoints.slice(-6);
-				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.22);
+			if (hasVoicedSpeech && allPoints.length >= MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck) {
+				const recent = allPoints.slice(-MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck);
+				const isSilent = recent.every((p) => !isUsableVoicePoint(p));
 				if (isSilent) {
 					if (!silenceDebounce) {
 						silenceDebounce = setTimeout(() => {
 							if (isListening) {
 								stopVoicePractice();
 							}
-						}, 280);
+						}, MICROPHONE_CAPTURE.silenceAfterSpeechMs);
 					}
 				} else if (silenceDebounce) {
 					clearTimeout(silenceDebounce);
@@ -323,17 +325,18 @@
 			speechRecognizer = null;
 		}
 
+		const diagnostics = activePitchTracker.getDiagnostics();
 		const recordedPoints: PitchPoint[] = activePitchTracker.stop();
 		activePitchTracker = null;
 		const candidatePool = [speechTranscript, ...speechCandidates].filter((candidate) => Boolean(candidate.trim()));
-		const voicedFrames = recordedPoints.filter(
-			(point) => point.f0 >= 65 && point.f0 <= 550 && point.clarity > 0.18 && point.volume > 0.005
-		);
+		const voicedFrames = recordedPoints.filter(isUsableVoicePoint);
 		const maxVolume = Math.max(...recordedPoints.map((point) => point.volume || 0), 0);
 		const isRealHumanVoice = voicedFrames.length >= 2 && maxVolume >= 0.007;
 
 		if (!isRealHumanVoice && candidatePool.length === 0) {
-			voiceFeedback = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
+			voiceFeedback = diagnostics.quality === 'noisy'
+				? 'ตรวจพบเสียงรบกวนมาก แต่ยังแยกเสียงพูดไม่ได้ ลองพูดใกล้ไมโครโฟนขึ้นอีกเล็กน้อย'
+				: 'ยังไม่พบเสียงพูดที่ชัดเจน ลองพูดใหม่อีกครั้ง';
 			return;
 		}
 

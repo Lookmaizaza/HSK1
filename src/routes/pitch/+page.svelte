@@ -15,6 +15,8 @@
 	} from '$lib/speech';
 	import {
 		RealtimePitchTracker,
+		MICROPHONE_CAPTURE,
+		isUsableVoicePoint,
 		analyzeToneContour,
 		analyzeMultiSyllableToneContour,
 		TONE_PROFILES,
@@ -375,27 +377,27 @@
 			}
 		}
 
-		// Set max duration safety timeout (auto-stop after 4.2s for multi-syllables)
+		// Give the learner enough time to begin speaking after the mic opens.
 		if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
 		maxDurationTimeout = setTimeout(() => {
 			if (isRecording) {
 				stopRecording();
 			}
-		}, 4200);
+		}, MICROPHONE_CAPTURE.maxDurationMs);
 
 		tracker.onPitchUpdate = (point, all) => {
 			pitchPoints = [...all];
 			currentHz = point.f0;
 
 			// Check if voiced speech has been produced
-			if (point.f0 > 0 && point.clarity > 0.35 && point.volume > 0.012) {
+			if (isUsableVoicePoint(point)) {
 				hasVoicedSpeech = true;
 			}
 
 			// Auto silence detection after speech has occurred
-			if (hasVoicedSpeech && all.length >= 15) {
-				const recent = all.slice(-10);
-				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
+			if (hasVoicedSpeech && all.length >= MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck) {
+				const recent = all.slice(-MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck);
+				const isSilent = recent.every((p) => !isUsableVoicePoint(p));
 
 				if (isSilent) {
 					if (!silenceTimeout) {
@@ -403,7 +405,7 @@
 							if (isRecording) {
 								stopRecording();
 							}
-						}, 280);
+						}, MICROPHONE_CAPTURE.silenceAfterSpeechMs);
 					}
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
@@ -449,9 +451,16 @@
 
 		if (!tracker || !isRecording) return;
 
+		const diagnostics = tracker.getDiagnostics();
 		const recorded = tracker.stop();
 		isRecording = false;
 		currentHz = 0;
+		if (!diagnostics.speechDetected && speechTranscript.trim() === '' && speechCandidates.length === 0) {
+			errorMessage = diagnostics.quality === 'noisy'
+				? 'ตรวจพบเสียงรบกวนมาก แต่ยังแยกเสียงพูดไม่ได้ ลองพูดใกล้ไมโครโฟนขึ้นอีกเล็กน้อย'
+				: 'ยังไม่พบเสียงพูดที่ชัดเจน กรุณาลองพูดใหม่อีกครั้ง';
+			return;
+		}
 
 		// Perform AI Deep Learning Multi-Syllable Tone Analysis (syllable-by-syllable)
 		if (recorded.length > 0) {

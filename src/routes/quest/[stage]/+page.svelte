@@ -9,6 +9,8 @@
 	import { 
 		RealtimePitchTracker, 
 		analyzeMultiSyllableToneContour, 
+		MICROPHONE_CAPTURE,
+		isUsableVoicePoint,
 		type PitchPoint,
 		TONE_PROFILES
 	} from '$lib/pitch';
@@ -285,14 +287,14 @@
 		}
 
 		tracker.onPitchUpdate = (point, all) => {
-			if (point.f0 >= 65 && point.f0 <= 550 && point.clarity > 0.18 && point.volume > 0.005) {
+			if (isUsableVoicePoint(point)) {
 				hasVoicedSpeech = true;
 			}
-			if (hasVoicedSpeech && all.length >= 8) {
-				const recent = all.slice(-6);
-				const isSilent = recent.every((p) => p.volume < 0.008 || p.f0 <= 0 || p.clarity < 0.20);
+			if (hasVoicedSpeech && all.length >= MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck) {
+				const recent = all.slice(-MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck);
+				const isSilent = recent.every((p) => !isUsableVoicePoint(p));
 				if (isSilent) {
-					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), 260);
+					if (!silenceTimeout) silenceTimeout = setTimeout(() => stopRecording(), MICROPHONE_CAPTURE.silenceAfterSpeechMs);
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
 					silenceTimeout = null;
@@ -323,7 +325,7 @@
 			if (maxRecordTimeout) clearTimeout(maxRecordTimeout);
 			maxRecordTimeout = setTimeout(() => {
 				if (isRecording) stopRecording();
-			}, 3500);
+			}, MICROPHONE_CAPTURE.maxDurationMs);
 		} else {
 			isRecording = false;
 			if (speechRecognizer) {
@@ -355,6 +357,7 @@
 		}
 		speechRecognizer = null;
 
+		const diagnostics = tracker.getDiagnostics();
 		const recorded = tracker.stop();
 		isRecording = false;
 		if (isDestroyed) return;
@@ -368,15 +371,15 @@
 				].filter((c) => Boolean(c && c.trim()));
 
 				// 1. Voice Activity Check
-				const voicedFrames = recorded.filter(
-					(p) => p.f0 >= 65 && p.f0 <= 550 && p.clarity > 0.18 && p.volume > 0.005
-				);
+				const voicedFrames = recorded.filter(isUsableVoicePoint);
 				const maxVolume = Math.max(...recorded.map((p) => p.volume || 0), 0);
 				const isRealHumanVoice = (hasVoicedSpeech || voicedFrames.length >= 2) && (voicedFrames.length >= 2 || maxVolume >= 0.007);
 
 				if (candidatePool.length === 0 && !isRealHumanVoice && recorded.length < 5) {
 					feedbackType = 'error';
-					feedbackMessage = 'ไม่พบเสียงพูด ลองใหม่อีกครั้ง';
+					feedbackMessage = diagnostics.quality === 'noisy'
+						? 'ตรวจพบเสียงรบกวนมาก แต่ยังแยกเสียงพูดไม่ได้ ลองพูดใกล้ไมโครโฟนขึ้นอีกเล็กน้อย'
+						: 'ยังไม่พบเสียงพูดที่ชัดเจน ลองพูดใหม่อีกครั้ง';
 					scheduleFeedbackTimer(() => {
 						if (feedbackType === 'error') feedbackType = 'none';
 					}, 1500);

@@ -15,6 +15,8 @@
 	} from '$lib/speech';
 	import {
 		RealtimePitchTracker,
+		MICROPHONE_CAPTURE,
+		isUsableVoicePoint,
 		analyzeToneContour,
 		analyzeMultiSyllableToneContour,
 		TONE_PROFILES,
@@ -494,19 +496,19 @@
 			if (isRecording) {
 				stopRecording();
 			}
-		}, 5200);
+		}, MICROPHONE_CAPTURE.maxDurationMs);
 
 		tracker.onPitchUpdate = (point, all) => {
 			pitchPoints = [...all];
 			currentHz = point.f0;
 
-			if (point.f0 > 0 && point.clarity > 0.32) {
+			if (isUsableVoicePoint(point)) {
 				hasVoicedSpeech = true;
 			}
 
-			if (hasVoicedSpeech && all.length >= 10) {
-				const recent = all.slice(-8);
-				const isSilent = recent.every((p) => p.f0 <= 0 || p.clarity < 0.25);
+			if (hasVoicedSpeech && all.length >= MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck) {
+				const recent = all.slice(-MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck);
+				const isSilent = recent.every((p) => !isUsableVoicePoint(p));
 
 				if (isSilent) {
 					if (!silenceTimeout) {
@@ -514,7 +516,7 @@
 							if (isRecording) {
 								stopRecording();
 							}
-						}, 550);
+						}, MICROPHONE_CAPTURE.silenceAfterSpeechMs);
 					}
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);

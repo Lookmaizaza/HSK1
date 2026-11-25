@@ -6,7 +6,7 @@
 	import { getFlashcardSets } from '$lib/data/flashcardData';
 	import { getBossAssessmentConfig, getLearnerStage, MAX_LEARNER_LEVEL, XP_PER_LEVEL } from '$lib/gamification';
 	import { progress } from '$lib/progress.svelte';
-	import { RealtimePitchTracker, analyzeToneContour, type PitchPoint } from '$lib/pitch';
+	import { RealtimePitchTracker, analyzeToneContour, MICROPHONE_CAPTURE, isUsableVoicePoint, type PitchPoint } from '$lib/pitch';
 	import { initToneNeuralNetwork, predictToneNeuralNetwork } from '$lib/onnxTonePredictor';
 	import { 
 		Mic, 
@@ -212,20 +212,20 @@
 			pitchPoints = all;
 			currentVolume = point.volume;
 
-			if (point.volume > 0.015 && point.f0 > 0 && point.clarity > 0.28) {
+			if (isUsableVoicePoint(point)) {
 				hasVoiced = true;
 			}
 
 			// Auto-stop when voice ends
-			if (hasVoiced && all.length >= 8) {
-				const recent = all.slice(-6);
-				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.22);
+			if (hasVoiced && all.length >= MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck) {
+				const recent = all.slice(-MICROPHONE_CAPTURE.minFramesBeforeSilenceCheck);
+				const isSilent = recent.every((p) => !isUsableVoicePoint(p));
 				if (isSilent) {
 					if (!silenceTimeout) {
 						silenceTimeout = setTimeout(() => {
 							silenceTimeout = null;
 							if (isRecording) stopRecording();
-						}, 280);
+						}, MICROPHONE_CAPTURE.silenceAfterSpeechMs);
 					}
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
@@ -245,12 +245,12 @@
 		}
 		if (ok) {
 			isRecording = true;
-			// Max recording window for one syllable: 3 seconds
+			// Give the learner enough time to begin speaking after the mic opens.
 			if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
 			maxDurationTimeout = setTimeout(() => {
 				maxDurationTimeout = null;
 				if (isRecording) stopRecording();
-			}, 3000);
+			}, MICROPHONE_CAPTURE.maxDurationMs);
 		} else {
 			isRecording = false;
 		}
@@ -279,6 +279,14 @@
 	async function evaluateRecording() {
 		isEvaluating = true;
 		try {
+			const diagnostics = tracker?.getDiagnostics();
+			if (diagnostics && !diagnostics.speechDetected) {
+				errorMessage = diagnostics.quality === 'noisy'
+					? 'ตรวจพบเสียงรบกวนมาก ระบบกรองเสียงแล้ว แต่ยังแยกเสียงพูดไม่ได้ ลองพูดใกล้ไมโครโฟนขึ้นอีกเล็กน้อย'
+					: 'ยังไม่พบเสียงพูดที่ชัดเจน กรุณากดไมค์แล้วพูดคำตอบอีกครั้ง';
+				isEvaluating = false;
+				return;
+			}
 			if (pitchPoints.length < 5) {
 				errorMessage = 'เสียงเบาหรือสั้นเกินไป กรุณากดไมโครโฟนแล้วเปล่งเสียงใหม่อีกครั้ง';
 				isEvaluating = false;
