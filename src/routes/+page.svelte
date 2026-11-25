@@ -109,6 +109,7 @@
 	let currentHz = $state(0);
 	let analysisResult = $state<MultiSyllableAnalysisResult | null>(null);
 	let errorMessage = $state<string | null>(null);
+	let speechRecognitionWarning = $state<string | null>(null);
 	let recognizedWord = $state<string>('');
 
 	// Listening Behavior Telemetry State
@@ -123,6 +124,23 @@
 	let silenceTimeout: ReturnType<typeof setTimeout> | null = null;
 	let maxDurationTimeout: ReturnType<typeof setTimeout> | null = null;
 	let hasVoicedSpeech = false;
+
+	function formatMicrophoneError(error: Error): string {
+		const name = (error as Error & { name?: string }).name || '';
+		if (name === 'NotAllowedError' || name === 'SecurityError') {
+			return 'ไม่สามารถใช้ไมโครโฟนได้: เบราว์เซอร์ยังไม่ได้รับอนุญาตให้เข้าถึงไมโครโฟน';
+		}
+		if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+			return 'ไม่พบไมโครโฟนบนอุปกรณ์นี้';
+		}
+		if (name === 'NotReadableError' || name === 'TrackStartError') {
+			return 'ไมโครโฟนกำลังถูกใช้งานโดยโปรแกรมอื่น กรุณาลองใหม่อีกครั้ง';
+		}
+		if (name === 'OverconstrainedError') {
+			return 'ไม่สามารถเริ่มการรับเสียงด้วยการตั้งค่าปัจจุบันได้ กรุณาลองใหม่อีกครั้ง';
+		}
+		return `ไม่สามารถใช้งานไมโครโฟนได้: ${error.message || 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ'}`;
+	}
 
 	onMount(() => {
 		loadStats();
@@ -390,6 +408,7 @@
 		currentHz = 0;
 		analysisResult = null;
 		errorMessage = null;
+		speechRecognitionWarning = null;
 		recognizedWord = '';
 	}
 
@@ -420,7 +439,7 @@
 		if (!tracker) {
 			tracker = new RealtimePitchTracker();
 			tracker.onError = (err) => {
-				errorMessage = `ไมโครโฟนไม่พร้อมใช้งาน: ${err.message}`;
+				errorMessage = formatMicrophoneError(err);
 				stopRecording();
 			};
 		}
@@ -456,7 +475,14 @@
 							}
 						}
 					};
-					speechRecognizer.onerror = () => {};
+					speechRecognizer.onerror = (event: any) => {
+						const speechError = event?.error;
+						if (speechError && speechError !== 'no-speech' && speechError !== 'aborted') {
+							speechRecognitionWarning = speechError === 'not-allowed'
+								? 'ระบบรู้จำคำพูดไม่ได้รับสิทธิ์ แต่ยังสามารถวิเคราะห์ระดับเสียงได้'
+								: 'ระบบรู้จำคำพูดขัดข้องชั่วคราว แต่ยังสามารถวิเคราะห์ระดับเสียงได้';
+						}
+					};
 					speechRecognizer.onend = () => {};
 					speechRecognizer.start();
 				}
@@ -468,19 +494,19 @@
 			if (isRecording) {
 				stopRecording();
 			}
-		}, 4200);
+		}, 5200);
 
 		tracker.onPitchUpdate = (point, all) => {
 			pitchPoints = [...all];
 			currentHz = point.f0;
 
-			if (point.f0 > 0 && point.clarity > 0.35 && point.volume > 0.012) {
+			if (point.f0 > 0 && point.clarity > 0.32) {
 				hasVoicedSpeech = true;
 			}
 
 			if (hasVoicedSpeech && all.length >= 10) {
 				const recent = all.slice(-8);
-				const isSilent = recent.every((p) => p.volume < 0.012 || p.f0 <= 0 || p.clarity < 0.25);
+				const isSilent = recent.every((p) => p.f0 <= 0 || p.clarity < 0.25);
 
 				if (isSilent) {
 					if (!silenceTimeout) {
@@ -488,7 +514,7 @@
 							if (isRecording) {
 								stopRecording();
 							}
-						}, 280);
+						}, 550);
 					}
 				} else if (silenceTimeout) {
 					clearTimeout(silenceTimeout);
@@ -535,6 +561,16 @@
 		const recorded = tracker.stop();
 		isRecording = false;
 		currentHz = 0;
+		const diagnostics = tracker.getDiagnostics();
+
+		if (!diagnostics.speechDetected) {
+			errorMessage = diagnostics.quality === 'noisy'
+				? 'ตรวจพบสัญญาณรบกวน แต่ยังแยกเสียงพูดที่ชัดเจนไม่ได้ ระบบกรองเฟรมรบกวนออกแล้ว กรุณาพูดใกล้ไมโครโฟนขึ้นเล็กน้อยแล้วลองใหม่'
+				: diagnostics.quality === 'low-signal'
+					? 'ตรวจพบเสียงเบาเกินไป กรุณาพูดให้ชัดหรือขยับเข้าใกล้ไมโครโฟนขึ้นเล็กน้อยแล้วลองใหม่'
+					: 'ยังไม่พบเสียงพูดที่ใช้วิเคราะห์ได้ กรุณาลองพูดอีกครั้ง';
+			return;
+		}
 
 		if (recorded.length > 0) {
 			const syllablesToAnalyze = selectedPreset.syllables && selectedPreset.syllables.length > 0
@@ -1199,6 +1235,12 @@
 				<div class="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
 					<AlertCircle class="size-5 shrink-0 text-rose-600 dark:text-rose-400" />
 					<span>{errorMessage}</span>
+				</div>
+			{/if}
+			{#if speechRecognitionWarning && !errorMessage}
+				<div class="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+					<AlertTriangle class="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+					<span>{speechRecognitionWarning}</span>
 				</div>
 			{/if}
 

@@ -38,8 +38,8 @@
 		3: examHsk3
 	};
 
-	let selectedLevel = $state<number>(1);
-	let currentExam = $derived(EXAM_SETS[selectedLevel] || examHsk1);
+	let selectedLevel = $state<number | null>(null);
+	let currentExam = $derived(EXAM_SETS[selectedLevel ?? 1] || examHsk1);
 
 	// Exam Modes: 'lobby' (เลือกระดับ/โหมด), 'testing' (กำลังทำข้อสอบ), 'result' (ดูคะแนนและเฉลย)
 	let examState = $state<'lobby' | 'testing' | 'result'>('lobby');

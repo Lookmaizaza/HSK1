@@ -11,6 +11,16 @@ export type PitchPoint = {
 	chaoLevel: number; // 1.0 to 5.0 Chao pitch level
 };
 
+export type AudioCaptureDiagnostics = {
+	frames: number;
+	voicedFrames: number;
+	noiseFrames: number;
+	noiseFloor: number;
+	speechThreshold: number;
+	speechDetected: boolean;
+	quality: 'ok' | 'no-signal' | 'low-signal' | 'noisy';
+};
+
 export type SyllableInfo = {
 	hanzi: string; // e.g. '白', '天'
 	pinyin: string; // e.g. 'bái', 'tiān'
@@ -779,6 +789,11 @@ export class RealtimePitchTracker {
 	private isRunning = false;
 	private recordedPoints: PitchPoint[] = [];
 	private startTime = 0;
+	private calibrationVolumes: number[] = [];
+	private noiseFloor = 0.008;
+	private speechThreshold = 0.012;
+	private voicedFrames = 0;
+	private noiseFrames = 0;
 
 	public onPitchUpdate?: (point: PitchPoint, allPoints: PitchPoint[]) => void;
 	public onError?: (error: Error) => void;
@@ -818,7 +833,16 @@ export class RealtimePitchTracker {
 			// 2. Lowpass (1200 Hz): Strips high-frequency hiss, keyboard typing clatter, electronic noise
 			const lowpassFilter = this.audioContext.createBiquadFilter();
 			lowpassFilter.type = 'lowpass';
-			lowpassFilter.frequency.value = 1200;
+			lowpassFilter.frequency.value = 1400;
+
+			// Keep the speech band prominent while the browser's built-in
+			// noise suppression handles device-specific background noise.
+			const compressor = this.audioContext.createDynamicsCompressor();
+			compressor.threshold.value = -45;
+			compressor.knee.value = 18;
+			compressor.ratio.value = 4;
+			compressor.attack.value = 0.003;
+			compressor.release.value = 0.12;
 
 			this.analyserNode = this.audioContext.createAnalyser();
 			this.analyserNode.fftSize = 2048;
@@ -826,11 +850,17 @@ export class RealtimePitchTracker {
 			// Connect audio pipeline: Source -> Highpass -> Lowpass -> Analyser
 			this.sourceNode.connect(highpassFilter);
 			highpassFilter.connect(lowpassFilter);
-			lowpassFilter.connect(this.analyserNode);
+			lowpassFilter.connect(compressor);
+			compressor.connect(this.analyserNode);
 
 			this.buffer = new Float32Array(this.analyserNode.fftSize);
 			this.isRunning = true;
 			this.recordedPoints = [];
+			this.calibrationVolumes = [];
+			this.noiseFloor = 0.008;
+			this.speechThreshold = 0.012;
+			this.voicedFrames = 0;
+			this.noiseFrames = 0;
 			this.startTime = performance.now();
 
 			this.tick();
@@ -847,11 +877,28 @@ export class RealtimePitchTracker {
 
 		this.analyserNode.getFloatTimeDomainData(this.buffer as unknown as Float32Array<ArrayBuffer>);
 		const result = detectPitchYIN(this.buffer, this.audioContext.sampleRate);
+
+		// Estimate the local background level from the first short window. Use
+		// an upper-middle percentile so a user who starts speaking immediately
+		// does not make the gate too strict.
+		if (this.calibrationVolumes.length < 18) {
+			this.calibrationVolumes.push(result.volume);
+			if (this.calibrationVolumes.length === 18) {
+				const sorted = [...this.calibrationVolumes].sort((a, b) => a - b);
+				this.noiseFloor = sorted[Math.floor(sorted.length * 0.6)] || 0.008;
+				this.speechThreshold = Math.min(0.045, Math.max(0.009, this.noiseFloor * 1.8 + 0.003));
+			}
+		}
+
+		const aboveNoiseGate = result.volume >= this.speechThreshold;
+		const hasPitch = result.f0 > 0 && result.clarity >= 0.32;
+		if (aboveNoiseGate && hasPitch) this.voicedFrames++;
+		else if (result.volume > this.noiseFloor * 1.25) this.noiseFrames++;
 		const now = performance.now();
 		const timeMs = Math.round(now - this.startTime);
 
 		// Voice Activity Gate: Reject non-human speech sounds (outside 75-480Hz or low harmonic periodicity)
-		const isHumanVoice = result.f0 >= 75 && result.f0 <= 480 && result.clarity >= 0.32 && result.volume >= 0.007;
+		const isHumanVoice = aboveNoiseGate && result.f0 >= 75 && result.f0 <= 480 && result.clarity >= 0.32;
 		const cleanF0 = isHumanVoice ? result.f0 : 0;
 		const cleanChao = isHumanVoice ? hzToChao(cleanF0) : 0;
 
@@ -891,6 +938,28 @@ export class RealtimePitchTracker {
 
 	getRecordedPoints(): PitchPoint[] {
 		return [...this.recordedPoints];
+	}
+
+	getDiagnostics(): AudioCaptureDiagnostics {
+		const frames = this.recordedPoints.length;
+		const speechDetected = this.voicedFrames >= 3;
+		const quality = speechDetected
+			? 'ok'
+			: this.noiseFrames > Math.max(8, frames * 0.35)
+				? 'noisy'
+				: frames > 12 && this.recordedPoints.every((point) => point.volume < this.speechThreshold)
+					? 'low-signal'
+					: 'no-signal';
+
+		return {
+			frames,
+			voicedFrames: this.voicedFrames,
+			noiseFrames: this.noiseFrames,
+			noiseFloor: this.noiseFloor,
+			speechThreshold: this.speechThreshold,
+			speechDetected,
+			quality
+		};
 	}
 
 	clear() {
